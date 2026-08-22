@@ -13,7 +13,7 @@ README/checks sheets are ignored — nothing reads them yet.
 """
 import sys, os, glob, re, csv, io
 
-TABLES = ["emotions", "abilities", "matchups", "units", "rules", "sounds"]
+TABLES = ["emotions", "abilities", "matchups", "units", "dialogue", "rules", "sounds"]
 
 # spreadsheet-side balancing helpers — meaningless at runtime, so they are
 # stripped rather than shipped into data.js
@@ -28,6 +28,7 @@ HEADER_COMMENTS = {
  "units":     "layers are outermost-first and rotate as they take hits. pool = usable abilities.",
  "rules":     "global tunables, read by name.",
  "sounds":    "synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.",
+ "dialogue":  "what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one\n   persona at random from the rows matching the enemy's emotion.",
 }
 
 def find(folder, table):
@@ -45,7 +46,7 @@ def clean(path):
         rows = [r for r in csv.reader(fh)]
     rows = [r for r in rows if any(c.strip() for c in r)]
     # the header row is the first one whose first cell is a known key column
-    keys = {"id", "key", "attack_emotion"}
+    keys = {"id", "key", "attack_emotion", "emotion"}
     start = next((i for i, r in enumerate(rows) if r and r[0].strip() in keys), 0)
     rows = rows[start:]
     if len(rows) > 1 and rows[1] and rows[1][0].strip().upper() in ("LIVE", "PLANNED"):
@@ -140,6 +141,7 @@ const UNITS     = byId(parseCSV(DATA.units));
 const RULES     = Object.fromEntries(parseCSV(DATA.rules).map(r=>[r.key,r.value]));
 const SOUNDS    = byId(parseCSV(DATA.sounds));
 const MATCHUPS  = parseCSV(DATA.matchups);
+const DIALOGUE  = parseCSV(DATA.dialogue);
 '''
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(js)

@@ -47,20 +47,21 @@ body{background:var(--void); color:var(--ink);
 }
 .screen{display:flex; flex-direction:column; height:100%; padding:7px 7px 8px; gap:5px;
   position:relative; overflow:hidden; transition:filter 1.4s linear}
-.panel,.lane-wrap,.tray,.depart,.stage,.pstrip{position:relative; z-index:2}
+.panel,.lane-wrap,.tray,.depart,.btnrow,.pstrip{position:relative; z-index:3}
+.stage{position:relative; z-index:1}
 .panel{border:var(--px) solid var(--line); box-shadow:var(--bevel);
   background:linear-gradient(180deg,var(--panelHi) 0%,var(--panel) 58%,var(--dark) 100%)}
 
 /* ============ GAUGE ============ */
 .unit{padding:4px 11px}
-.gwrap{position:relative; height:62px}
-.gauge{position:absolute; left:0; right:0; top:23px; height:16px;
+.gwrap{position:relative; height:78px}
+.gauge{position:absolute; left:0; right:0; top:25px; height:28px;
   background:var(--void); border:var(--px) solid var(--line); box-shadow:var(--bevel);
   transition:box-shadow .3s linear, transform 1.2s linear}
 .gauge > .seg{position:absolute; top:0; bottom:0; transition:left .22s steps(6),width .22s steps(6)}
 .g-empty{left:0}
-.p .g-empty{background:rgba(53,214,176,.30); box-shadow:inset 0 0 12px rgba(53,214,176,.8)}
-.e .g-empty{background:rgba(255,77,61,.27);  box-shadow:inset 0 0 12px rgba(255,77,61,.75)}
+.p .g-empty{background:rgba(53,214,176,.52); box-shadow:inset 0 0 14px rgba(53,214,176,1)}
+.e .g-empty{background:rgba(255,77,61,.48);  box-shadow:inset 0 0 14px rgba(255,77,61,.95)}
 .g-dead{background-color:var(--deadred); background-image:var(--warn); background-size:8px 8px}
 .g-ec{left:0; background:linear-gradient(180deg,#ffe08a 0%,var(--euphoria) 45%,#c98f16 100%);
   box-shadow:0 0 7px rgba(255,198,61,.5)}
@@ -76,21 +77,36 @@ body{background:var(--void); color:var(--ink);
 @keyframes pulse{from{opacity:.55}to{opacity:.95}}
 .gauge::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:4;
   background:repeating-linear-gradient(90deg,transparent 0 4px,rgba(0,0,0,.34) 4px 5px)}
-.chev{position:absolute; top:18px; height:26px; width:15px; z-index:9; pointer-events:none;
+.chev{position:absolute; top:20px; height:38px; width:15px; z-index:9; pointer-events:none;
   transition:left .22s steps(6); filter:drop-shadow(0 0 4px var(--ink)) drop-shadow(0 0 10px var(--ink))}
 .chev svg{width:100%; height:100%; display:block}
 .chev.near{animation:doom .38s steps(2) infinite alternate}
 @keyframes doom{
   from{filter:drop-shadow(0 0 4px var(--ink)) drop-shadow(0 0 10px var(--ink))}
   to{filter:drop-shadow(0 0 8px var(--fury)) drop-shadow(0 0 18px var(--fury)) brightness(1.3)}}
-.g-proj{position:absolute; top:20px; height:22px; width:var(--px); background:var(--fury);
+/* the stretch of Mental Stamina still standing, bracketed between the two
+   chevrons by a thick white stroke top and bottom */
+.g-span{left:0; z-index:6; pointer-events:none; background:transparent;
+  border-top:3px solid #fff; border-bottom:3px solid #fff;
+  box-shadow:0 0 7px rgba(255,255,255,.75), 0 0 18px rgba(255,255,255,.30)}
+/* a hot filament at the leading edge of the charge */
+.g-ecedge{z-index:7; pointer-events:none; width:3px; background:#fffbe0;
+  box-shadow:0 0 5px #fff3a8, 0 0 13px var(--euphoria), 0 0 26px var(--euphoria)}
+.g-proj{position:absolute; top:22px; height:34px; width:var(--px); background:var(--fury);
   box-shadow:0 0 5px var(--fury); z-index:5; transition:left .22s steps(6)}
 /* value tags stay large — they are the only numbers on screen */
 .tag{position:absolute; transform:translateX(-50%); padding:2px 7px; font-size:17px;
   color:#0c0a16; letter-spacing:.02em; white-space:nowrap; z-index:12; line-height:1.2;
   transition:left .22s steps(6); box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7)}
 .tag.ms{top:0; background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0)}
-.tag.ec{bottom:0; background:linear-gradient(180deg,#ffe08a,var(--euphoria) 55%,#c98f16)}
+.tag.ec{bottom:0; color:#0c0a16;
+  background-image:linear-gradient(90deg,var(--fury),var(--euphoria),var(--stoic),
+    var(--sorrow),var(--nostalgia),var(--fury));
+  background-size:50vw 100%; background-repeat:repeat-x;
+  animation:floaty 3.4s ease-in-out infinite alternate, rainbow 7s linear infinite;
+  box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 12px rgba(255,255,255,.5)}
+.tag.ec.over{box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 18px var(--fury);
+  outline:var(--px) solid var(--fury); outline-offset:1px}
 .shieldpip{position:absolute; left:0; top:1px; width:13px; height:13px; color:var(--stoic);
   z-index:13; filter:drop-shadow(0 0 5px var(--stoic))}
 .hide{display:none !important}
@@ -149,6 +165,8 @@ body{background:var(--void); color:var(--ink);
 .term{flex:none; width:0; height:0; border-right:6px solid currentColor;
   border-top:5px solid transparent; border-bottom:5px solid transparent; filter:var(--drop)}
 .term.dead{color:var(--line); filter:none; opacity:.55}
+#pLane .term{border-right:0; border-left:6px solid currentColor}
+#pLane.zoom .term{border-left-width:9px}
 .lane.zoom .term{border-right-width:9px; border-top-width:7px; border-bottom-width:7px}
 .station{position:relative; flex:none; width:28px; height:28px;
   transition:width .3s steps(4),height .3s steps(4),transform .18s steps(3),filter .18s linear}
@@ -158,6 +176,20 @@ body{background:var(--void); color:var(--ink);
 .station.active{filter:drop-shadow(0 0 9px currentColor) drop-shadow(0 0 20px currentColor) brightness(1.45);
   transform:scale(1.3); z-index:6}
 .station.spent{opacity:.18}
+/* idle: a wave of swell-and-glow travelling along the line, plus a bobbing
+   float on the same phase. Player waves left to right, enemy right to left. */
+.lane .station{animation:stationIdle 2.4s ease-in-out infinite; animation-delay:var(--d,0s)}
+@keyframes stationIdle{
+  0%,100%{transform:translateY(0) scale(1); filter:none}
+  45%{transform:translateY(-4px) scale(1.10);
+      filter:drop-shadow(0 0 7px currentColor) brightness(1.2)}}
+.lane.zoom .station{animation:none}
+.station.active,.station.spent,.station.dragging{animation:none !important}
+.station.ghost{opacity:.85}
+.station.locked{animation:lockPulse .6s steps(2) infinite alternate !important}
+@keyframes lockPulse{
+  from{filter:drop-shadow(0 0 5px var(--fury)) saturate(1.6)}
+  to  {filter:drop-shadow(0 0 13px var(--fury)) brightness(1.4) saturate(2)}}
 
 /* ============ TRAY ============ */
 .tray{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:5px}
@@ -179,43 +211,279 @@ body{background:var(--void); color:var(--ink);
 .over h1{font-size:19px; letter-spacing:.22em}
 .over.win h1{color:var(--stoic); text-shadow:1px 2px 0 var(--void),0 0 14px var(--stoic)}
 .over.lose h1{color:var(--fury); text-shadow:1px 2px 0 var(--void),0 0 14px var(--fury)}
+
+/* ---- rainbow charge: gradient is screen-wide, only visible where charge reaches ---- */
+/* one tile is half the screen and starts and ends on the same hue, and the
+   animation shifts by exactly one tile — so the loop is seamless */
+.g-ec{background-image:linear-gradient(90deg,var(--fury),var(--euphoria),var(--stoic),
+    var(--sorrow),var(--nostalgia),var(--fury));
+  background-size:50vw 100%; background-repeat:repeat-x;
+  animation:rainbow 7s linear infinite; box-shadow:0 0 8px rgba(255,255,255,.25)}
+@keyframes rainbow{from{background-position:0 0} to{background-position:-50vw 0}}
+/* ---- destroyed capacity: bigger warning glyph, drifting diagonally ---- */
+.g-dead{background-size:16px 16px; animation:warndrift 4.5s linear infinite}
+@keyframes warndrift{from{background-position:0 0} to{background-position:16px 16px}}
+/* ---- the bar's own segmentation is chevrons too, matching the markers ---- */
+.gauge::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:4;
+  background-image:var(--chevpat); background-size:6px 19px; background-repeat:repeat}
+/* ---- markers ---- */
+.chev{transform-origin:50% 50%}
+.chev.cap{animation:none}
+.chev.ceil{animation:chevBreathe 2.6s ease-in-out infinite alternate}
+@keyframes chevBreathe{from{transform:scale(1)} to{transform:scale(1.16)}}
+.chev.ceil.strobe{animation:chevHurt .12s steps(2) 5 !important}
+@keyframes chevHurt{
+  0%{transform:scale(1.5) translateX(-4px); filter:brightness(2.4) drop-shadow(0 0 12px var(--fury))}
+  50%{transform:scale(.72) translateX(4px); filter:brightness(.6)}
+  100%{transform:scale(1.25); filter:brightness(1.8)}}
+/* ---- taking damage: the whole gauge block shakes and flashes magenta ---- */
+.gflash{position:absolute; inset:-5px; background:#ff2fd0; opacity:0; pointer-events:none;
+  z-index:20; mix-blend-mode:screen}
+.gwrap.hurt{animation:gshake .1s steps(2) 5}
+.gwrap.hurt .gflash{animation:magenta .1s steps(2) 5}
+@keyframes magenta{0%{opacity:.9} 100%{opacity:0}}
+@keyframes gshake{0%{transform:translate(-6px,2px)}50%{transform:translate(6px,-2px)}100%{transform:translate(0,0)}}
+/* ---- value tags: anchor holds the position, the tag itself idles ---- */
+.tanchor{position:absolute; z-index:12; transition:left .22s steps(6)}
+.tanchor.ms{top:0} .tanchor.ec{bottom:0}
+.tag{position:static; transform:none; animation:floaty 3.4s ease-in-out infinite alternate}
+.tanchor.ec .tag{animation-delay:-1.7s}
+@keyframes floaty{from{transform:translateY(2px)} to{transform:translateY(-3px)}}
+/* ---- flying ability ---- */
+.flyer{position:absolute; z-index:30; pointer-events:none;
+  filter:drop-shadow(0 0 14px currentColor) drop-shadow(0 0 30px currentColor) brightness(1.4)}
+.flyer svg{width:100%; height:100%; display:block}
+/* ---- shield break ---- */
+.shbreak{position:absolute; z-index:28; width:26px; height:26px; color:var(--stoic); pointer-events:none;
+  filter:drop-shadow(0 0 10px var(--stoic))}
+.shbreak svg{width:100%; height:100%}
+/* ---- charge segment station ---- */
+.station.chg{opacity:.9}
+/* ---- the EMOTIONS panel ---- */
+.btnrow{display:grid; grid-template-columns:1fr 1fr; gap:5px}
+.abilpanel{height:0; opacity:0; overflow:hidden; position:relative; z-index:3;
+  border:0 solid var(--line); box-shadow:var(--bevel); flex:none;
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 40%,var(--dark));
+  transition:height .46s cubic-bezier(.16,1,.3,1), opacity .28s ease,
+             border-width .46s cubic-bezier(.16,1,.3,1)}
+.abilpanel.open{height:33dvh; opacity:1; border-width:var(--px)}
+.abilscroll{height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:5px}
+.abrow{display:flex; align-items:center; gap:8px; padding:6px 5px; cursor:pointer;
+  border-bottom:1px solid rgba(91,79,160,.5)}
+.abrow:active{background:rgba(91,79,160,.28)}
+.abrow.dis{opacity:.34; pointer-events:none}
+.abline{display:flex; align-items:center; gap:0; flex:none}
+.abline .station{width:26px; height:26px}
+.abline .station.chg{width:15px; height:15px}
+.abline .link{width:7px; height:4px}
+.abinfo{display:flex; flex-direction:column; gap:3px; min-width:0}
+.abname{font-size:12px; letter-spacing:.08em}
+.pills{display:flex; gap:4px}
+.pill{font-size:10px; padding:1px 6px; color:#0c0a16; box-shadow:var(--bevel),1px 1px 0 rgba(6,4,14,.7)}
+.pill.rain{background-image:linear-gradient(90deg,var(--fury),var(--euphoria),var(--stoic),
+    var(--sorrow),var(--nostalgia),var(--fury));
+  background-size:50vw 100%; background-repeat:repeat-x; animation:rainbow 7s linear infinite}
+.pill.wht{background:linear-gradient(180deg,#fff,var(--ink) 60%,#c9c3b0)}
+
+/* ---------- background: darkens toward the top ---------- */
+.phone{background:linear-gradient(180deg,#08080c 0%,#100e1c 30%,#171331 62%,var(--dark) 100%)}
+/* ---------- the bar's chevron tiling is gone; the markers carry it now ---------- */
+.gauge::after{content:none}
+/* ---------- markers: brighter, thicker, outlined ---------- */
+.chev{width:26px; filter:drop-shadow(0 0 5px rgba(255,255,255,.95)) drop-shadow(0 0 15px rgba(190,215,255,.75))}
+.chev.near{animation:doom .38s steps(2) infinite alternate}
+@keyframes doom{
+  from{filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 16px var(--ink))}
+  to{filter:drop-shadow(0 0 12px var(--fury)) drop-shadow(0 0 26px var(--fury)) brightness(1.35)}}
+/* ---------- enemy: hovers, and lights the floor beneath it ---------- */
+.enemyholder{position:relative; display:flex; align-items:center; justify-content:center}
+.sprwrap{animation:hover 3.6s ease-in-out infinite alternate}
+@keyframes hover{from{transform:translateY(7px)} to{transform:translateY(-15px)}}
+.floorwrap{position:absolute; inset:0; opacity:0; transition:opacity .9s ease; pointer-events:none; z-index:-1}
+.floorwrap.lit{opacity:1}
+.floorlight{position:absolute; left:50%; bottom:-30px; width:78%; height:26px; pointer-events:none;
+  background:radial-gradient(ellipse at center, currentColor 0%, transparent 68%);
+  animation:floorpulse 3.6s ease-in-out infinite alternate; z-index:-1}
+/* down = tight and bright, up = wide and faint, exactly counter to the hover */
+@keyframes floorpulse{
+  from{transform:translateX(-50%) scale(.68); opacity:.9;  filter:blur(2px)}
+  to  {transform:translateX(-50%) scale(1.45); opacity:.22; filter:blur(7px)}}
+/* ---------- enemy defeat: the layers come apart and fall ---------- */
+.fallring{position:absolute; border-style:solid; border-color:currentColor; border-radius:50%;
+  z-index:33; pointer-events:none; filter:drop-shadow(0 0 12px currentColor)}
+/* ---------- opening sequence ---------- */
+/* the enemy speaks before the interface arrives, so the bubble must be exempt
+   from the pre-intro blackout too */
+.screen.preintro > *:not(.intro):not(.flash):not(.stage):not(.title):not(.howto):not(.bubblewrap){opacity:0}
+.intro{position:absolute; inset:0; z-index:70; overflow:hidden; background:#000}
+.intro.clear{background:transparent}
+.introrail{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(135deg);
+  transform-origin:50% 50%; width:2200px; height:120px}
+.introtrack{position:absolute; left:50%; top:50%; transform:translateY(-50%); height:100%}
+.introtrack .rail{position:absolute; left:-1600px; width:3200px; top:50%; height:12px;
+  transform:translateY(-50%); background:#fff; box-shadow:0 0 22px #fff, 0 0 60px rgba(255,255,255,.6)}
+.introstation{position:absolute; top:50%; width:78px; height:78px; transform:translate(-50%,-50%);
+  border:12px solid #fff; border-radius:50%; background:#000;
+  box-shadow:0 0 26px #fff, 0 0 70px rgba(255,255,255,.5), inset 0 0 14px rgba(255,255,255,.55)}
+/* black circle, but with a blazing leading edge so the wipe is legible on black */
+/* sized to just cover the screen diagonal, so its edge sweeps visibly */
+.introwipe{position:absolute; left:50%; top:50%; width:118vmax; height:118vmax; border-radius:50%;
+  background:#000; transform:translate(-50%,-50%) scale(0);
+  box-shadow:0 0 0 7px #fff, 0 0 46px 12px #fff}
+
+/* ---------- enemy dialogue ----------
+   The wrapper is unclipped so the tail and the drop shadow can escape; the
+   body and the black stroke behind it are two stacked pixel-cornered plates. */
+.bubblewrap{position:absolute; left:50%; transform:translateX(-50%); width:86%; max-width:360px;
+  z-index:80; pointer-events:none; filter:drop-shadow(5px 7px 0 rgba(0,0,0,.9))}
+.bubbleborder{position:absolute; inset:-4px; background:#000; z-index:0}
+.bubble{position:relative; z-index:1; padding:11px 14px; background:var(--c);
+  color:#fff; text-shadow:2px 2px 0 #000, 3px 3px 0 rgba(0,0,0,.55);
+  font-size:12.5px; line-height:1.5; letter-spacing:.03em; text-transform:none; font-weight:700}
+.bubble .tailslot{display:none}
+.tail{position:absolute; top:-19px; width:0; height:0; z-index:2; transform:translateX(-50%);
+  border-left:15px solid transparent; border-right:15px solid transparent;
+  border-bottom:19px solid #000}
+.tail::after{content:""; position:absolute; left:-10px; top:5px; width:0; height:0;
+  border-left:10px solid transparent; border-right:10px solid transparent;
+  border-bottom:13px solid var(--c)}
+/* ---------- the persona's name, hanging over the enemy ---------- */
+.personaname{position:absolute; left:50%; top:-30px; white-space:nowrap; z-index:4;
+  font-size:12px; letter-spacing:.24em; color:var(--c); min-height:1em;
+  text-shadow:2px 2px 0 #000, 0 0 16px currentColor;
+  animation:namefloat 4.6s ease-in-out infinite alternate; pointer-events:none}
+.personaname.typing{font-size:15px;
+  animation:namefloat 4.6s ease-in-out infinite alternate, nameGlow .5s steps(2) infinite alternate}
+@keyframes nameGlow{
+  from{text-shadow:2px 2px 0 #000, 0 0 10px currentColor}
+  to  {text-shadow:2px 2px 0 #000, 0 0 26px currentColor, 0 0 52px currentColor}}
+@keyframes namefloat{
+  from{transform:translateX(-50%) translateY(0)}
+  to  {transform:translateX(-50%) translateY(-8px)}}
+
+/* ---------- title screen ---------- */
+.title{position:absolute; inset:0; z-index:90; background:#000; display:flex;
+  align-items:center; justify-content:center; transition:opacity .5s ease}
+.title.gone{opacity:0; pointer-events:none}
+.titlewrap{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center}
+.titlemain{font-size:26px; letter-spacing:.30em; color:#fff;
+  text-shadow:2px 3px 0 #000, 0 0 24px rgba(255,255,255,.55)}
+.titlesub{font-size:52px; letter-spacing:.20em; color:var(--fury); margin-top:-2px;
+  text-shadow:3px 4px 0 #000, 0 0 30px var(--fury)}
+.titletag{font-size:9px; letter-spacing:.30em; color:var(--apathy); margin-top:6px}
+.confront{margin-top:34px; padding:13px 22px; font:inherit; font-size:12px; letter-spacing:.18em;
+  cursor:pointer; color:var(--void); border:var(--px) solid var(--ink); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,#ffe08a,var(--euphoria) 55%,#c98f16);
+  animation:confrontPulse 1.6s ease-in-out infinite alternate}
+.confront:active{transform:translate(1px,1px)}
+@keyframes confrontPulse{
+  from{box-shadow:var(--bevel), 0 0 10px rgba(255,198,61,.5)}
+  to  {box-shadow:var(--bevel), 0 0 26px rgba(255,198,61,.95)}}
+
+/* ---------- how to play ---------- */
+.howto{position:absolute; inset:0; z-index:92; background:#000; display:none;
+  flex-direction:column; align-items:center; justify-content:center; gap:7px;
+  padding:12px 13px; overflow-y:auto}
+.step .v em{font-style:normal; color:var(--euphoria)}
+.howlead{font-size:13px; letter-spacing:.04em; color:var(--apathy); text-align:center;
+  line-height:1.4; text-transform:none; margin-top:-4px}
+.howto.show{display:flex}
+.howto h2{font-size:19px; letter-spacing:.20em; color:var(--ink); text-shadow:2px 2px 0 #000}
+.steps{display:flex; flex-direction:column; gap:6px; width:100%; max-width:340px}
+.step{display:flex; align-items:center; gap:11px; padding:8px 11px;
+  border:var(--px) solid var(--line); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark))}
+.step .num{flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  font-size:19px; color:var(--void); background:var(--c);
+  box-shadow:var(--bevel),1px 1px 0 rgba(0,0,0,.8)}
+.step .txt{display:flex; flex-direction:column; gap:1px; min-width:0}
+.step .k{font-size:18px; letter-spacing:.13em; color:var(--c)}
+.step .v{font-size:15px; letter-spacing:.01em; color:var(--ink); text-transform:none; line-height:1.3}
 </style>
 
 <div class="phone">
- <div class="screen" id="screen">
+ <div class="screen preintro" id="screen">
   <div class="flash" id="flash"></div>
+  <div class="title" id="title"><div class="titlewrap">
+    <div class="titlemain">NEURO-METRO</div>
+    <div class="titlesub">AVUI</div>
+    <div class="titletag">PARAL&middot;LEL SPIN-OFF &middot; COMBAT PROTOTYPE</div>
+    <button class="confront pxr pxr-sh" id="confrontBtn">CONFRONT EMOTION</button>
+    <button class="confront rest pxr pxr-sh" id="howtoBtn"
+      style="margin-top:9px;background:linear-gradient(180deg,#b3a7d0,var(--apathy) 55%,#5d5378);color:var(--ink);animation:none">HOW TO PLAY</button>
+  </div></div>
+  <div class="howto" id="howto">
+    <h2>HOW TO PLAY</h2>
+    <p class="howlead">Emotional Entities wander the line.<br>Confront them without losing yourself.</p>
+    <div class="steps">
+      <div class="step pxr" style="--c:var(--fury)"><div class="num pxr">1</div>
+        <div class="txt"><span class="k">CONFRONT</span>
+        <span class="v">Break the Entity&rsquo;s emotional layers before it breaks yours.</span></div></div>
+      <div class="step pxr" style="--c:var(--euphoria)"><div class="num pxr">2</div>
+        <div class="txt"><span class="k">SUMMON</span>
+        <span class="v">Spend Emotional Charge (EC) to summon abilities onto your Metro Line. It runs right to left.</span></div></div>
+      <div class="step pxr" style="--c:var(--sorrow)"><div class="num pxr">3</div>
+        <div class="txt"><span class="k">MATCH</span>
+        <span class="v">Match a layer&rsquo;s emotion and it absorbs the blow &mdash; half damage, and it charges them. Strip them all and hits land double.</span></div></div>
+      <div class="step pxr" style="--c:var(--stoic)"><div class="num pxr">4</div>
+        <div class="txt"><span class="k">REGULATE</span>
+        <span class="v">EC is your fuel. Mental Stamina (MS) is your life <em>and</em> the ceiling your EC must stay under. Damage lowers MS, closing the ceiling in.</span></div></div>
+      <div class="step pxr" style="--c:var(--nostalgia)"><div class="num pxr">5</div>
+        <div class="txt"><span class="k">OVERLOAD</span>
+        <span class="v">Let EC pass MS and you lose control &mdash; your Line fills with Self Harm and Feed, and you cannot remove them.</span></div></div>
+    </div>
+    <button class="confront pxr pxr-sh" id="howtoBack" style="animation:none;margin-top:6px;padding:10px 22px">BACK</button>
+  </div>
+  <div class="intro" id="intro">
+    <div class="introrail"><div class="introtrack" id="introTrack">
+      <div class="rail"></div>
+    </div></div>
+    <div class="introwipe" id="introWipe"></div>
+  </div>
 
   <div class="panel unit pxr pxr-sh">
-    <div class="gwrap">
-      <div class="tag ms pxr" id="eTagMs"></div>
+    <div class="gwrap" id="eWrap">
+      <div class="tanchor ms" id="eTagMsA"><div class="tag ms pxr" id="eTagMs"></div></div>
       <div class="gauge e pxr" id="eGauge"></div><div id="eChev"></div>
-      <div class="tag ec pxr" id="eTagEc"></div>
+      <div class="tanchor ec" id="eTagEcA"><div class="tag ec pxr" id="eTagEc"></div></div>
       <div class="shieldpip hide" id="eShield"></div>
+      <div class="gflash"></div>
     </div>
+
   </div>
   <div class="lane-wrap"><div class="lane pxr" id="eLane"><div class="track" id="eTrack"></div></div></div>
 
   <div class="stage" id="stage">
-    <div class="sprwrap"><canvas id="sprIn"></canvas><canvas id="sprOut"></canvas></div>
+    <div class="enemyholder">
+      <div class="sprwrap"><canvas id="sprIn"></canvas><canvas id="sprOut"></canvas></div>
+      <div class="floorwrap" id="floorWrap"><div class="floorlight" id="floorLight"></div></div>
+      <div class="personaname" id="personaName"></div>
+    </div>
   </div>
 
-  <div class="pstrip"><canvas id="pRingsIn"></canvas><canvas id="pRingsOut"></canvas></div>
+  <div class="pstrip" id="pstrip"><canvas id="pRingsIn"></canvas><canvas id="pRingsOut"></canvas></div>
   <div class="lane-wrap"><div class="lane pxr" id="pLane"><div class="track" id="pTrack"></div></div></div>
-  <div class="tray" id="tray"></div>
-  <button class="depart pxr pxr-sh" id="departBtn">DEPART &#9654;</button>
+  <div class="abilpanel pxr" id="abilPanel"><div class="abilscroll" id="abilScroll"></div></div>
+  <div class="btnrow">
+    <button class="depart rest pxr pxr-sh" id="emoBtn">EMOTIONS</button>
+    <button class="depart pxr pxr-sh" id="departBtn">DEPART &#9654;</button>
+  </div>
 
   <div class="panel unit pxr pxr-sh">
-    <div class="gwrap">
-      <div class="tag ms pxr" id="pTagMs"></div>
+    <div class="gwrap" id="pWrap">
+      <div class="tanchor ms" id="pTagMsA"><div class="tag ms pxr" id="pTagMs"></div></div>
       <div class="gauge p pxr" id="pGauge"></div><div id="pChev"></div>
-      <div class="tag ec pxr" id="pTagEc"></div>
+      <div class="tanchor ec" id="pTagEcA"><div class="tag ec pxr" id="pTagEc"></div></div>
       <div class="shieldpip hide" id="pShield"></div>
+      <div class="gflash"></div>
     </div>
+
   </div>
  </div>
 </div>
 
 <script src="data.js"></script>
+<script src="music.js"></script>
 <script>
 "use strict";
 
@@ -224,6 +492,7 @@ const ICONS={
   DROP :["...xx...","...xx...","..xxxx..","..xxxx..",".xxxxxx.","xxxxxxxx",".xxxxxx.","..xxxx.."],
   SPARK:["...xx...","...xx...","x..xx..x",".xxxxxx.",".xxxxxx.","x..xx..x","...xx...","...xx..."],
   SHIELD:["xxxxxxxx","xxxxxxxx","xx....xx","xx....xx","xx....xx",".xx..xx.","..xxxx..","...xx..."],
+  CHARGE:["...xx...","..xxxx..",".xxxxxx.","xxxxxxxx","...xx...","...xx...","...xx...","...xx..."],
   WARN :["...xx...","...xx...","..xxxx..","..x..x..",".xx..xx.",".x.xx.x.","xx.xx.xx","xxxxxxxx"]
 };
 const $=id=>document.getElementById(id);
@@ -259,19 +528,29 @@ function initAudio(){
   const d=noiseBuf.getChannelData(0);
   for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
 }
+/* each consecutive charge segment ticks a step higher than the one before */
+function chargeTone(step){
+  const base=SOUNDS.arrive; if(!base) return;
+  sfxAt(base, Math.pow(1.20, step));
+}
 function sfx(id){
   const s=SOUNDS[id]; if(!s) return;
+  initAudio(); if(!actx) return;
+  if(actx.state==="suspended") actx.resume();
+  sfxAt(s,1);
+}
+function sfxAt(s,mult){
   initAudio(); if(!actx) return;
   if(actx.state==="suspended") actx.resume();
   const t0=actx.currentTime, dur=s.dur/1000;
   let src;
   if(s.wave==="noise"){
     src=actx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
-    src.playbackRate.value=Math.max(0.05,s.f0/700);
+    src.playbackRate.value=Math.max(0.05,s.f0/700*mult);
   }else{
     src=actx.createOscillator(); src.type=s.wave;
-    src.frequency.setValueAtTime(Math.max(20,s.f0),t0);
-    src.frequency.exponentialRampToValueAtTime(Math.max(20,s.f1),t0+dur);
+    src.frequency.setValueAtTime(Math.max(20,s.f0*mult),t0);
+    src.frequency.exponentialRampToValueAtTime(Math.max(20,s.f1*mult),t0+dur);
   }
   const g=actx.createGain();
   g.gain.setValueAtTime(0.0001,t0);
@@ -281,7 +560,50 @@ function sfx(id){
   if(s.echo>0){ const e=actx.createGain(); e.gain.value=s.echo; g.connect(e); e.connect(delay); }
   src.start(t0); src.stop(t0+dur+0.05);
 }
-window.addEventListener("pointerdown",initAudio,{once:true});
+/* ---------------- music: the theme, played by the same synth ---------------- */
+let musicBus=null, musicOn=false, musicStart=0, musicIdx=[], musicTimer=null;
+const midiHz = n => 440*Math.pow(2,(n-69)/12);
+function playNote(tr,when,dur,n,v){
+  let src;
+  if(tr.wave==="noise"){
+    src=actx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
+    src.playbackRate.value=Math.max(0.15,Math.min(5,midiHz(n)/240));
+    dur=Math.min(dur,0.09);
+  }else{
+    src=actx.createOscillator(); src.type=tr.wave; src.frequency.value=midiHz(n);
+  }
+  const g=actx.createGain(), peak=Math.max(0.001,tr.gain*v);
+  g.gain.setValueAtTime(0.0001,when);
+  g.gain.exponentialRampToValueAtTime(peak,when+0.012);
+  g.gain.setValueAtTime(peak,when+Math.max(0.03,dur*0.7));
+  g.gain.exponentialRampToValueAtTime(0.0001,when+dur+0.06);
+  src.connect(g); g.connect(musicBus);
+  src.start(when); src.stop(when+dur+0.09);
+}
+function schedMusic(){
+  if(!musicOn||!actx) return;
+  const now=actx.currentTime;
+  if(now > musicStart + MUSIC.length){ musicStart += MUSIC.length; musicIdx.fill(0); }
+  const ahead=now+0.30;
+  MUSIC.tracks.forEach((tr,ti)=>{
+    let i=musicIdx[ti];
+    while(i<tr.notes.length && musicStart+tr.notes[i][0] <= ahead){
+      const [t,d,n,v]=tr.notes[i];
+      const when=musicStart+t;
+      if(when>now-0.05) playNote(tr,when,d,n,v);
+      i++;
+    }
+    musicIdx[ti]=i;
+  });
+}
+function startMusic(){
+  initAudio(); if(!actx||musicOn||typeof MUSIC==="undefined") return;
+  if(actx.state==="suspended") actx.resume();
+  musicBus=actx.createGain(); musicBus.gain.value=0.5; musicBus.connect(master);
+  musicOn=true; musicStart=actx.currentTime+0.2; musicIdx=MUSIC.tracks.map(()=>0);
+  schedMusic(); musicTimer=setInterval(schedMusic,50);
+}
+window.addEventListener("pointerdown",()=>{ initAudio(); startMusic(); },{once:true});
 
 /* ================= STATE ================= */
 function makeUnit(id){
@@ -289,13 +611,61 @@ function makeUnit(id){
   return {id, name:r.name, emotion:r.emotion, maxMs:r.max_ms, ms:r.max_ms,
     ec:Math.round(r.max_ms*r.start_ec_pct), shield:0,
     layers:r.layers.slice(0,RULES.maxLayers).map((e,i)=>({e,pos:i,flash:0})),
-    pool:r.pool.map(a=>ABILITIES[a]), line:[]};
+    pool:r.pool.map(a=>ABILITIES[a]).filter(Boolean),
+    line:Array(RULES.lineCap).fill(null), broken:[], overloaded:false, dir:r.line_dir||1};
 }
-const S={phase:"BUILD", round:1, busy:false, player:makeUnit("player"), enemy:makeUnit("enemy")};
+const S={phase:"BUILD", round:1, busy:false, saidWinning:false, saidLosing:false,
+  player:makeUnit("player"), enemy:makeUnit("enemy")};
 
-/* Stations fire RIGHTMOST FIRST. Taps prepend, so the first ability you tap
-   lands on the right and is therefore the first to execute.               */
-const execOrder = line => [...line].reverse();
+/* `unit.line` is stored in EXECUTION order — index 0 always fires first.
+   Rendering, not the data, respects direction: a unit whose line travels right
+   draws index 0 at the right-hand end; one travelling left draws it at the left.
+   Every entry is {ab, charge}; charge segments only consume a slot and tick.  */
+const execOrder   = line => line.filter(Boolean);
+/* index 0 always fires first; a line travelling right draws index 0 on the right */
+const visualIdx   = u => u.dir>0 ? [...u.line.keys()].reverse() : [...u.line.keys()];
+const slotsUsed   = u => u.line.filter(Boolean).length;
+const emptySlots  = u => u.line.filter(x=>!x).length;
+function entriesFor(ab){
+  const out=[];
+  for(let i=0;i<(ab.charge||0);i++) out.push({ab, charge:true});
+  out.push({ab, charge:false});
+  return out;
+}
+/* charge segments must sit immediately before their ability, so a multi-slot
+   ability needs that many consecutive free slots */
+function placeEntries(u, ab){
+  const need=(ab.charge||0)+1;
+  for(let i=0;i<=u.line.length-need;i++){
+    let ok=true;
+    for(let k=0;k<need;k++) if(u.line[i+k]) { ok=false; break; }
+    if(!ok) continue;
+    entriesFor(ab).forEach((e,k)=>{ u.line[i+k]=e; });
+    return true;
+  }
+  return false;
+}
+function clearLine(u){ u.line=Array(RULES.lineCap).fill(null); }
+/* OVERLOAD: charge past the ceiling and the line is invaded by things you did
+   not choose and cannot remove. */
+function applyOverload(u){
+  u.overloaded = u.ec > u.ms;
+  if(!u.overloaded) return 0;
+  const over=u.ec-u.ms;
+  const n=Math.max(1, Math.min(RULES.lineCap-1,
+        Math.ceil(over/(RULES.overloadSlotPer*u.maxMs))));
+  const idx=[...u.line.keys()];
+  for(let i=idx.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
+  const pool=[ABILITIES.SELF_HARM, ABILITIES.FEED].filter(Boolean);
+  let placed=0;
+  for(const at of idx){
+    if(placed>=n) break;
+    if(u.line[at]) continue;
+    u.line[at]={ab:pool[Math.floor(Math.random()*pool.length)], charge:false, locked:true};
+    placed++;
+  }
+  return placed;
+}
 
 /* Interactions come entirely from the matchups table. '*' is a wildcard and
    'NONE' means the target has no layers; highest priority wins, so a specific
@@ -317,13 +687,15 @@ function matchup(layerEmotion, abilityEmotion){
 const ecFrom=(ab,dealt,m)=>Math.round((RULES.ecBasis==="POWER"?ab.power:dealt)*m.ec);
 function simulate(line, def){
   let ms=def.ms, ec=def.ec, shield=def.shield, layers=def.layers.map(l=>l.e);
-  for(const ab of execOrder(line)){
+  for(const entry of execOrder(line)){
+    if(entry.charge) continue;
+    const ab=entry.ab;
     if(ab.kind!=="DAMAGE") continue;
     if(shield>0){ shield--; continue; }
     const m=matchup(layers[0]||null, ab.emotion);
     const dealt=Math.min(Math.round(ab.power*m.dmg), ms);
     ms-=dealt; ec+=ecFrom(ab,dealt,m);
-    if(ab.hits_layer&&layers.length) layers.push(layers.shift());
+    if(ab.hits_layer&&layers.length) layers.shift();   // broken layers do not come back this turn
   }
   return {ms,ec};
 }
@@ -348,19 +720,52 @@ function stationSVG(key){
     <g fill="#0b0b0e">${shadow}</g><g fill="#1e1e26">${inner}</g>
     <g fill="currentColor">${ring}${icon}</g></svg>`;
 }
-function chevronSVG(dir){
-  const H=16,W=10,TH=2,GAP=4,SLOPE=.5,mid=(H-1)/2;
-  let body="",shadow="";
-  for(let k=0;k<2;k++)for(let y=0;y<H;y++){
-    const base=Math.round(Math.abs(y-mid)*SLOPE)+k*GAP;
-    for(let t=0;t<TH;t++){
-      const x = dir<0 ? base+t : (W-1-base-t);
-      if(x<0||x>=W) continue;
-      body+=R(x,y); shadow+=R(x+1,y+1);
-    }
+/* One thick solid chevron. A black stroke runs all the way round; the WHITE
+   stroke is drawn only on the side facing the other chevron, so the span of
+   Mental Stamina still standing between them is outlined.               */
+function chevronSVG(facing){          // facing: +1 white on the right, -1 on the left
+  const H=16,W=13,TH=8,SLOPE=.5,mid=(H-1)/2;
+  const cells=new Set();
+  for(let y=0;y<H;y++){
+    const base=Math.round(Math.abs(y-mid)*SLOPE);
+    for(let t=0;t<TH;t++){const x=base+t; if(x<W) cells.add(x+","+y);}
   }
-  return `<svg viewBox="0 0 ${W+1} ${H+1}" preserveAspectRatio="none" shape-rendering="crispEdges">
-    <g fill="#0b0b0e" opacity=".85">${shadow}</g><g fill="var(--ink)">${body}</g></svg>`;
+  const has=(x,y)=>cells.has(x+","+y);
+  const near=(x,y,k)=>{ for(let i=1;i<=k;i++) if(has(x-i*facing,y)) return true; return false; };
+  const adj =(x,y,k)=>{
+    for(let i=1;i<=k;i++)
+      if(has(x-i,y)||has(x+i,y)||has(x,y-i)||has(x,y+i)) return true;
+    return false;
+  };
+  let blk="",wht="",body="";
+  for(let y=-3;y<=H+2;y++)for(let x=-3;x<=W+2;x++){
+    if(has(x,y)){ body+=R(x+3,y+3); continue; }
+    // white rim ONLY on the face turned toward the other chevron — it outlines
+    // the stretch of Mental Stamina still standing. Black rim everywhere else.
+    if(near(x,y,2))      wht+=R(x+3,y+3);
+    else if(adj(x,y,2))  blk+=R(x+3,y+3);
+  }
+  return `<svg viewBox="0 0 ${W+6} ${H+6}" preserveAspectRatio="none" shape-rendering="crispEdges">
+    <g fill="#000">${blk}</g><g fill="#ffffff">${wht}</g><g fill="#ffffff">${body}</g></svg>`;
+}
+/* the same chevron, tiled, as the bar's internal segmentation */
+(function(){
+  const H=16,W=6,TH=3,SLOPE=.4,mid=(H-1)/2; let r="";
+  for(let y=0;y<H;y++){
+    const base=Math.round(Math.abs(y-mid)*SLOPE);
+    for(let t=0;t<TH;t++){const x=base+t; if(x<W) r+=R(x,y);}
+  }
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges"><g fill="rgba(0,0,0,.42)">${r}</g></svg>`;
+  document.documentElement.style.setProperty("--chevpat",`url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+})();
+/* a charge segment: a small solid node, as in Paral·lel */
+function chargeSVG(){
+  const N=10,c=(N-1)/2; let dot="",sh="";
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    if(Math.hypot(x-c,y-c)<=c-1){ dot+=R(x,y); sh+=R(x+1,y+1); }
+  }
+  return `<svg viewBox="0 0 ${N+1} ${N+1}" shape-rendering="crispEdges">
+    <g fill="#0c0a16">${sh}</g><g fill="currentColor">${dot}</g></svg>`;
 }
 (function(){
   const g=ICONS.WARN; let r="";
@@ -373,7 +778,7 @@ function chevronSVG(dir){
    Split across two canvases: the outermost layer draws alone on the top one so
    it can carry a colour-coded CSS glow, while everything behind it draws on the
    lower one and stays unlit. Outer band is thick, inner bands are thin.     */
-const DARK_RING=[34,34,44];
+const DARK_RING=[34,34,44], DARK_RING_HI=[66,64,90];   // empty slots breathe between these
 const outerR=(pos,cfg)=>Math.max(0, cfg.baseR - pos*cfg.spacing);
 function slotGeom(pos,cfg,mult){
   const o=outerR(pos,cfg), oIn=outerR(pos+1,cfg), gap=o-oIn;
@@ -395,8 +800,16 @@ function stepLayers(u){
 function ringsOf(u,t,cfg,which){
   const rings=[];
   if(which!=="outer"){
-    for(let i=u.layers.length;i<RULES.maxLayers;i++)
-      rings.push({...slotGeom(i,cfg,RULES.layerInnerThick), col:DARK_RING});
+    for(let i=u.layers.length;i<RULES.maxLayers;i++){
+      // empty slots ride the same wave, but running centre -> outward, and
+      // breathe between two greys instead of glowing
+      const ph=t*0.22 + i*RULES.layerWaveDelay;
+      const wob=Math.sin(ph)*cfg.breathe*0.55;
+      const k=0.5+0.5*Math.sin(ph);
+      const g=slotGeom(i,cfg,RULES.layerInnerThick);
+      rings.push({outer:g.outer+wob, inner:Math.max(0,g.inner+wob),
+                  col:DARK_RING.map((v,c)=>Math.round(v+(DARK_RING_HI[c]-v)*k))});
+    }
   }
   u.layers.forEach((l,i)=>{
     if(which==="outer" && i!==0) return;
@@ -469,13 +882,15 @@ function tick(){
   paint(CV.pIn ,PW,PH,pcx,pcy,ringsOf(S.player,t,P_CFG,"inner"));
   paint(CV.pOut,PW,PH,pcx,pcy,ringsOf(S.player,t,P_CFG,"outer"));
   applyGlow($("sprOut"),S.enemy,4);
+  const fl=$("floorLight"), oe=S.enemy.layers.length?S.enemy.layers[0].e:null;
+  if(fl && fl.dataset.e!==String(oe)){ fl.dataset.e=String(oe); fl.style.color=emoHex(oe); }
   applyGlow($("pRingsOut"),S.player,4);
 }
 function setFps(f){ if(timer)clearInterval(timer); timer=setInterval(tick,1000/f); }
 tick(); setFps(12);
 
 /* ================= RENDER ================= */
-function lineCost(u){return u.line.reduce((s,a)=>s+a.cost,0);}
+function lineCost(u){return u.line.reduce((s,e)=>s+((e&&!e.charge)?e.ab.cost:0),0);}
 function renderGauge(el,u,opts){
   const pct=v=>Math.max(0,Math.min(100,v/u.maxMs*100));
   const ecIn=Math.min(u.ec,u.ms), over=Math.max(0,u.ec-u.ms);
@@ -490,18 +905,22 @@ function renderGauge(el,u,opts){
     h+=`<div class="seg g-charge" style="left:${pct(u.ec)}%;width:${pct(opts.chargeTo-u.ec)}%"></div>`;
   if(opts.projMs!=null&&opts.projMs<u.ms)
     h+=`<div class="g-proj" style="left:${pct(opts.projMs)}%"></div>`;
+  h+=`<div class="seg g-span" style="width:${pct(u.ms)}%"></div>`;
+  h+=`<div class="seg g-ecedge" style="left:calc(${pct(Math.min(u.ec,u.maxMs))}% - 1px)"></div>`;
   el.innerHTML=h;
   const anchor=(e,v)=>{
     const x=pct(v); e.style.left=x+"%";
     e.style.transform = x>86 ? "translateX(-100%)" : x<14 ? "translateX(0)" : "translateX(-50%)";
   };
-  opts.tagMs.textContent=u.ms; anchor(opts.tagMs,u.ms);
-  opts.tagEc.textContent=u.ec; anchor(opts.tagEc,Math.min(u.ec,u.maxMs));
-  opts.tagEc.style.background=u.ec>u.ms?"var(--fury)":"var(--euphoria)";
+  opts.tagMs.textContent=u.ms+" MS"; anchor(opts.tagMsA,u.ms);
+  opts.tagEc.textContent=u.ec+" EC"; anchor(opts.tagEcA,Math.min(u.ec,u.maxMs));
+  opts.tagEc.classList.toggle("over", u.ec>u.ms);
   const near=(u.ms/u.maxMs)<RULES.lowMsWarnPct;
+  // a re-render mid-hit must not wipe the strobe the damage just started
+  const strobe=opts.chevEl.querySelector(".ceil.strobe")?" strobe":"";
   opts.chevEl.innerHTML=
-    `<div class="chev cap" style="left:-14px">${chevronSVG(-1)}</div>`+
-    `<div class="chev ceil ${near?"near":""}" style="left:calc(${pct(u.ms)}% - 14px)">${chevronSVG(-1)}</div>`;
+    `<div class="chev cap" style="left:-11px">${chevronSVG(1)}</div>`+
+    `<div class="chev ceil ${near?"near":""}${strobe}" style="left:calc(${pct(u.ms)}% - 11px)">${chevronSVG(-1)}</div>`;
   opts.shield.classList.toggle("hide",u.shield<=0);
   opts.shield.innerHTML=u.shield>0
     ? `<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${iconSVG("SHIELD")}</svg>` : "";
@@ -510,52 +929,78 @@ function renderStats(){
   const p=S.player,e=S.enemy,building=S.phase==="BUILD";
   const pr=building?simulate(p.line,e):{ms:null,ec:e.ec};
   renderGauge($("pGauge"),p,{spend:building?lineCost(p):0,chargeTo:p.ec,projMs:null,
-    chevEl:$("pChev"),tagMs:$("pTagMs"),tagEc:$("pTagEc"),shield:$("pShield")});
+    chevEl:$("pChev"),tagMs:$("pTagMs"),tagEc:$("pTagEc"),
+    tagMsA:$("pTagMsA"),tagEcA:$("pTagEcA"),shield:$("pShield")});
   renderGauge($("eGauge"),e,{spend:0,chargeTo:pr.ec,projMs:pr.ms,
-    chevEl:$("eChev"),tagMs:$("eTagMs"),tagEc:$("eTagEc"),shield:$("eShield")});
+    chevEl:$("eChev"),tagMs:$("eTagMs"),tagEc:$("eTagEc"),
+    tagMsA:$("eTagMsA"),tagEcA:$("eTagEcA"),shield:$("eShield")});
 }
 /* ghosts sit on the LEFT: taps prepend, so that is where the next one lands */
-function trackHTML(unit,ghosts){
-  let h="";
-  if(unit.line.length||ghosts)
-    h+=`<div class="term ${ghosts?"dead":""}" style="color:${ghosts?"var(--line)":emoHex(unit.line[0]?.emotion)}"></div>`;
-  if(ghosts) for(let i=unit.line.length;i<RULES.lineCap;i++)
-    h+=`<div class="link dead"></div><div class="station ghost" style="color:var(--line)">${stationSVG(null)}</div>`;
-  unit.line.forEach((a,i)=>{
-    h+=`<div class="link" style="color:${emoHex(a.emotion)}"></div>`;
-    h+=`<div class="station" data-idx="${i}" style="color:${emoHex(a.emotion)}">${stationSVG(a.icon)}</div>`;
-  });
-  return h;
+/* Draws the line in travel order. `dir > 0` means it moves right, so the
+   first-to-fire entry sits at the RIGHT end behind the terminus arrow.      */
+function trackHTML(unit,showGhosts){
+  const order=visualIdx(unit), n=order.length, STEP=0.16;
+  const seg=(i,vp)=>{
+    // the wave always runs in the line's direction of travel
+    const delay=(unit.dir>0 ? vp : (n-1-vp))*STEP;
+    const e=unit.line[i];
+    if(!e) return showGhosts
+      ? `<div class="link dead"></div><div class="station ghost" data-vp="${vp}"`+
+        ` style="color:var(--line);--d:${delay.toFixed(2)}s">${stationSVG(null)}</div>`
+      : "";
+    const col=emoHex(e.ab.emotion);
+    const cls="station"+(e.charge?" chg":"")+(e.locked?" locked":"");
+    const inner=e.charge?chargeSVG():stationSVG(e.ab.icon);
+    return `<div class="link" style="color:${col}"></div>`+
+           `<div class="${cls}" data-idx="${i}" style="color:${col};--d:${delay.toFixed(2)}s">${inner}</div>`;
+  };
+  const body=order.map((i,vp)=>seg(i,vp)).join("");
+  const first=unit.line.find(Boolean);
+  const headCol=first?emoHex(first.ab.emotion):"var(--line)";
+  const arrow=`<div class="term${first?"":" dead"}" style="color:${headCol}"></div>`;
+  return unit.dir>0 ? body+arrow : arrow+body;
 }
 function renderLines(){
   $("pTrack").innerHTML=trackHTML(S.player,S.phase==="BUILD");
   $("eTrack").innerHTML=S.enemy.line.length?trackHTML(S.enemy,false)
     :`<div class="station ghost" style="color:var(--line)">${stationSVG(null)}</div>`;
 }
-function buildTray(){
-  $("tray").innerHTML=S.player.pool.map(a=>{
-    const d=a.kind==="DAMAGE"?`${a.cost} · ${a.power}`:`${a.cost} · ▣${a.power}`;
-    return `<div class="abil pxr pxr-sh" data-a="${a.id}" style="color:${emoHex(a.emotion)}">
-      <svg viewBox="0 0 8 8" shape-rendering="crispEdges">${iconSVG(a.icon)}</svg>
-      <span class="d">${d}</span></div>`;
-  }).join("");
-  $("tray").querySelectorAll(".abil").forEach(el=>el.addEventListener("click",()=>{
+function abilRowHTML(a){
+  const col=emoHex(a.emotion);
+  let line="";
+  for(let i=0;i<(a.charge||0);i++)
+    line+=`<div class="link" style="color:${col}"></div><div class="station chg" style="color:${col}">${chargeSVG()}</div>`;
+  line+=`<div class="link" style="color:${col}"></div><div class="station" style="color:${col}">${stationSVG(a.icon)}</div>`;
+  const dmg = a.kind==="DAMAGE" ? `<span class="pill wht">${a.power} DMG</span>`
+            : a.kind==="CHARGE" ? `<span class="pill wht">+${a.power} EC</span>`+
+                (a.self_ms?`<span class="pill wht">-${a.self_ms} MS</span>`:``)
+            : `<span class="pill wht">BLOCK ${a.power}</span>`;
+  return `<div class="abrow" data-a="${a.id}">
+      <div class="abline">${line}</div>
+      <div class="abinfo">
+        <div class="abname">${a.name.toUpperCase()}</div>
+        <div class="pills">${a.cost>0?`<span class="pill rain">-${a.cost} EC</span>`:``}${dmg}</div>
+      </div></div>`;
+}
+function buildPanel(){
+  $("abilScroll").innerHTML=S.player.pool.map(abilRowHTML).join("");
+  $("abilScroll").querySelectorAll(".abrow").forEach(el=>el.addEventListener("click",()=>{
     if(S.phase!=="BUILD")return;
     const a=ABILITIES[el.dataset.a], p=S.player;
-    if(p.line.length>=RULES.lineCap||lineCost(p)+a.cost>p.ec)return;
-    p.line.unshift(a);            // first tap ends up rightmost = first to fire
+    if(lineCost(p)+a.cost>p.ec) return;
+    if(!placeEntries(p,a)) return;      // needs consecutive free slots
     sfx("tap"); render();
   }));
 }
 function renderTray(){
-  const p=S.player,spent=lineCost(p);
-  $("tray").querySelectorAll(".abil").forEach(el=>{
-    const a=ABILITIES[el.dataset.a];
-    el.classList.toggle("dis",!(S.phase==="BUILD"&&p.line.length<RULES.lineCap&&spent+a.cost<=p.ec));
+  const p=S.player, spent=lineCost(p);
+  $("abilScroll").querySelectorAll(".abrow").forEach(el=>{
+    const a=ABILITIES[el.dataset.a], need=(a.charge||0)+1;
+    el.classList.toggle("dis", !(S.phase==="BUILD" && emptySlots(p)>=need && spent+a.cost<=p.ec));
   });
-  const btn=$("departBtn"),empty=p.line.length===0;
+  const btn=$("departBtn"), empty=p.line.length===0;
   btn.classList.toggle("rest",empty);
-  btn.textContent=empty?"REST ▶":"DEPART ▶";
+  btn.textContent=empty?"REST \u25B6":"DEPART \u25B6";
 }
 function render(){renderStats();renderLines();renderTray();}
 let tagRow=0;
@@ -566,6 +1011,48 @@ function bigTag(txt,cls){
   tagRow++; setTimeout(()=>{tagRow=Math.max(0,tagRow-1);},760);
   $("screen").appendChild(el); setTimeout(()=>el.remove(),960);
 }
+async function flyStrike(stationEl,targetEl,col){
+  if(!stationEl||!targetEl) return;
+  const sr=$("screen").getBoundingClientRect();
+  const a=stationEl.getBoundingClientRect(), b=targetEl.getBoundingClientRect();
+  const el=document.createElement("div");
+  el.className="flyer"; el.innerHTML=stationEl.innerHTML;
+  el.style.cssText=`left:${a.left-sr.left}px;top:${a.top-sr.top}px;width:${a.width}px;height:${a.height}px;color:${col}`;
+  $("screen").appendChild(el);
+  const dx=(b.left+b.width/2)-(a.left+a.width/2), dy=(b.top+b.height/2)-(a.top+a.height/2);
+  sfx("travel");
+  await el.animate([
+    {transform:"translate(0,0) scale(1)"},
+    {transform:`translate(${dx*0.34}px,${dy*0.34}px) scale(2.4)`, offset:.6},
+    {transform:`translate(${dx}px,${dy}px) scale(1.15)`}
+  ],{duration:RULES.flyMs, easing:"cubic-bezier(.45,0,.9,.45)"}).finished;
+  el.remove();
+}
+function shieldBreak(hostEl){
+  const sr=$("screen").getBoundingClientRect(), b=hostEl.getBoundingClientRect();
+  for(let i=0;i<2;i++){
+    const el=document.createElement("div");
+    el.className="shbreak";
+    el.innerHTML=`<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${iconSVG("SHIELD")}</svg>`;
+    el.style.left=(b.left-sr.left+b.width/2-13)+"px";
+    el.style.top=(b.top-sr.top+b.height/2-13)+"px";
+    el.style.clipPath = i===0 ? "polygon(0 0,50% 0,50% 100%,0 100%)" : "polygon(50% 0,100% 0,100% 100%,50% 100%)";
+    $("screen").appendChild(el);
+    const dir=i===0?-1:1;
+    el.animate([
+      {transform:"translate(0,0) rotate(0deg)", opacity:1},
+      {transform:`translate(${dir*34}px,52px) rotate(${dir*70}deg)`, opacity:0}
+    ],{duration:620, easing:"cubic-bezier(.3,.1,.7,1)", fill:"forwards"});
+    setTimeout(()=>el.remove(),660);
+  }
+}
+function gaugeHurt(onEnemy){
+  const w=onEnemy?$("eWrap"):$("pWrap");
+  const c=(onEnemy?$("eChev"):$("pChev")).querySelector(".ceil");
+  w.classList.remove("hurt"); void w.offsetWidth; w.classList.add("hurt");
+  if(c){ c.classList.remove("strobe"); void c.offsetWidth; c.classList.add("strobe"); }
+  setTimeout(()=>{ w.classList.remove("hurt"); if(c) c.classList.remove("strobe"); },620);
+}
 async function impact(onEnemy){
   frozen=true; $("flash").classList.add("on"); await sleep(95);
   frozen=false; $("flash").classList.remove("on");
@@ -575,27 +1062,59 @@ async function impact(onEnemy){
 }
 /* Paced layer break: flash → vanish (the rest ease outward) → beat → regrow
    from the centre at the back of the queue.                                */
+/* A struck layer flashes, then is gone for the rest of the round. Everything
+   behind it eases outward. Broken layers return in regrowLayers().        */
 async function breakLayer(u){
   if(!u.layers.length) return;
   const l=u.layers[0];
   l.flash=Math.ceil(RULES.layerFlashMs/(1000/12))+1;
   sfx("breaklayer");
   await sleep(RULES.layerFlashMs);
-  u.layers.shift();
+  u.layers.shift(); u.broken.push(l);
   await sleep(RULES.layerGapMs);
-  l.flash=0; l.pos=RULES.maxLayers; u.layers.push(l);
+}
+async function regrowLayers(u){
+  if(!u.broken.length) return;
+  for(const l of u.broken){ l.flash=0; l.pos=RULES.maxLayers; u.layers.push(l); }
+  u.broken.length=0;
   sfx("regrow");
   await sleep(RULES.layerRegrowMs);
 }
 
 /* ================= COMBAT ================= */
-async function applyAbility(actor,target,ab,onEnemy){
+async function applyAbility(actor,target,ab,onEnemy,stationEl){
+  if(ab.kind==="SELFHARM"){
+    const dealt=Math.min(ab.power, actor.ms);
+    actor.ms-=dealt;
+    bigTag("-"+dealt+" MS","dmg"); bigTag("SELF HARM","off"); sfx("hit");
+    renderStats(); gaugeHurt(!onEnemy);
+    await impact(!onEnemy);
+    if(actor.ms<=0) await clashSequence(actor===S.player);
+    return;
+  }
+  if(ab.kind==="FEED"){
+    const healed=Math.min(ab.power, target.maxMs-target.ms);
+    target.ms+=healed;
+    bigTag("+"+healed+" MS","absorb"); bigTag("FED THE ENEMY","off"); sfx("regrow");
+    renderStats(); await sleep(520); return;
+  }
+  if(ab.kind==="CHARGE"){
+    const burn=Math.min(ab.self_ms||0, Math.max(0,actor.ms-1));   // never self-kill
+    actor.ms-=burn; actor.ec+=ab.power;
+    bigTag("+"+ab.power+" EC","absorb"); sfx("absorb");
+    if(burn>0) bigTag("-"+burn+" MS","dmg");
+    renderStats(); gaugeHurt(!onEnemy); checkDialogue();
+    await sleep(420); return;
+  }
   if(ab.kind==="SHIELD"){
     actor.shield+=ab.power; bigTag("SHIELD UP","block"); sfx("block");
     renderStats(); await sleep(380); return;
   }
+  const targetEl = onEnemy ? document.querySelector(".sprwrap") : $("pstrip");
+  if(stationEl) await flyStrike(stationEl,targetEl,emoHex(ab.emotion));
   if(target.shield>0){
     target.shield-=1; bigTag("BLOCKED","block"); sfx("block");
+    shieldBreak(targetEl);
     if(RULES.shieldRotatesLayer&&ab.hits_layer) await breakLayer(target);
     renderStats(); await sleep(380); return;
   }
@@ -608,6 +1127,8 @@ async function applyAbility(actor,target,ab,onEnemy){
   bigTag(gain>0 ? `${m.label} +${gain} EC` : m.label, m.cls);
   sfx(m.sound);
   renderStats();
+  checkDialogue();
+  gaugeHurt(onEnemy);
   await impact(onEnemy);
   if(target.ms<=0){ await clashSequence(target===S.player); return; }
   if(ab.hits_layer) await breakLayer(target);
@@ -618,20 +1139,32 @@ function centerStation(lane,track,st){
 }
 async function resolveLine(actor,target,laneId,trackId,onEnemy){
   const lane=$(laneId),track=$(trackId);
-  if(actor.line.length===0){
+  if(slotsUsed(actor)===0){
     actor.ec+=RULES.restEc; sfx("regrow"); renderStats(); await sleep(800); return;
   }
   actor.ec-=lineCost(actor); renderStats(); sfx("depart"); await sleep(560);
   lane.classList.add("zoom"); await sleep(260);
-  const sts=track.querySelectorAll(".station[data-idx]");
-  for(let i=actor.line.length-1;i>=0;i--){          // rightmost fires first
+  let chargeRun=0;
+  for(let i=0;i<actor.line.length;i++){             // fixed slots, execution order
     if(S.player.ms<=0||S.enemy.ms<=0)break;
-    centerStation(lane,track,sts[i]); sfx("travel"); await sleep(340);
-    sts[i].classList.add("active"); sfx("arrive"); await sleep(180);
-    await applyAbility(actor,target,actor.line[i],onEnemy);
-    await sleep(200);
-    sts[i].classList.remove("active"); sts[i].classList.add("spent");
-    await sleep(140);
+    const entry=actor.line[i];
+    if(!entry) continue;
+    const st=track.querySelector(`.station[data-idx="${i}"]`);
+    if(st) centerStation(lane,track,st);
+    await sleep(entry.charge?160:300);
+    if(st) st.classList.add("active");
+    if(entry.charge){
+      // charge segments do nothing but hold, each a step higher than the last
+      chargeRun++;
+      chargeTone(chargeRun);
+      await sleep(RULES.chargeStepMs);
+    }else{
+      sfx("arrive"); await sleep(150);
+      await applyAbility(actor,target,entry.ab,onEnemy,st);
+      chargeRun=0; await sleep(180);
+    }
+    if(st){ st.classList.remove("active"); st.classList.add("spent"); }
+    await sleep(110);
   }
   await sleep(200); lane.classList.remove("zoom");
   track.style.transform="translateX(0)"; await sleep(250);
@@ -641,6 +1174,11 @@ async function clashSequence(playerDied){
   const sr=screen.getBoundingClientRect(), gr=gauge.getBoundingClientRect();
   const cx=gr.left-sr.left+4, cy=gr.top-sr.top+gr.height/2;
   setFps(3); screen.classList.add("slowmo"); gauge.classList.add("clash"); sfx("clash");
+  if(!playerDied){
+    enemyCollapse();                        // the enemy's layers scatter and drop
+    bubbleToken++;                          // cut off anything mid-sentence
+    if(S.enemy.persona) speak(S.enemy.persona.lines.DEFEAT, S.enemy.emotion);
+  }
   const wv=document.createElement("div"); wv.className="wave";
   wv.style.left=cx+"px"; wv.style.top=cy+"px"; wv.style.transform="translate(-50%,-50%)";
   screen.appendChild(wv);
@@ -668,25 +1206,40 @@ async function clashSequence(playerDied){
   screen.classList.remove("slowmo"); gauge.classList.remove("clash");
 }
 function buildEnemyLine(){
-  const e=S.enemy, p=S.player; e.line=[]; let ec=e.ec;
+  const e=S.enemy, p=S.player;
+  clearLine(e); applyOverload(e);
+  let ec=e.ec;
   let layers=p.layers.map(l=>l.e), shield=p.shield;
   const shieldAb=e.pool.find(a=>a.kind==="SHIELD");
-  if(e.ms<e.maxMs*0.5 && e.shield===0 && shieldAb && ec>=shieldAb.cost){
-    e.line.push(shieldAb); ec-=shieldAb.cost;
+  if(e.ms<e.maxMs*0.5 && e.shield===0 && shieldAb && ec>=shieldAb.cost && placeEntries(e,shieldAb)){
+    ec-=shieldAb.cost;
   }
-  while(e.line.length<RULES.lineCap){
-    const opts=e.pool.filter(a=>a.kind==="DAMAGE"&&a.cost<=ec);
-    if(!opts.length) break;
-    let best=opts[0], bestScore=-Infinity;
-    for(const a of opts){
-      const score=a.power*matchup(layers[0]||null,a.emotion).dmg;
-      if(score>bestScore){bestScore=score; best=a;}
+  let guard=0;
+  while(emptySlots(e)>0 && guard++<40){
+    const room=emptySlots(e);
+    const opts=e.pool.filter(a=>a.kind==="DAMAGE"&&a.cost<=ec&&((a.charge||0)+1)<=room);
+    if(!opts.length){
+      // nothing affordable — top up instead of idling, if it can spare the stamina
+      const rc=e.pool.find(a=>a.kind==="CHARGE"&&a.cost<=ec&&((a.charge||0)+1)<=room);
+      if(rc && e.ms>(rc.self_ms||0)*2 && placeEntries(e,rc)) continue;
+      break;
     }
-    e.line.push(best); ec-=best.cost;
+    let best;
+    if(Math.random()<RULES.aiVarietyChance){
+      best=opts[Math.floor(Math.random()*opts.length)];   // occasionally off-book
+    }else{
+      best=opts[0]; let bestScore=-Infinity;
+      for(const a of opts){
+        // value per slot, so a slow heavy hitter is weighed against the quick ones it displaces
+        const score=a.power*matchup(layers[0]||null,a.emotion).dmg/((a.charge||0)+1);
+        if(score>bestScore){bestScore=score; best=a;}
+      }
+    }
+    if(!placeEntries(e,best)) break;
+    ec-=best.cost;
     if(shield>0) shield--;
-    else if(best.hits_layer&&layers.length) layers.push(layers.shift());
+    else if(best.hits_layer&&layers.length) layers.shift();
   }
-  e.line.reverse();     // built in execution order, stored left-to-right
 }
 function endCheck(){
   if(S.enemy.ms<=0){finish("win");return true;}
@@ -703,44 +1256,233 @@ function finish(kind){
 async function depart(){
   if(S.phase!=="BUILD"||S.busy)return;
   S.busy=true; S.phase="RESOLVE";
-  $("tray").classList.add("hide"); $("departBtn").classList.add("hide");
+  $("abilPanel").classList.remove("open");      // close the panel while the line resolves
+  $("emoBtn").classList.add("rest");
+  document.querySelector(".btnrow").classList.add("hide");
   renderLines(); renderStats();
   await resolveLine(S.player,S.enemy,"pLane","pTrack",true);
   if(endCheck()){S.busy=false;return;}
   await sleep(300);
   await resolveLine(S.enemy,S.player,"eLane","eTrack",false);
   if(endCheck()){S.busy=false;return;}
-  S.round++; S.player.line=[]; buildEnemyLine();
+  await regrowLayers(S.player); await regrowLayers(S.enemy);
+  S.round++;
+  clearLine(S.player);
+  const forced=applyOverload(S.player);
+  if(forced){ bigTag("OVERLOAD","dmg"); sfx("breaklayer"); }
+  buildEnemyLine();
   S.phase="BUILD"; S.busy=false;
-  $("tray").classList.remove("hide"); $("departBtn").classList.remove("hide");
+  document.querySelector(".btnrow").classList.remove("hide");
   render();
 }
 $("departBtn").addEventListener("click",depart);
-let drag=null;
-$("pTrack").addEventListener("pointerdown",e=>{
+/* Tapping any segment removes the whole ability, charge segments included.
+   Drag-reordering is off while charge groups exist — moving one would have to
+   drag its charges with it. Worth restoring once the grouping is settled.  */
+$("pTrack").addEventListener("click",e=>{
   if(S.phase!=="BUILD")return;
-  const st=e.target.closest(".station"); if(!st||st.classList.contains("ghost"))return;
-  drag={idx:+st.dataset.idx,startX:e.clientX,moved:false};
-  st.classList.add("dragging"); e.preventDefault();
-},{passive:false});
-window.addEventListener("pointermove",e=>{
-  if(!drag)return;
-  const dx=e.clientX-drag.startX; if(Math.abs(dx)>8)drag.moved=true;
-  const el=$("pTrack").querySelector(`.station[data-idx="${drag.idx}"]`); if(!el)return;
-  el.style.transform=`translateX(${dx}px)`;
-  const sts=[...$("pTrack").querySelectorAll(".station[data-idx]")];
-  const step=sts.length>1?Math.abs(sts[1].offsetLeft-sts[0].offsetLeft):el.offsetWidth+15;
-  const tgt=Math.max(0,Math.min(S.player.line.length-1,drag.idx+Math.round(dx/step)));
-  if(tgt!==drag.idx){
-    const arr=S.player.line,[m]=arr.splice(drag.idx,1); arr.splice(tgt,0,m);
-    drag.idx=tgt; drag.startX=e.clientX; renderLines(); sfx("travel");
-    const nu=$("pTrack").querySelector(`.station[data-idx="${tgt}"]`); if(nu)nu.classList.add("dragging");
+  const st=e.target.closest(".station[data-idx]"); if(!st)return;
+  const idx=+st.dataset.idx, ent=S.player.line[idx]; if(!ent)return;
+  if(ent.locked){ sfx("block"); return; }              // overload stations cannot be cleared
+  const ab=ent.ab;
+  let start=idx;
+  while(start>0 && S.player.line[start-1] && S.player.line[start-1].charge
+        && S.player.line[start-1].ab===ab) start--;
+  let end=start;
+  while(end<S.player.line.length-1 && S.player.line[end] && S.player.line[end].charge) end++;
+  for(let i=start;i<=end;i++) S.player.line[i]=null;
+  sfx("remove"); render();
+});
+$("emoBtn").addEventListener("click",()=>{
+  const open=$("abilPanel").classList.toggle("open");
+  $("emoBtn").classList.toggle("rest",!open);
+  sfx("tap");
+});
+
+/* ================= ENEMY DIALOGUE ================= */
+function pickPersona(u){
+  const rows=DIALOGUE.filter(d=>d.emotion===u.emotion && d.enabled!==false && d.line);
+  if(!rows.length) return null;
+  const names=[...new Set(rows.map(d=>d.persona))];
+  const name=names[Math.floor(Math.random()*names.length)];   // a different one each battle
+  const lines={};
+  rows.filter(d=>d.persona===name).forEach(d=>{ lines[d.state]=d.line; });
+  return {name, lines};
+}
+let bubbleToken=0;
+async function speak(text, emotion){
+  if(!text) return;
+  const tok=++bubbleToken;
+  const el=document.createElement("div");
+  el.className="bubblewrap";
+  el.style.setProperty("--c", emoHex(emotion));
+  const border=document.createElement("div"); border.className="bubbleborder pxr";
+  const box=document.createElement("div"); box.className="bubble pxr";
+  const body=document.createElement("span"); box.appendChild(body);
+  const tail=document.createElement("i"); tail.className="tail";
+  el.appendChild(border); el.appendChild(box); el.appendChild(tail);
+  $("screen").appendChild(el);
+  // sits just below the enemy, overlapping it slightly, with the tail aimed at its centre
+  const sr=$("screen").getBoundingClientRect();
+  const spr=document.querySelector(".sprwrap").getBoundingClientRect();
+  el.style.top=(spr.bottom-sr.top-16)+"px";
+  const wrapBox=el.getBoundingClientRect();
+  tail.style.left=((spr.left+spr.width/2)-wrapBox.left)+"px";
+  for(let i=0;i<text.length;i++){
+    if(tok!==bubbleToken){ el.remove(); return; }
+    body.textContent=text.slice(0,i+1);
+    const ch=text[i];
+    if(ch.trim()){ sfxAt(SOUNDS.speak, 0.92+((i*7)%5)*0.05); await sleep(RULES.typeMs); }
+    else await sleep(Math.round(RULES.typeMs*0.5));
   }
-});
-window.addEventListener("pointerup",()=>{
-  if(!drag)return;
-  if(!drag.moved){ S.player.line.splice(drag.idx,1); sfx("remove"); }
-  drag=null; render();
-});
-buildTray(); buildEnemyLine(); render();
+  await sleep(RULES.dialogueHoldMs);
+  if(tok!==bubbleToken){ el.remove(); return; }
+  await el.animate([{opacity:1},{opacity:0}],{duration:280,fill:"forwards"}).finished;
+  el.remove();
+}
+/* fires the winning / losing lines the first time either side crosses the mark */
+function checkDialogue(){
+  const P=S.enemy.persona; if(!P) return;
+  const pct=(u)=>u.ms/u.maxMs;
+  if(!S.saidLosing && S.enemy.ms>0 && pct(S.enemy)<RULES.lowHpTalkPct){
+    S.saidLosing=true; speak(P.lines.LOSING, S.enemy.emotion); return;
+  }
+  if(!S.saidWinning && S.player.ms>0 && pct(S.player)<RULES.lowHpTalkPct){
+    S.saidWinning=true; speak(P.lines.WINNING, S.enemy.emotion);
+  }
+}
+/* the backdrop takes the enemy's colour */
+function applyBackdrop(){
+  const e=EMOTIONS[S.enemy.emotion];
+  const bg=(e&&e.bg_hex)||"#171331";
+  document.querySelector(".phone").style.background=
+    `linear-gradient(180deg,#000 0%,#050408 22%,${bg} 100%)`;
+}
+function applyPersona(){
+  const P=pickPersona(S.enemy);
+  S.enemy.persona=P;
+  if(P) S.enemy.name=P.name;
+  const el=$("personaName");
+  el.dataset.full=(P?P.name:S.enemy.name).toUpperCase();
+  el.textContent="";                      // typed in during the opening
+  el.style.setProperty("--c", emoHex(S.enemy.emotion));
+  applyBackdrop();
+}
+
+async function typeName(){
+  const el=$("personaName"), full=el.dataset.full||"";
+  el.classList.add("typing");
+  for(let i=0;i<full.length;i++){
+    el.textContent=full.slice(0,i+1);
+    if(full[i].trim()) sfxAt(SOUNDS.speak, 0.55+i*0.02);
+    await sleep(105);
+  }
+  await sleep(420);
+  el.classList.remove("typing");
+}
+
+/* ---------------- opening sequence ---------------- */
+async function whiteFlash(times){
+  for(let i=0;i<times;i++){
+    $("flash").classList.remove("on"); void $("flash").offsetWidth;
+    $("flash").classList.add("on");
+    await sleep(150);
+  }
+  $("flash").classList.remove("on");
+}
+async function intro(){
+  const track=$("introTrack"), wipe=$("introWipe"), banner=$("banner");
+  // four stations strung along the diagonal, the last one landing dead centre
+  const SP=210;
+  for(let i=0;i<4;i++){
+    const d=document.createElement("div");
+    d.className="introstation"; d.style.left=(i*SP)+"px";
+    track.appendChild(d);
+  }
+  await track.animate(
+    [{transform:`translateY(-50%) translateX(${-(3*SP)-560}px)`},
+     {transform:"translateY(-50%) translateX(0px)"}],
+    {duration:1650, easing:"cubic-bezier(.12,.72,.22,1)", fill:"forwards"}).finished;
+  await sleep(200);
+
+  // a black circle swells out of the centre while the screen strobes
+  wipe.animate([{transform:"translate(-50%,-50%) scale(0)"},
+                {transform:"translate(-50%,-50%) scale(1)"}],
+               {duration:780, easing:"cubic-bezier(.5,0,.6,1)", fill:"forwards"});
+  sfx("clash");
+  await whiteFlash(3);
+  await sleep(160);
+
+  // everything is black now — swap the intro away and let the enemy rise into it
+  $("intro").classList.add("clear");
+  track.innerHTML=""; wipe.style.display="none";
+  const stage=$("stage");
+  stage.style.opacity="1";
+  // rises hard, overshoots, shudders, settles — stepped so it reads at 12 fps
+  await stage.animate([
+    {transform:"translate(0,150px) scale(.45)", opacity:0,   offset:0},
+    {transform:"translate(0,96px) scale(.58)",  opacity:.45, offset:.16},
+    {transform:"translate(-7px,52px) scale(.86)",opacity:.9, offset:.34},
+    {transform:"translate(6px,18px) scale(1.30)",opacity:1,  offset:.50},
+    {transform:"translate(-9px,26px) scale(1.02)",opacity:1, offset:.60},
+    {transform:"translate(8px,4px) scale(1.22)", opacity:1,  offset:.70},
+    {transform:"translate(-6px,12px) scale(1.04)",opacity:1, offset:.79},
+    {transform:"translate(5px,-4px) scale(1.14)",opacity:1,  offset:.87},
+    {transform:"translate(-3px,3px) scale(1.03)",opacity:1,  offset:.94},
+    {transform:"translate(0,0) scale(1)",        opacity:1,  offset:1}
+  ],{duration:2000, easing:"steps(24,end)", fill:"forwards"}).finished;
+  stage.style.transform="";
+
+  // the name resolves over the enemy, one letter at a time
+  await typeName();
+
+  await speak(S.enemy.persona && S.enemy.persona.lines.INTRO, S.enemy.emotion);
+
+  // and only now does the interface arrive
+  $("floorWrap").classList.add("lit");
+  $("intro").remove();
+  $("screen").classList.remove("preintro");
+  document.querySelectorAll(".screen > *").forEach((el,i)=>{
+    el.animate([{opacity:0},{opacity:1}],{duration:420,delay:i*45,easing:"steps(4)",fill:"backwards"});
+  });
+}
+
+/* ---------------- enemy defeat: the layers come apart ---------------- */
+function enemyCollapse(){
+  const wrap=document.querySelector(".sprwrap");
+  const sr=$("screen").getBoundingClientRect(), r=wrap.getBoundingClientRect();
+  const cx=r.left-sr.left+r.width/2, cy=r.top-sr.top+r.height/2, scale=r.width/EW;
+  const all=[...S.enemy.layers, ...S.enemy.broken];
+  all.forEach((l,i)=>{
+    const g=slotGeom(i,E_CFG, i===0?RULES.layerOuterThick:RULES.layerInnerThick);
+    const d=g.outer*2*scale, bw=Math.max(3,(g.outer-g.inner)*scale);
+    const el=document.createElement("div");
+    el.className="fallring";
+    el.style.cssText=`left:${cx-d/2}px;top:${cy-d/2}px;width:${d}px;height:${d}px;`+
+                     `border-width:${bw}px;color:${emoHex(l.e)}`;
+    $("screen").appendChild(el);
+    const dx=(Math.random()*2-1)*110, rot=(Math.random()*2-1)*220;
+    el.animate([
+      {transform:"translate(0,0) rotate(0deg) scale(1)", opacity:1},
+      {transform:`translate(${dx*0.4}px,${-30-Math.random()*30}px) rotate(${rot*0.2}deg) scale(1.05)`,
+       opacity:1, offset:.22},
+      {transform:`translate(${dx}px,${sr.height*0.48}px) rotate(${rot}deg) scale(.45)`, opacity:0}
+    ],{duration:1600+i*140, delay:i*110, easing:"cubic-bezier(.4,.02,.7,1)", fill:"forwards"});
+    setTimeout(()=>el.remove(), 2400+i*160);
+  });
+  wrap.style.opacity="0";
+  $("floorWrap").classList.remove("lit");
+  S.enemy.layers.length=0; S.enemy.broken.length=0;
+}
+
+applyPersona(); buildPanel(); applyOverload(S.player); buildEnemyLine(); render();
+$("howtoBtn").addEventListener("click",()=>{ $("howto").classList.add("show"); sfx("tap"); });
+$("howtoBack").addEventListener("click",()=>{ $("howto").classList.remove("show"); sfx("tap"); });
+$("confrontBtn").addEventListener("click",()=>{
+  startMusic();                                  // the tap is also the gesture that unlocks audio
+  const t=$("title");
+  t.classList.add("gone");
+  setTimeout(()=>t.remove(),520);
+  intro();
+},{once:true});
 </script>

@@ -14,22 +14,28 @@ const DATA = {
 
 /* --- emotions ---
    one row per emotion. `token` maps to the CSS palette variable.  */
-emotions: `id,name,token,hex,short,description,enabled,notes
-ANGER,Anger,fury,#ff4d3d,ANG,"Hot, direct, aggressive.",1,
-SADNESS,Sadness,sorrow,#4a86ff,SAD,"Heavy, draining, persistent.",1,
-JOY,Joy,euphoria,#ffc63d,JOY,"Bright, volatile, energising.",1,
-APATHY,Apathy,apathy,#8a7fa8,APA,"Blunt, numbing, absorbing.",1,
-NOSTALGIA,Nostalgia,nostalgia,#ff5fae,NOS,"Warm, distracting, sticky.",1,
-CALM,Calm,stoic,#35d6b0,CAL,"Steady, defensive, restorative.",1,`,
+emotions: `id,name,token,hex,bg_hex,short,description,enabled,notes
+ANGER,Anger,fury,#ff4d3d,#3a0509,ANG,"Hot, direct, aggressive.",1,
+SADNESS,Sadness,sorrow,#4a86ff,#061634,SAD,"Heavy, draining, persistent.",1,
+JOY,Joy,euphoria,#ffc63d,#332305,JOY,"Bright, volatile, energising.",1,
+APATHY,Apathy,apathy,#8a7fa8,#1b1526,APA,"Blunt, numbing, absorbing.",1,
+NOSTALGIA,Nostalgia,nostalgia,#ff5fae,#330a1d,NOS,"Warm, distracting, sticky.",1,
+CALM,Calm,stoic,#35d6b0,#052622,CAL,"Steady, defensive, restorative.",1,`,
 
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
    (never matches a layer) · hits_layer = whether a hit rotates the target's queue.  */
-abilities: `id,name,emotion,cost,kind,power,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses_per_battle,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
-ATK_ANGER,Anger,ANGER,20,DAMAGE,35,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_JOY,Joy,JOY,20,DAMAGE,35,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-DEFEND,Defend,,10,SHIELD,1,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,0,0,,0,0,,,,SELF,COMMON,,1,`,
+abilities: `id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses_per_battle,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
+ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,0,0,,0,0,,,,SELF,COMMON,,1,
+HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
+RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
+SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
+FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
 
 /* --- matchups ---
    attack emotion x layer emotion. '*' is a wildcard, 'NONE' means the target has
@@ -37,7 +43,7 @@ DEFEND,Defend,,10,SHIELD,1,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,0,0,,0,0,,,,SE
    Adding a synergy is adding a row.  */
 matchups: `attack_emotion,layer_emotion,priority,dmg_mult,ec_mult,label,tag_class,sound,rotates_layer,self_ec,status_apply,enabled,notes
 *,*,0,1,0,OFF TYPE,off,hit,,0,,1,Fallback. Every pair you do not name lands here.
-*,NONE,5,1,0,NO LAYER,off,hit,,0,,1,Target has no layers left.
+*,NONE,5,2,0,EXPOSED!,dmg,hit,,0,,1,"No layers left: double damage, no charge."
 ANGER,ANGER,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
 SADNESS,SADNESS,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
 JOY,JOY,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
@@ -47,14 +53,139 @@ CALM,CALM,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks 
 
 /* --- units ---
    layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
-units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,1,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER,-1,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+
+/* --- dialogue ---
+   what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one
+   persona at random from the rows matching the enemy's emotion.  */
+dialogue: `emotion,persona,state,line,enabled,notes
+ANGER,The Evicted,INTRO,Thirty years in this flat and they sell it to a fund! I'LL BURN IT DOWN WITH YOU IN IT!,1,
+ANGER,The Evicted,WINNING,Choke on the ashes! CHOKE ON THEM!,1,
+ANGER,The Evicted,LOSING,No... my things... my life...,1,
+ANGER,The Evicted,DEFEAT,Just let me... lock the door... one last time.,1,
+ANGER,The Exploited,INTRO,Fourteen hours biking in the rain for three euros! I'LL BREAK YOUR FUCKING LEGS!,1,
+ANGER,The Exploited,WINNING,Take your luxury takeout and choke on it!,1,
+ANGER,The Exploited,LOSING,My bike... I can't afford to fix my bike...,1,
+ANGER,The Exploited,DEFEAT,The app... it says I'm deactivated...,1,
+ANGER,The Betrayed,INTRO,You think a text message makes up for six months of lies?! I'LL TEAR YOUR THROAT OUT!,1,
+ANGER,The Betrayed,WINNING,Look at me! Look at me when I'm screaming at you!,1,
+ANGER,The Betrayed,LOSING,Stop deflecting... stop making me the crazy one!,1,
+ANGER,The Betrayed,DEFEAT,I just... wanted the truth.,1,
+ANGER,The Vandal,INTRO,This isn't your playground! Get out of my neighborhood before I smash your skull!,1,
+ANGER,The Vandal,WINNING,Go back to your perfect little life!,1,
+ANGER,The Vandal,LOSING,There are too many of you...,1,
+ANGER,The Vandal,DEFEAT,We're being erased...,1,
+ANGER,The Denied,INTRO,Three years waiting for papers and you stamp DENIED?! I'LL KILL EVERYONE HERE!,1,
+ANGER,The Denied,WINNING,Stamp this! STAMP THIS IN BLOOD!,1,
+ANGER,The Denied,LOSING,"Please, you don't understand what they'll do to me...",1,
+ANGER,The Denied,DEFEAT,I don't exist anymore...,1,
+DISGUST,The Aristocrat,INTRO,"Look at you, sweating on the metro. Did you even shower before touching my city?",1,
+DISGUST,The Aristocrat,WINNING,Filth always sinks to the bottom. Stay there.,1,
+DISGUST,The Aristocrat,LOSING,Don't touch me with those calloused hands!,1,
+DISGUST,The Aristocrat,DEFEAT,Your smell... it won't wash off...,1,
+DISGUST,The Apathetic,INTRO,Another addict blocking the ATM. Can't you just die somewhere out of sight?,1,
+DISGUST,The Apathetic,WINNING,Scrape yourself off my shoes.,1,
+DISGUST,The Apathetic,LOSING,Don't bleed on my designer coat!,1,
+DISGUST,The Apathetic,DEFEAT,I am... better than this...,1,
+DISGUST,The Xenophobe,INTRO,"You come here, take our space, speak your garbage language. You make me sick.",1,
+DISGUST,The Xenophobe,WINNING,Clean it up. That's all you're good for.,1,
+DISGUST,The Xenophobe,LOSING,How dare you speak back to me?!,1,
+DISGUST,The Xenophobe,DEFEAT,This isn't... your home...,1,
+DISGUST,The Purist,INTRO,"Plastic faces, fake lips, empty heads. You're a walking infection in this club.",1,
+DISGUST,The Purist,WINNING,Choke on your vanity.,1,
+DISGUST,The Purist,LOSING,Get your cheap perfume away from me.,1,
+DISGUST,The Purist,DEFEAT,It's all so... hollow...,1,
+DISGUST,The Mirror,INTRO,"I see the track marks under your sleeves. You're rotting from the inside, just like me.",1,
+DISGUST,The Mirror,WINNING,We belong in the gutter. Accept it.,1,
+DISGUST,The Mirror,LOSING,Don't look at me with pity!,1,
+DISGUST,The Mirror,DEFEAT,Just... one more hit to make it stop...,1,
+SADNESS,The Left Behind,INTRO,No. Dad didn't leave. Dad loves me... Loved me?,1,
+SADNESS,The Left Behind,WINNING,I'll make you stay! Nobody leaves me again!,1,
+SADNESS,The Left Behind,LOSING,Did I do something wrong?,1,
+SADNESS,The Left Behind,DEFEAT,I'll be good... I promise I'll be good...,1,
+SADNESS,The Isolated,INTRO,The hospital called. Nobody came to claim his things. Am I next?,1,
+SADNESS,The Isolated,WINNING,If you stay down... it hurts less. I promise.,1,
+SADNESS,The Isolated,LOSING,Why does everyone walk away?,1,
+SADNESS,The Isolated,DEFEAT,Finally... it's quiet.,1,
+SADNESS,The Erased,INTRO,My grandfather built this bar. Now it's a fucking brunch spot... I have nothing.,1,
+SADNESS,The Erased,WINNING,Drink the bitterness. It's all we have left.,1,
+SADNESS,The Erased,LOSING,They're painting over the mural...,1,
+SADNESS,The Erased,DEFEAT,I don't recognize my own street.,1,
+SADNESS,The Grieving,INTRO,The sea was supposed to be calm... they promised it was safe to cross...,1,
+SADNESS,The Grieving,WINNING,Drown with me! Drown with my memories!,1,
+SADNESS,The Grieving,LOSING,I can't hold on to the raft...,1,
+SADNESS,The Grieving,DEFEAT,The water is so cold...,1,
+SADNESS,The Broken Dream,INTRO,Ten years playing in the metro... nobody even looks up anymore.,1,
+SADNESS,The Broken Dream,WINNING,LISTEN TO ME! FOR ONCE IN YOUR LIFE!,1,
+SADNESS,The Broken Dream,LOSING,My strings are snapping...,1,
+SADNESS,The Broken Dream,DEFEAT,Silence... just like always.,1,
+FEAR,The Hunted,INTRO,"Shhhh shhhhhhhhh! Those transphobes behind the corner, they'll notice us, move back slowly... oh no OH NO",1,
+FEAR,The Hunted,WINNING,STAY BACK! I HAVE A KNIFE!,1,
+FEAR,The Hunted,LOSING,"Please, I just want to walk home...",1,
+FEAR,The Hunted,DEFEAT,Not again... please not again...,1,
+FEAR,The Paranoid,INTRO,The cameras on the streetlights—they track our heartbeats. Don't let them see you panic!,1,
+FEAR,The Paranoid,WINNING,I'll blind them! I'LL BLIND THE WHOLE CITY!,1,
+FEAR,The Paranoid,LOSING,They're zooming in... they know my name...,1,
+FEAR,The Paranoid,DEFEAT,Erase my... search history...,1,
+FEAR,The Debt-Ridden,INTRO,"I have the money, I swear! Just give me till Friday!",1,
+FEAR,The Debt-Ridden,WINNING,I'll take yours! I'll pay them with your blood!,1,
+FEAR,The Debt-Ridden,LOSING,They're going to break my hands...,1,
+FEAR,The Debt-Ridden,DEFEAT,Tell my mother... I'm sorry...,1,
+FEAR,The Trapped,INTRO,He said he wouldn't hit me again if I just stayed quiet...,1,
+FEAR,The Trapped,WINNING,Don't make him angry! Just do what he says!,1,
+FEAR,The Trapped,LOSING,He's coming up the stairs... I can hear his keys...,1,
+FEAR,The Trapped,DEFEAT,It was always going to end like this...,1,
+FEAR,The Night-Walker,INTRO,Footsteps. Stop. Footsteps. Why are they matching my pace?,1,
+FEAR,The Night-Walker,WINNING,I'll run! You can't catch me in the dark!,1,
+FEAR,The Night-Walker,LOSING,The streetlights are all broken here...,1,
+FEAR,The Night-Walker,DEFEAT,Nobody can hear me scream...,1,
+JOY,The Delusional,INTRO,Life is MINE and this street is MY world to strut by and BLIND YOU WITH MY LIGHT,1,
+JOY,The Delusional,WINNING,Bask in my glory! I am untouched by sorrow!,1,
+JOY,The Delusional,LOSING,Wait... why is everyone looking at me like that?,1,
+JOY,The Delusional,DEFEAT,The spotlight... it's fading...,1,
+JOY,The Substance Abuser,INTRO,"Another pill, another party! The sun never sets in Raval if your eyes are wide enough!",1,
+JOY,The Substance Abuser,WINNING,DANCE WITH ME! WHY AREN'T YOU DANCING?!,1,
+JOY,The Substance Abuser,LOSING,"No, no, the comedown... I can't feel my teeth...",1,
+JOY,The Substance Abuser,DEFEAT,It's so dark... where did the music go?,1,
+JOY,The Cultist,INTRO,We are all just vibrations! I have transcended this fleshy prison!,1,
+JOY,The Cultist,WINNING,Let me cleanse your aura... WITH FIRE!,1,
+JOY,The Cultist,LOSING,My chakras... they are bleeding...,1,
+JOY,The Cultist,DEFEAT,The universe... lied to me...,1,
+JOY,The Influencer,INTRO,"A million followers, baby! Look at this view, look at this life!",1,
+JOY,The Influencer,WINNING,"SMILE FOR THE CAMERA, TRASH!",1,
+JOY,The Influencer,LOSING,I'm losing sponsors... I'm losing relevance...,1,
+JOY,The Influencer,DEFEAT,Did anybody... even like... the post?,1,
+JOY,The Pyromaniac,INTRO,Look at how pretty the flames are on the dumpsters! It's art!,1,
+JOY,The Pyromaniac,WINNING,BURN! EVERYTHING LOOKS BETTER IN RED!,1,
+JOY,The Pyromaniac,LOSING,The smoke... I can't breathe...,1,
+JOY,The Pyromaniac,DEFEAT,"Just embers... cold, dead embers...",1,
+SURPRISE,The Betrayed,INTRO,"Yesss YESSSS give me that sweet sweet nectar GIVE IT... wait, what did you just inject me with?",1,
+SURPRISE,The Betrayed,WINNING,I'LL TEAR THE POISON OUT OF YOUR CHEST!,1,
+SURPRISE,The Betrayed,LOSING,My heart... it's beating too fast...,1,
+SURPRISE,The Betrayed,DEFEAT,You... you killed me...,1,
+SURPRISE,The Accident,INTRO,The light was green! I swear on my mother's life the light was green!,1,
+SURPRISE,The Accident,WINNING,"You see it too, right? The glass in my hair?",1,
+SURPRISE,The Accident,LOSING,Why is the steering wheel bending like that?,1,
+SURPRISE,The Accident,DEFEAT,I can't... feel my legs...,1,
+SURPRISE,The Diagnosis,INTRO,"Six months? You're joking, right? I ran a marathon yesterday...",1,
+SURPRISE,The Diagnosis,WINNING,I'M NOT SICK! LOOK AT HOW STRONG I AM!,1,
+SURPRISE,The Diagnosis,LOSING,Why am I coughing blood...?,1,
+SURPRISE,The Diagnosis,DEFEAT,I don't have enough time...,1,
+SURPRISE,The Raid,INTRO,"They're breaking down the door! Throw it in the toilet, NOW!",1,
+SURPRISE,The Raid,WINNING,"YOU'LL NEVER TAKE ME ALIVE, PIGS!",1,
+SURPRISE,The Raid,LOSING,The window... it's too high up...,1,
+SURPRISE,The Raid,DEFEAT,Handcuffs... so cold...,1,
+SURPRISE,The Ghost,INTRO,Why won't anybody look at me? I've been screaming on this platform for hours...,1,
+SURPRISE,The Ghost,WINNING,FEEL ME! FEEL MY COLD HANDS!,1,
+SURPRISE,The Ghost,LOSING,My reflection... I don't have a reflection...,1,
+SURPRISE,The Ghost,DEFEAT,I died... I died under the metro...,1,`,
 
 /* --- rules ---
    global tunables, read by name.  */
 rules: `key,value,description,,,
-lineCap,3,Stations per line.,,,
+lineCap,6,"Line segments per line. A charge segment consumes one, same as a station.",,,
 maxLayers,6,Layer slots per unit.,,,
 restEc,15,Charge gained by departing with an empty line.,,,
 ecBasis,POWER,POWER = charge figured from the ability's base power. DEALT = from damage actually dealt.,,,
@@ -63,6 +194,14 @@ noLayerEcMult,0,Superseded by the matchups sheet; kept as a fallback.,,,
 shieldRotatesLayer,0,Whether a blocked attack still rotates the layer queue.,,,
 lowMsWarnPct,0.18,Below this fraction of max MS the ceiling chevron pulses red.,,,
 clashSeconds,4,Length of the death sequence.,,,
+layerRegenAtTurnEnd,1,"Broken layers stay gone until the round ends, then regrow at the back of the queue.",,,
+chargeStepMs,260,How long each charge segment holds before the next.,,,
+flyMs,420,How long a station takes to fly across and strike the target.,,,
+typeMs,32,Delay between letters of dialogue.,,,
+dialogueHoldMs,3000,How long a finished line stays on screen before it fades.,,,
+lowHpTalkPct,0.2,Fraction of max MS below which the winning / losing lines fire.,,,
+overloadSlotPer,0.25,Every this-much overflow (as a fraction of max MS) forces one more corrupted slot.,,,
+aiVarietyChance,0.22,Chance the AI takes a random affordable attack instead of its best one.,,,
 layerEase,0.16,How fast layers slide to their new slot. Higher = snappier.,,,
 layerWaveDelay,0.85,"Phase offset per slot, so breathing travels outward in waves.",,,
 layerInnerShrink,0.85,Curve of the radius falloff toward the centre.,,,
@@ -97,6 +236,7 @@ block,noise,1600,1600,90,0.3,0.35,"Shield blocks, or shield goes up."
 breaklayer,sawtooth,760,80,340,0.28,0.55,A layer flashes and breaks.
 regrow,triangle,120,520,300,0.16,0.4,The broken layer regrows at the back.
 clash,noise,240,240,1500,0.4,0.65,Death: the chevrons meet.
+speak,square,620,540,42,0.09,0.12,One letter of dialogue appearing.
 win,square,440,1320,620,0.24,0.55,Victory.
 lose,sawtooth,320,50,950,0.28,0.6,Defeat.`
 };
@@ -141,3 +281,4 @@ const UNITS     = byId(parseCSV(DATA.units));
 const RULES     = Object.fromEntries(parseCSV(DATA.rules).map(r=>[r.key,r.value]));
 const SOUNDS    = byId(parseCSV(DATA.sounds));
 const MATCHUPS  = parseCSV(DATA.matchups);
+const DIALOGUE  = parseCSV(DATA.dialogue);

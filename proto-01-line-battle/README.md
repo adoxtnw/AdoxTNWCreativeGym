@@ -20,6 +20,209 @@ A single self-contained `index.html`. No build step, no dependencies, no network
 | Remove from the line | Tap a node in the line |
 | Resolve the turn | **DEPART** |
 
+## Pass 14 — labelled tags
+
+- **Tags name their units**: `280 MS` on the white plate, `210 EC` on the charge plate.
+- **The EC tag is rainbow**, drifting on the same 7-second cycle as the charge fill and the cost
+  pills, so charge reads as one colour language wherever it appears. Overcharge no longer swaps the
+  plate to red — it keeps the rainbow and gains a red outline and glow, so the identity survives the
+  warning.
+- **The bar fill is 1.5× thicker** (19px → 28px). The white span strokes, the chevrons and the edge
+  filament all keep their previous weight.
+
+## Pass 13 — reading the bar
+
+- **A thick white stroke now runs along the bar itself between the two chevrons**, top and bottom,
+  bracketing the stretch of Mental Stamina still standing. *(Pass 07 put the white rim on the
+  chevrons' inner faces instead — a misreading of the same request. Both are now present, and the
+  span stroke is the one that actually communicates it.)*
+- **A hot yellow filament marks the leading edge of the charge**, so the boundary between charge and
+  unlit capacity is unmistakable.
+- **Unlit capacity is roughly twice as bright** on both bars — teal for you, red for the enemy.
+- The gauge grew from 16px to 19px. A 3px stroke top and bottom plus its glow was eating most of a
+  16px bar, leaving almost none of the fill it was supposed to be bracketing.
+
+## Pass 12 — Overload bites, and the lines breathe
+
+### Overload finally has consequences
+Charge above your ceiling and, at the start of the round, **random slots on your line are taken over
+by things you did not choose**:
+- **Self Harm** — 25 MS off your own stamina.
+- **Feed** — heals your opponent for 30.
+
+They are **locked**: tapping one refuses instead of removing it. The number forced in scales with how
+far over you are (`overloadSlotPer`, one more slot per 25% of max MS of overflow), and is capped so
+at least one slot always stays yours. The rules are symmetric — **the enemy overloads too**.
+
+This required the line to become a **fixed array of slots** rather than a dense list, so a locked
+station can hold a specific position while you build around it. Multi-slot abilities now need that
+many *consecutive* free slots, which is a real constraint once Overload has punched holes in the line.
+
+### The enemy varies
+`aiVarietyChance` (0.22) makes the AI take a random affordable attack instead of its best one, so its
+Sadness and Joy attacks surface occasionally instead of never — its scoring otherwise always picked
+whichever emotion was off-type against you.
+
+### Idle motion
+- **Line stations** swell, glow and bob on a wave running in each line's direction of travel — left
+  to right for the player, right to left for the enemy. It stops during resolution so the firing
+  station is the only thing moving.
+- **Empty layer slots** ride the same wave in the opposite direction, centre outward, breathing
+  between two greys instead of glowing.
+
+### HOW TO PLAY
+Type roughly doubled, five steps, still one screen at 375×812. Now states outright that **EC is your
+fuel and MS is both your life *and* the ceiling your EC must stay under**, with a fifth step for
+Overload.
+
+### Opening, revised
+The screen-wide name banner is gone. Instead the **persona's name resolves over the enemy one letter
+at a time**, larger and pulsing while it types, then settling into the permanent floating label it
+stays as for the rest of the battle. **The floor light stays dark until the interface arrives**, so
+the enemy hangs in nothing until the moment the fight actually starts.
+
+> The reveal gate had to move to a **wrapper element**. `floorpulse` animates `opacity` in its own
+> keyframes, and a running CSS animation overrides a plain `opacity` declaration — so hiding the
+> light by setting `opacity:0` on the same element did nothing at all. The wrapper is not animated,
+> so its opacity multiplies with the pulse instead of losing to it. Worth remembering: **verifying a
+> class was applied is not verifying the element is hidden.**
+
+### Fix — the intro line typed invisibly
+The speech bubble is a child of `.screen`, and the pre-intro blackout rule sets `opacity:0` on
+children it does not exempt. So the enemy's opening line typed out its whole life unseen, and then
+its fade-*out* animation briefly overrode the CSS — which is the "blinks for a microsecond" before
+the UI appears. The bubble is now exempt from the blackout.
+
+## Pass 11 — front end, Recharge
+
+- **HOW TO PLAY** sits under CONFRONT EMOTION on the title screen, rewritten around the fiction:
+  a lead line (*"Emotional Entities wander the line. Confront them without losing yourself."*) and
+  four colour-coded steps — **CONFRONT** (break their emotional layers before they break yours),
+  **SUMMON** (spend Emotional Charge to summon abilities onto your Metro Line), **MATCH** (a layer
+  struck with its own emotion absorbs the blow), **REGULATE** (never let Charge pass your Mental
+  Stamina). 84 words: about **13 seconds** skimming the headings, longer read word for word.
+  Fits on one screen at 375×812 without scrolling.
+- **Recharge** — a new ability: **+20 EC, −5 of your own MS**, costs nothing to cast. Because MS is
+  also the charge ceiling, paying stamina for charge narrows your own band from both sides, which
+  is the tension the whole system is built on. It takes a line slot like anything else, so the
+  real cost is the attack it displaces.
+  - Added to both pools. The **enemy AI reaches for it when it cannot afford an attack**, instead
+    of idling on REST.
+  - Self-damage is clamped to leave at least 1 MS — a unit cannot recharge itself to death.
+  - The speech bubble was rebuilt: an unclipped wrapper carries the tail and the drop shadow, with
+    the black stroke and the coloured body as two stacked pixel-cornered plates behind it, so the
+    corners stay pixelated while the tail still escapes the clip.
+
+## Pass 10 — title screen, enemy dialogue, identity
+
+- **Title screen.** Black, the game's name, one button: **CONFRONT EMOTION**. Nothing runs until it
+  is pressed — and that press is also the gesture browsers require before audio, so the theme now
+  starts exactly when the game does.
+- **Enemy dialogue.** `neuro_metro_avui_enemy_dialogues.csv` is imported into the workbook as a
+  **dialogue** sheet and flows through the same CSV pipeline. Speech bubbles are solid emotion
+  colour, white text with a hard black shadow, a tail pointing at the speaker, typed **letter by
+  letter** with a blip per character, held **3 seconds after the last letter**, then faded.
+  - `INTRO` — after the reveal banner
+  - `WINNING` — first time the player drops below 20% MS
+  - `LOSING` — first time this enemy drops below 20% MS
+  - `DEFEAT` — as the enemy comes apart
+- **A different persona every battle.** One is drawn at random from the personas matching the
+  enemy's emotion, so the same enemy type speaks with a different voice each run. Anger has five:
+  The Evicted, The Exploited, The Betrayed, The Vandal, The Denied.
+- **The persona's name hangs over the enemy** for the whole battle, colour-coded and drifting.
+- **The backdrop takes the enemy's colour** — a `bg_hex` column on the emotions sheet. Anger fights
+  happen against dark red bleeding up into black.
+
+### Fixes in this pass
+- **The intro was never visible.** `.introtrack` sat at `left:0` of a 2200px rail, so the stations
+  ran 1100px off-centre and never crossed the screen. The track origin is now the rail's centre;
+  verified by measurement — the fourth station lands dead centre.
+- **The wipe was black on black,** and at `280vmax` it covered the screen almost instantly. It is
+  now sized to just cover the diagonal and carries a blazing white leading edge, so it reads as a
+  circle sweeping outward. The three white flashes fire *during* it.
+- **The rainbow charge now loops seamlessly.** One tile is half a screen wide, the gradient starts
+  and ends on the same hue, and the animation shifts by exactly one tile.
+- **The chevron strokes were invisible** because the body was also pure white. The rim is now black
+  on every side *except* the one facing the other chevron, which is pure white — so the span of
+  Mental Stamina between them is outlined.
+- **The EMOTIONS panel eases open and closed** on height and opacity, and **the enemy sits behind
+  the interface** (stage `z-index:1`, panels `3`).
+- **The enemy's arrival is nastier**: it lurches up, overshoots, shudders and settles, stepped at
+  roughly 12 fps.
+
+### ⚠ The dialogue CSV uses a different set of six emotions
+The sheet is built on **Anger, Disgust, Sadness, Fear, Joy, Surprise**. The game is built on
+**Anger, Sadness, Joy, Apathy, Nostalgia, Calm**. Only three line up — **Disgust, Fear and Surprise
+have 60 lines that nothing can currently speak, and Apathy, Nostalgia and Calm enemies have nothing
+to say.** Nothing breaks; the rows simply never match. This is the same open question the GDD flags
+in §7.3, now with content riding on it. Worth settling which six the game actually has.
+
+## Pass 09 — opening sequence, music, presence
+
+### Music
+`Theme Song 8_bit.mid` is converted by `tools/build_music.py` into `music.js` — a plain note list
+that **the prototype's own WebAudio synth plays back**. No audio file is fetched and no MIDI is
+parsed in the browser, so it works from `file://` as well as from a server, and the theme runs
+through the same bit-crusher as the sound effects.
+
+```
+python3 tools/build_music.py "Theme Song 8_bit.mid"
+```
+
+Track names pick the voice: lead guitars → square, bass → triangle, drums → noise, and so on
+(`VOICES` at the top of the script). 8 tracks, 3,637 notes, an 89-second loop. Notes are scheduled
+on a rolling 300 ms lookahead rather than all at once.
+
+**Browsers will not start audio before a gesture**, so the theme begins on your first tap and loops
+from there. Nothing else changes.
+
+### Opening sequence
+Black screen → a metro line sweeps in diagonally from the top right, three stations flying past
+before the fourth stops dead centre → a black circle swells out of the middle while the screen
+strobes off-white three times → the wipe hands over to the enemy rising into place → a screen-wide
+banner with its name → and only then does the interface fade in.
+
+### Presence
+- **The background darkens toward the top** of the screen.
+- **The enemy hovers**, and casts an ellipse of light on the floor beneath it in the colour of its
+  outer layer. The pool tightens and brightens as the enemy sinks, widens and dims as it rises —
+  exactly counter to the hover, the way a point light over a floor behaves.
+- **Defeat**: the enemy's layers come apart and tumble to the floor.
+
+### Bars
+- The chevron tiling **inside** the bars is gone — the markers carry that language now.
+- The markers are **1.5× thicker, far brighter**, and carry a **black stroke all the way round**
+  plus a **pure white stroke only on the face turned toward the other chevron**, so the stretch of
+  Mental Stamina still standing between them is outlined on both ends.
+
+## Pass 08 — charge segments, the EMOTIONS panel, deferred layers
+
+- **Lines are 6 segments.** The player's travels **right**, the enemy's travels **left**. The
+  terminus arrow now sits at the **head** of each line, marking the segment that fires first and
+  therefore the direction the rest execute in.
+- **Charge segments.** An ability can declare `charge` in the spreadsheet; each charge consumes a
+  line slot ahead of it. `Rage` and `Grief` cost 2, `Mania` costs 3 — so one heavy ability eats
+  half the line and locks out the rest. During resolution a charge segment does nothing but hold,
+  each one a semitone-ish step higher than the last, until the ability itself lands.
+- **The EMOTIONS panel.** The always-on tray is gone. A button opens a scrollable bottom sheet
+  about a third of the screen tall; the stage compresses so everything moves up. Each ability is
+  drawn as a **line fragment** with its charge segments, its name in bold, its cost as a
+  **rainbow pill** (`-45 EC`) and its effect as a **white pill** (`90 DMG`).
+- **Abilities fly.** When a station fires, it lifts off the line, scales up and strikes the
+  target's outer layer, so what was executed and where it landed are the same gesture.
+- **Layers no longer regenerate mid-turn.** A struck layer flashes, breaks and stays gone. Every
+  broken layer returns to the back of the queue **when the round ends**. Being hit with **no layers
+  left is EXPOSED: double damage and zero charge.**
+- **Rainbow charge.** The EC fill is a screen-wide rainbow that drifts slowly, visible only where
+  charge actually reaches.
+- **Chevrons everywhere.** The markers are now a **single thick solid chevron**, and the bar's own
+  segmentation is the same chevron tiled, so the interior and the ends read as one system. The left
+  chevron is anchored and still; the right one **breathes**, and **strobes and shakes** when it is
+  driven down. The whole gauge block shakes and flashes magenta on damage.
+- **Idle motion**: the MS and EC tags drift slowly up and down; the warning glyph in destroyed
+  capacity is twice as large and scrolls diagonally.
+- **Shield break**: the shield splits in two and the halves tumble away.
+
 ## Pass 07 — smaller, SNES-era, mirrored layout
 
 - **Everything roughly halved.** Gauges 30→16px, lanes 64→38, stations 48→28, tray icons 26→15,
@@ -354,6 +557,40 @@ Listed because the brief didn't cover them and each one is a design decision you
 48. **MS tag stays above the bar and EC below on both units**, rather than mirroring vertically with
     the layout. A true mirror would have put the player's numbers in the opposite order to the
     enemy's, which reads as a different quantity rather than the same one.
+
+### Added in pass 08
+
+49. **`unit.line` is now stored in execution order** (index 0 always fires first) and *rendering*
+    applies direction, rather than the data being stored visually and reversed everywhere it is
+    read. With two units travelling opposite ways and multi-slot abilities, the old scheme had four
+    places that each had to get the reversal right.
+50. **Drag-to-reorder is currently off.** Moving a station would have to drag its charge segments
+    with it as a group, and a half-working version is worse than none. Tapping any segment removes
+    the whole ability, charges included. Worth restoring once the grouping settles.
+51. **The AI scores heavy abilities per slot**, not per cast, so a 3-slot nuke is weighed against
+    the three quick attacks it displaces.
+52. **A `charge` column and a `line_dir` column** were added to the spreadsheet, along with
+    `chargeStepMs`, `flyMs` and `layerRegenAtTurnEnd` in rules — all reached the game through the
+    CSV pipeline rather than being typed into the code.
+
+### ⚠⚠ Balance finding — the fight is now decided on turn one
+With **6-slot lines**, whoever strips the other's layers first wins outright. An automated run had
+the player queue three cheap attacks — breaking all three enemy layers, since broken layers no
+longer return mid-round — and then land `Rage` into the empty stack for **180 damage** on a 250 MS
+enemy. **Won in round 1, at full health, untouched.**
+
+The same rule killed the player in round 2 in pass 08's run. It is not that EXPOSED is too strong
+in one direction; it is that **line length, layer count and the EXPOSED multiplier now multiply
+together**, and going first decides it. Three dials, all in the spreadsheet:
+`lineCap`, each unit's `layers`, and the `*,NONE` row's `dmg_mult`.
+
+### ⚠ Earlier balance finding
+EXPOSED is brutal in combination with deferred regeneration. The player has 2 layers against a
+6-segment enemy line, so both break in the first two hits and **every remaining station lands at
+double damage**. An automated run lost in **round 2**. The rule works exactly as specified — but
+layer count, line length and the EXPOSED multiplier are now tightly coupled, and 2 layers against
+6 segments is not a survivable ratio. Worth deciding whether players get more layers, whether
+regeneration is partial, or whether EXPOSED is less than 2×.
 
 ### Interface / feel
 
