@@ -202,6 +202,9 @@ dialogueHoldMs,3000,How long a finished line stays on screen before it fades.,,,
 lowHpTalkPct,0.2,Fraction of max MS below which the winning / losing lines fire.,,,
 overloadSlotPer,0.25,Every this-much overflow (as a fraction of max MS) forces one more corrupted slot.,,,
 aiVarietyChance,0.22,Chance the AI takes a random affordable attack instead of its best one.,,,
+musicFadeMs,900,How quickly the theme fades out when the battle ends.,,,
+musicVolume,0.3,Theme level. Lower this if the sound effects are getting buried.,,,
+sfxVolume,1.05,"Sound-effect level, mixed against musicVolume.",,,
 layerEase,0.16,How fast layers slide to their new slot. Higher = snappier.,,,
 layerWaveDelay,0.85,"Phase offset per slot, so breathing travels outward in waves.",,,
 layerInnerShrink,0.85,Curve of the radius falloff toward the centre.,,,
@@ -225,8 +228,8 @@ crusherSteps,12,"Audio bit-crusher quantisation. Low = Atari harsh, high = SNES-
 /* --- sounds ---
    synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.  */
 sounds: `id,wave,f0,f1,dur,gain,echo,description
-tap,square,440,660,55,0.2,0.22,Adding an ability to the line.
-remove,square,330,160,70,0.16,0.18,Removing a station.
+tap,square,980,1460,80,0.46,0.3,Adding an ability to the line.
+remove,square,520,220,90,0.34,0.24,Removing a station.
 depart,sawtooth,240,70,420,0.26,0.45,The line departs and charge is spent.
 travel,square,150,150,38,0.1,0.15,Line scrolling to the next station.
 arrive,square,880,880,45,0.14,0.3,Station reaches the head and lights up.

@@ -105,7 +105,7 @@ body{background:var(--void); color:var(--ink);
   background-size:50vw 100%; background-repeat:repeat-x;
   animation:floaty 3.4s ease-in-out infinite alternate, rainbow 7s linear infinite;
   box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 12px rgba(255,255,255,.5)}
-.tag.ec.over{box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 18px var(--fury);
+.tag.ec.overcharged{box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 18px var(--fury);
   outline:var(--px) solid var(--fury); outline-offset:1px}
 .shieldpip{position:absolute; left:0; top:1px; width:13px; height:13px; color:var(--stoic);
   z-index:13; filter:drop-shadow(0 0 5px var(--stoic))}
@@ -497,13 +497,20 @@ const ICONS={
 };
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* A backgrounded tab throttles animations, so `.finished` may never resolve —
+   which would strand the opening sequence forever. Always race it against a
+   timer so the sequence keeps moving no matter what the browser does. */
+const waitAnim=(anim,ms)=>Promise.race([
+  anim.finished.catch(()=>{}),
+  sleep(ms+140)
+]);
 const R=(x,y)=>`<rect x="${x}" y="${y}" width="1" height="1"/>`;
 const hexRGB=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
 const emoHex=id=>id&&EMOTIONS[id]?EMOTIONS[id].hex:"#8a7fa8";
 const emoName=id=>id&&EMOTIONS[id]?EMOTIONS[id].name.toUpperCase():"NEUTRAL";
 
 /* ================= AUDIO — synthesised, crunchy, echoing ================= */
-let actx=null, master=null, delay=null, noiseBuf=null;
+let actx=null, master=null, sfxBus=null, delay=null, noiseBuf=null;
 function crushCurve(steps){
   const n=1024, c=new Float32Array(n);
   for(let i=0;i<n;i++){ const x=i/(n-1)*2-1; c[i]=Math.round(x*steps)/steps; }
@@ -513,7 +520,8 @@ function initAudio(){
   if(actx) return;
   const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
   actx=new AC();
-  master=actx.createGain(); master.gain.value=0.55;
+  master=actx.createGain(); master.gain.value=0.7;
+  sfxBus=actx.createGain(); sfxBus.gain.value=RULES.sfxVolume; sfxBus.connect(master);
   const crusher=actx.createWaveShaper();          // lo-fi quantisation = the crunch
   crusher.curve=crushCurve(RULES.crusherSteps||12); crusher.oversample="none";
   const lp=actx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=7200;
@@ -556,7 +564,7 @@ function sfxAt(s,mult){
   g.gain.setValueAtTime(0.0001,t0);
   g.gain.exponentialRampToValueAtTime(s.gain,t0+0.008);
   g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
-  src.connect(g); g.connect(master);
+  src.connect(g); g.connect(sfxBus);
   if(s.echo>0){ const e=actx.createGain(); e.gain.value=s.echo; g.connect(e); e.connect(delay); }
   src.start(t0); src.stop(t0+dur+0.05);
 }
@@ -599,11 +607,29 @@ function schedMusic(){
 function startMusic(){
   initAudio(); if(!actx||musicOn||typeof MUSIC==="undefined") return;
   if(actx.state==="suspended") actx.resume();
-  musicBus=actx.createGain(); musicBus.gain.value=0.5; musicBus.connect(master);
-  musicOn=true; musicStart=actx.currentTime+0.2; musicIdx=MUSIC.tracks.map(()=>0);
+  musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume; musicBus.connect(master);
+  musicOn=true; musicStart=actx.currentTime+0.06; musicIdx=MUSIC.tracks.map(()=>0);
   schedMusic(); musicTimer=setInterval(schedMusic,50);
 }
-window.addEventListener("pointerdown",()=>{ initAudio(); startMusic(); },{once:true});
+/* The graph — context, buses, crusher curve and the noise buffer — is built
+   while the title screen is up, so CONFRONT EMOTION only has to resume it and
+   the theme starts on the tap rather than after it. The context begins
+   suspended, which is exactly what browsers require before a gesture. */
+initAudio();
+window.addEventListener("pointerdown",initAudio,{once:true});
+function stopMusic(fadeMs){
+  if(!musicOn||!actx||!musicBus) return;
+  musicOn=false;
+  if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
+  const bus=musicBus, t0=actx.currentTime, dur=(fadeMs||RULES.musicFadeMs)/1000;
+  musicBus=null;
+  try{
+    bus.gain.cancelScheduledValues(t0);
+    bus.gain.setValueAtTime(Math.max(0.0001,bus.gain.value), t0);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  }catch(_){}
+  setTimeout(()=>{ try{ bus.disconnect(); }catch(_){} }, (fadeMs||RULES.musicFadeMs)+150);
+}
 
 /* ================= STATE ================= */
 function makeUnit(id){
@@ -914,7 +940,7 @@ function renderGauge(el,u,opts){
   };
   opts.tagMs.textContent=u.ms+" MS"; anchor(opts.tagMsA,u.ms);
   opts.tagEc.textContent=u.ec+" EC"; anchor(opts.tagEcA,Math.min(u.ec,u.maxMs));
-  opts.tagEc.classList.toggle("over", u.ec>u.ms);
+  opts.tagEc.classList.toggle("overcharged", u.ec>u.ms);   // NOT "over" — that is the game-over overlay
   const near=(u.ms/u.maxMs)<RULES.lowMsWarnPct;
   // a re-render mid-hit must not wipe the strobe the damage just started
   const strobe=opts.chevEl.querySelector(".ceil.strobe")?" strobe":"";
@@ -1021,11 +1047,11 @@ async function flyStrike(stationEl,targetEl,col){
   $("screen").appendChild(el);
   const dx=(b.left+b.width/2)-(a.left+a.width/2), dy=(b.top+b.height/2)-(a.top+a.height/2);
   sfx("travel");
-  await el.animate([
+  await waitAnim(el.animate([
     {transform:"translate(0,0) scale(1)"},
     {transform:`translate(${dx*0.34}px,${dy*0.34}px) scale(2.4)`, offset:.6},
     {transform:`translate(${dx}px,${dy}px) scale(1.15)`}
-  ],{duration:RULES.flyMs, easing:"cubic-bezier(.45,0,.9,.45)"}).finished;
+  ],{duration:RULES.flyMs, easing:"cubic-bezier(.45,0,.9,.45)"}), RULES.flyMs);
   el.remove();
 }
 function shieldBreak(hostEl){
@@ -1247,7 +1273,7 @@ function endCheck(){
   return false;
 }
 function finish(kind){
-  S.phase="OVER"; setFps(12); sfx(kind);
+  S.phase="OVER"; setFps(12); stopMusic(); sfx(kind);
   const o=document.createElement("div"); o.className="over "+kind;
   o.innerHTML=`<h1 class="hard">${kind==="win"?"LINE CLEAR":"BREAKDOWN"}</h1>
     <button class="depart pxr pxr-sh" style="width:auto;padding:13px 28px" onclick="location.reload()">RUN AGAIN</button>`;
@@ -1337,7 +1363,7 @@ async function speak(text, emotion){
   }
   await sleep(RULES.dialogueHoldMs);
   if(tok!==bubbleToken){ el.remove(); return; }
-  await el.animate([{opacity:1},{opacity:0}],{duration:280,fill:"forwards"}).finished;
+  await waitAnim(el.animate([{opacity:1},{opacity:0}],{duration:280,fill:"forwards"}), 280);
   el.remove();
 }
 /* fires the winning / losing lines the first time either side crosses the mark */
@@ -1399,10 +1425,10 @@ async function intro(){
     d.className="introstation"; d.style.left=(i*SP)+"px";
     track.appendChild(d);
   }
-  await track.animate(
+  await waitAnim(track.animate(
     [{transform:`translateY(-50%) translateX(${-(3*SP)-560}px)`},
      {transform:"translateY(-50%) translateX(0px)"}],
-    {duration:1650, easing:"cubic-bezier(.12,.72,.22,1)", fill:"forwards"}).finished;
+    {duration:1650, easing:"cubic-bezier(.12,.72,.22,1)", fill:"forwards"}), 1650);
   await sleep(200);
 
   // a black circle swells out of the centre while the screen strobes
@@ -1419,7 +1445,7 @@ async function intro(){
   const stage=$("stage");
   stage.style.opacity="1";
   // rises hard, overshoots, shudders, settles — stepped so it reads at 12 fps
-  await stage.animate([
+  await waitAnim(stage.animate([
     {transform:"translate(0,150px) scale(.45)", opacity:0,   offset:0},
     {transform:"translate(0,96px) scale(.58)",  opacity:.45, offset:.16},
     {transform:"translate(-7px,52px) scale(.86)",opacity:.9, offset:.34},
@@ -1430,7 +1456,7 @@ async function intro(){
     {transform:"translate(5px,-4px) scale(1.14)",opacity:1,  offset:.87},
     {transform:"translate(-3px,3px) scale(1.03)",opacity:1,  offset:.94},
     {transform:"translate(0,0) scale(1)",        opacity:1,  offset:1}
-  ],{duration:2000, easing:"steps(24,end)", fill:"forwards"}).finished;
+  ],{duration:2000, easing:"steps(24,end)", fill:"forwards"}), 2000);
   stage.style.transform="";
 
   // the name resolves over the enemy, one letter at a time

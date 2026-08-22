@@ -20,6 +20,34 @@ A single self-contained `index.html`. No build step, no dependencies, no network
 | Remove from the line | Tap a node in the line |
 | Resolve the turn | **DEPART** |
 
+## Pass 15 — audio mix, and two real bugs
+
+### Audio
+- **HOW TO PLAY is silent.** The theme used to start there because a fallback listener began playback
+  on the *first pointerdown anywhere*, and that button was often the first thing tapped. Only
+  CONFRONT EMOTION starts it now.
+- **The theme fades out over 900 ms when the battle ends** (`musicFadeMs`), and the scheduler stops
+  with it. Measured ramp: 0.5 → 0.12 → 0.03 → 0.0001.
+- **Sound effects and music are on separate buses** — `sfxVolume` (1.05) against `musicVolume`
+  (0.30), so effects sit well above the theme instead of under it. Both are in the rules sheet.
+- **The tap is much louder and higher** (gain 0.20 → 0.46, 980→1460 Hz), which cuts through the mix
+  far better than the old low blip. Remove got the same treatment.
+- **The audio graph is built while the title screen is up** — context, buses, crusher curve and
+  noise buffer — so CONFRONT EMOTION only resumes it. Measured **2.7 ms** from tap to first notes
+  scheduled, with a 60 ms lead-in.
+
+### ⚠ Bug — a backgrounded tab froze the opening forever
+The opening sequence awaited `animation.finished`. A browser throttles animations in a hidden tab,
+so if the player switched away during the intro the promise never resolved, the sequence stalled at
+whatever step it had reached, and **the game never started** — no error, no recovery. Every awaited
+animation now races a timer (`waitAnim`), so the sequence always advances. Verified: the whole
+battle now runs to completion with `document.hidden === true`.
+
+### ⚠ Bug — a class-name collision turned a tag into a full-screen overlay
+The overcharged EC tag was given the class `over`, which is also the game-over overlay's class. The
+generic `.over` rule (`position:absolute; inset:0; z-index:40`) matched the tag too, so going
+overcharged would stretch it across the whole screen. Renamed to `overcharged`.
+
 ## Pass 14 — labelled tags
 
 - **Tags name their units**: `280 MS` on the white plate, `210 EC` on the charge plate.
