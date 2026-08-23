@@ -1,0 +1,13 @@
+"One row per ability. kind: DAMAGE | SHIELD (add more kinds as you design them). power = damage for DAMAGE, shield charges for SHIELD. Leave 'emotion' blank for typeless — a typeless ability never matches a layer. 'suggested_cost' is a formula: a costing sanity check, not a rule.",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,suggested_cost,cost_delta,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,planned,LIVE,planned,planned,planned,planned,planned,planned,planned,planned,LIVE,LIVE,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned
+ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,,,
+HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,,,
+RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,,,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
+SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,OVERLOAD,,1,,,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
+FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,,,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.

@@ -15,25 +15,25 @@ const DATA = {
 /* --- emotions ---
    one row per emotion. `token` maps to the CSS palette variable.  */
 emotions: `id,name,token,hex,bg_hex,short,description,enabled,notes
-ANGER,Anger,fury,#ff4d3d,#3a0509,ANG,"Hot, direct, aggressive.",1,
-SADNESS,Sadness,sorrow,#4a86ff,#061634,SAD,"Heavy, draining, persistent.",1,
-JOY,Joy,euphoria,#ffc63d,#332305,JOY,"Bright, volatile, energising.",1,
-APATHY,Apathy,apathy,#8a7fa8,#1b1526,APA,"Blunt, numbing, absorbing.",1,
-NOSTALGIA,Nostalgia,nostalgia,#ff5fae,#330a1d,NOS,"Warm, distracting, sticky.",1,
-CALM,Calm,stoic,#35d6b0,#052622,CAL,"Steady, defensive, restorative.",1,`,
+ANGER,Anger,anger,#e53859,#2a0810,ANG,"Hot, direct, aggressive.",1,
+SURPRISE,Surprise,surprise,#724082,#170a1b,SUR,"Sudden, disruptive, disorienting.",1,
+DISGUST,Disgust,disgust,#56a36a,#0c1f13,DIS,"Rejecting, corrosive, contemptuous.",1,
+JOY,Joy,joy,#fcc336,#2a1f06,JOY,"Bright, volatile, energising.",1,
+SADNESS,Sadness,sadness,#3d66c1,#0a1229,SAD,"Heavy, draining, persistent.",1,
+FEAR,Fear,fear,#929fa5,#1a1e20,FEA,"Cold, freezing, evasive.",1,`,
 
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
    (never matches a layer) · hits_layer = whether a hit rotates the target's queue.  */
-abilities: `id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses_per_battle,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
-ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,0,0,,0,0,,,,SELF,COMMON,,1,
-HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,LOWEST_MS,COMMON,,1,
-RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
+abilities: `id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
+ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
+DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,
+HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
+RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
 SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
 FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
 
@@ -45,17 +45,17 @@ matchups: `attack_emotion,layer_emotion,priority,dmg_mult,ec_mult,label,tag_clas
 *,*,0,1,0,OFF TYPE,off,hit,,0,,1,Fallback. Every pair you do not name lands here.
 *,NONE,5,2,0,EXPOSED!,dmg,hit,,0,,1,"No layers left: double damage, no charge."
 ANGER,ANGER,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
-SADNESS,SADNESS,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+SURPRISE,SURPRISE,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+DISGUST,DISGUST,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
 JOY,JOY,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
-APATHY,APATHY,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
-NOSTALGIA,NOSTALGIA,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
-CALM,CALM,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.`,
+SADNESS,SADNESS,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+FEAR,FEAR,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.`,
 
 /* --- units ---
    layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
-units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,1,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER,-1,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,1,3,6,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,-1,3,6,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
 
 /* --- dialogue ---
    what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one
@@ -185,7 +185,7 @@ SURPRISE,The Ghost,DEFEAT,I died... I died under the metro...,1,`,
 /* --- rules ---
    global tunables, read by name.  */
 rules: `key,value,description,,,
-lineCap,6,"Line segments per line. A charge segment consumes one, same as a station.",,,
+lineCap,3,"FALLBACK line size, used only if a unit row leaves line_cap blank.",,,
 maxLayers,6,Layer slots per unit.,,,
 restEc,15,Charge gained by departing with an empty line.,,,
 ecBasis,POWER,POWER = charge figured from the ability's base power. DEALT = from damage actually dealt.,,,
@@ -202,6 +202,38 @@ dialogueHoldMs,3000,How long a finished line stays on screen before it fades.,,,
 lowHpTalkPct,0.2,Fraction of max MS below which the winning / losing lines fire.,,,
 overloadSlotPer,0.25,Every this-much overflow (as a fraction of max MS) forces one more corrupted slot.,,,
 aiVarietyChance,0.22,Chance the AI takes a random affordable attack instead of its best one.,,,
+aiChargeBias,0.55,Chance the AI prefers an ability with charge segments when it can afford one.,,,
+shuffleLayersEachRound,1,Re-order every unit's layer queue at the start of each round.,,,
+chargeGrantsSlots,1,Each charge segment in a line grants the OPPONENT one temporary slot next turn.,,,
+maxBonusSlots,6,"FALLBACK cap on temporary slots, used only if a unit row leaves max_bonus_slots blank.",,,
+abilPageSize,4,Abilities shown per page in the Emotions panel.,,,
+slotArriveMs,260,Gap between one temporary slot flying in and the next.,,,
+swipeMinPx,36,How far a pointer must travel across the panel to count as a page swipe.,,,
+tagGrowth,0.85,How much an accumulating tag grows once it holds a full max-MS worth of change.,,,
+tagBreathSlowMs,1700,Breathing period of an accumulating tag holding almost nothing.,,,
+tagBreathFastMs,380,Breathing period of a tag holding a full max-MS worth — it flashes far harder.,,,
+gaugeW,134,"Gauge canvas width in logical pixels. Lower = chunkier pixels, coarser value steps.",,,
+gaugeH,22,Gauge canvas height in logical pixels — tall enough for the end caps.,,,
+barCoreH,12,"Height of the bar's interior, before the wave, in logical pixels.",,,
+barWaveAmp,1.4,Wave amplitude on the bar's silhouette (reference: 9.8 of a 1026-long bar).,,,
+barWaveHalf,5.6,"Half-period of the silhouette wave, i.e. one arc (reference: 43.3).",,,
+barWaveSpeed,0.1,How fast the silhouette wave travels.,,,
+ecBandFrac,0.82,Charge fill height as a fraction of the bar interior (reference: 76 of 92.74).,,,
+ecWaveAmp,0.7,"Amplitude of the charge fill's own wave — long and shallow, per the reference.",,,
+ecWaveHalf,19,Half-period of the charge fill's wave. Much longer than the silhouette's.,,,
+ecWaveSpeed,0.05,How fast the charge wave travels.,,,
+ecInnerFrac,0.5,"Inner charge bar thickness, as a fraction of the outer one. Same shape, dodged over it.",,,
+ecInnerAmt,0.4,How hard the inner charge bar dodges. 1 blows out to white; lower keeps the hue.,,,
+arcSpacing,3.1,Spacing of the background arc texture (reference: 23.83).,,,
+arcRadius,12.6,Radius of the background arcs (reference: 96.95).,,,
+arcAlpha,0.11,How strongly the arcs show. They only read against the unlit stretch.,,,
+capW,5,End-cap width in logical pixels.,,,
+capR,2,End-cap corner rounding in logical pixels.,,,
+ballFlyMs,330,How long a ball of light takes to arc from its indicator into the bar.,,,
+settleStepMs,70,Pause between one hit landing on a bar and the next setting off.,,,
+barTweenMs,1000,How long a bar takes to travel to its new value once a hit lands.,,,
+overloadHoldMs,2000,How long the OVERLOAD tag and its slow motion last.,,,
+ecScrollSpeed,0.0022,How fast the charge gradient drifts along the bar.,,,
 musicFadeMs,900,How quickly the theme fades out when the battle ends.,,,
 musicVolume,0.3,Theme level. Lower this if the sound effects are getting buried.,,,
 sfxVolume,1.05,"Sound-effect level, mixed against musicVolume.",,,
@@ -229,6 +261,8 @@ crusherSteps,12,"Audio bit-crusher quantisation. Low = Atari harsh, high = SNES-
    synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.  */
 sounds: `id,wave,f0,f1,dur,gain,echo,description
 tap,square,980,1460,80,0.46,0.3,Adding an ability to the line.
+place,square,620,1760,130,0.4,0.35,The station lands on your line and flashes white.
+slot,triangle,300,1500,150,0.3,0.45,A temporary slot flies in from the opponent.
 remove,square,520,220,90,0.34,0.24,Removing a station.
 depart,sawtooth,240,70,420,0.26,0.45,The line departs and charge is spent.
 travel,square,150,150,38,0.1,0.15,Line scrolling to the next station.

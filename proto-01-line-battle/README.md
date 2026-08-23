@@ -20,6 +20,405 @@ A single self-contained `index.html`. No build step, no dependencies, no network
 | Remove from the line | Tap a node in the line |
 | Resolve the turn | **DEPART** |
 
+## Pass 24 — the tap bug, and a pass on the look
+
+### Bug: tapping an ability did nothing
+**I introduced this in Pass 22 and my own test missed it.** The swipe handler called
+`setPointerCapture` on *pointerdown*, and capturing retargets the `click` that follows
+to the capturing element — so the click never reached the `.abrow` underneath and no
+ability could be added to the line.
+
+My Pass 22 test called `row.click()` directly, which bypasses the pointer path
+entirely and therefore could never have caught it. Capture is now taken only once the
+gesture is genuinely a **drag**, and released on pointerup; the fix is verified by
+asserting `hasPointerCapture()` is false after a plain tap, which is the actual failure
+condition rather than a proxy for it.
+
+### The charge bar now has a bar inside it
+The colour-dodge overlay is gone — it washed the whole gauge out. In its place, the
+renderer draws a **second charge bar inside the first**: same wave, same gradient,
+**half the thickness**, colour-dodged over the outer one so the core of the fill blooms.
+`ecInnerFrac` and `ecInnerAmt` are rules, and `ecInnerAmt` is deliberately below 1 —
+dodging at full strength blows the hue out to white.
+
+### Tags
+Smaller to start (26px -> 18px, growth unchanged), and they **float much further and
+faster** (±16px at 1.05s, was ±6px at 2.6s). The ball of light they morph into is **3x
+larger** (16px -> 48px, measured at 48 in play).
+
+**MS tags now carry the bars' own colours** — flat `--mint` for you, flat `--rose` for
+the enemy, with the same drop-shadow bloom the gauges use. **EC tags are pointy**, a
+rectangle ending in sideways triangles, with white text.
+
+### Ability boxes
+Each box is **bordered in its own ability's colour**, and the depiction **floats up and
+down** on a per-ability offset so the four do not bob in lockstep. Icons, names and
+pills are all larger and the box packs them evenly, so the wasted vertical space is
+gone. Shot dots are **twice the size**.
+
+Defend and Recharge no longer borrow **FEAR's grey** — typeless abilities take the
+stamina mint in the panel instead, via `abAccent()`, so they stop reading as an emotion
+they are not.
+
+### Verified
+Full battle to completion, no errors: taps place, swipe-clicks stay swallowed, the shot
+invariant held, tags capped at four, ball measured at 48px.
+
+## Pass 23 — shots, whole-box cooldowns, a three-slot line
+
+### Abilities have shots, and shots are what run out
+Every ability now carries a **`uses`** column: how many times it can be added to the
+line. Weak abilities get **3**, the charged heavies get **2**. Shots are **not
+refilled each turn** — whatever you do not spend is still there next turn.
+
+**Emptying the pool is what starts the cooldown**, and finishing the cooldown is what
+refills it. Cooldown is no longer stamped every time you use something. Pulling an
+ability back off the line returns its shot immediately, because `usesLeft` counts what
+is currently *on* the line rather than tracking placements separately.
+
+Remaining shots are **tiny dots down the left edge of each box**, in the ability's own
+emotion colour; spent ones go grey.
+
+### Cooldown takes the whole box
+The `COOLDOWN 2` caption is gone. A cooling ability is **blacked out entirely** and the
+box shows nothing but the **number of turns left**, large, at low opacity, tinted with
+that ability's emotion.
+
+### The line is three slots
+Both lines drop from six to **three permanent slots**, with up to **six temporary
+ones** on top. These are now **per-unit** (`line_cap`, `max_bonus_slots` on the units
+row), so the two sides can be tuned apart; the old global `RULES` values survive only
+as the fallback when a row leaves them blank.
+
+### Verified
+Placement stops at zero shots and the fourth click is refused; removing from the line
+hands the shot straight back; a partly-spent pool carries into the next turn without
+cooling; exhausting it starts the cooldown and serving that cooldown refills to full.
+Across a whole battle the invariant held — **no ability ever appeared on a line more
+times than it had shots** — with two cooldown cycles observed, lines reaching 3+2, and
+no errors.
+
+### Balance note
+With only three slots, spending three shots of one ability costs your **entire line**,
+so cooldowns are now rare — I saw two in a five-round fight. Shots mostly act as a
+slow drain rather than a per-turn limit. If you want cooldowns to bite, either lower
+`uses` or accept that the three-slot line is already the real constraint. This was
+also the first run the scripted player **won** (LINE CLEAR, round 5); the shorter line
+appears to slow the enemy more than the player, since the enemy's extra slots only
+arrive when the player charges.
+
+## Pass 22 — mobile for real: paged panel, temporary slots, one tag per bar
+
+### The Emotions panel is paged, not scrolled
+Four abilities to a page in a 2x2 grid. Position is shown by **dots** (the one you
+are on simply grows); the **triangles** on either side are only indicators that a
+page exists that way. No labels, no words.
+
+Paging is a **swipe**, built on Pointer Events so one code path serves a finger and
+a mouse alike — which is what keeps a phone-only game playable in a desktop browser.
+The pages follow the drag, snap back if you do not clear `swipeMinPx`, and a tap that
+turned into a swipe is swallowed rather than placing an ability.
+
+### Charging no longer interrupts — it hands the opponent room
+The old rule fired the opponent's next station out of turn whenever you held on a
+charge segment. It read as chaos: you were punished by an event you could not see
+coming. **Every charge segment now grants the OPPONENT one temporary slot on their
+line next turn**, capped at `maxBonusSlots`. Same shape of cost — charging gives the
+other side more room — but it is visible before it matters.
+
+Temporary slots are drawn **dashed and slowly rotating**, on either line, filled or
+empty. They are always the tail of the line, so "is this slot temporary" is just
+`i >= lineCap`, and they last exactly one turn because the grant is recomputed from
+scratch each round rather than counted down.
+
+### One MS tag and one EC tag per fighter
+Five hits used to post five pills and the eye had nowhere to rest. Now each fighter
+has at most **one stamina tag and one charge tag**, and every hit **folds into the
+total already standing** — `-18` becomes `-43` becomes `-116`, with a kick each time.
+
+They are twice the size, far bolder, and **the more a tag holds the bigger it grows
+and the harder and faster it breathes** — both scaled against that fighter's own max
+stamina, so the same hit reads as more dangerous on a frailer opponent. Scale is
+clamped to the screen width, since a tag holding a whole stamina bar would otherwise
+be wider than the phone.
+
+**Damage numbers and matchup labels are gone** (`-35`, `RESONANT`, `OFF-TYPE`...).
+The accumulating tags carry that now, and the matchup still speaks through its sound.
+Event tags stay: BLOCKED, SHIELD UP, SELF HARM, FED THE ENEMY, OVERLOAD, LINE INVADED.
+
+### A centred inner glow on the charge
+Colour-dodge, off-white, 35%. It is centred on the **charge fill** rather than the
+gauge, so it tracks the fill as it grows instead of washing the whole bar out — the
+first attempt dodged the entire bar to near-white and lost the rainbow underneath.
+
+### Verified
+Full battle to completion, no errors: swipe paging both directions and refusing to
+run past either end, taps still placing while swipe-clicks are swallowed, charge
+grants confirmed (2 segments each side -> both lines 6 -> 8, four dashed stations
+drawn), tags never exceeding four on screen (two per fighter), and scale clamped to
+258px of a 375px screen at a full stamina bar's worth.
+
+## Pass 21 — indicators scatter, bars breathe
+
+### The tags float around the fighter, then converge
+Every hit posts its pill at its own spot **around the enemy or over your own layer
+strip**, drifting up and down on its own timing. When the line ends they **all morph
+into balls of light at once**, then stream into the bar one at a time.
+
+Placement is stratified rather than random — pills step across the field by the
+golden angle and cycle through four vertical lanes. Independent random draws clump;
+this doesn't. Verified with five simultaneous deltas: **zero overlapping pairs**.
+
+### Bars take a full second, and the empty stretch stops glowing
+Each landing **tweens the bar over one second** (`barTweenMs`) at the 12 fps clock
+instead of snapping. The next ball launches `ballFlyMs` *before* that tween ends, so
+a bar change still reads as a full second without the flights stacking on top —
+five deltas settle in **6.3 s** rather than **10.0 s**.
+
+The unlit stretch of the bar is now drawn to a **second canvas with no filter**, so
+the mint/rose glow belongs only to the living wavy part. OVERLOAD's slow motion and
+tag now hold for **2 s** (`overloadHoldMs`).
+
+### The charge gradient scrolls, seamlessly
+The six emotion colours are treated as a **ring, not a line** — after Fear the ramp
+wraps back into Anger, so it can scroll for ever with no seam. That hard grey→red
+edge is gone; the three CSS gradients that show the ramp are closed the same way.
+
+### ⚠ Bug found while testing this
+The indicators bunched into a small patch *below* the enemy instead of spreading
+over it. Cause: placement used `getBoundingClientRect()`, which **includes
+transforms** — and the enemy sprite is permanently mid-transform (entrance scale
+plus the idle float). It was scattering pills across a 55×31 transient box rather
+than the real 186×186 one. Placement now walks `offsetLeft`/`offsetTop`, which
+ignore transforms. The ball's flight target had the same latent bug (the gauge
+shakes when hit) and was fixed with it.
+
+### Pacing note
+Settlement is now ~**1.27 s per hit**, down from ~2.0 s. That is the honest cost of
+"one second each" — a five-hit line runs 6.3 s. If it still drags in play,
+`barTweenMs` is the dial, and it's in the sheet.
+
+## Pass 20 — hits land one at a time
+
+### The enemy's bar is pale warm pink
+`--rose #ffc2cd` against the player's `--mint #b0ffe1` — stroke, end caps, arcs and
+the canvas glow all follow, so the two bars are never confused at a glance.
+
+### Damage no longer moves the bar mid-line
+The bar now renders `shownMs` / `shownEc`, which **lag** the true ledger. During a
+line, each hit changes the ledger immediately — so the rules, the death check and
+the layer logic all stay exactly as correct as before — but only posts an
+**indicator pill** on screen. The bars hold still.
+
+Between the two lines (and again before the next round) `settle()` walks the queue:
+each pill **morphs into a ball of light**, arcs across in a curve, and the bar only
+moves when it lands — together with the shake, the flash, and a burst of **crash
+particles**. Multicolour for charge, mint for the player's stamina, rose for the
+enemy's.
+
+Deferring only the *presentation* rather than the simulation is what keeps this
+safe: nothing about resolution order, EXPOSED, cooldowns or the charge interrupt
+changed. Death settles the queue first, so the bar reaches zero before the clash.
+
+### OVERLOAD is now an event
+The moment charge passes the ceiling: everything drops to 3 fps, the screen shakes,
+and a large **OVERLOAD!** tag hits. For as long as it lasts, that unit's panel
+border **strobes through the six emotion colours**. It clears when charge falls back
+under the ceiling, and at the end of the fight.
+
+### ⚠ Bug found while testing this
+Overcharge was **invisible on the bar**. The destroyed-capacity branch ran before
+the overflow band could draw, so charge spilled past the ceiling into a region that
+had already been painted dead. It now renders as a hot orange band past the ceiling
+cap, capped by the crescent.
+
+### Pacing note
+Settlement costs roughly **490 ms per hit** (`ballFlyMs` 330 + `settleStepMs` 70 +
+the morph). A busy round with a dozen deltas adds ~6 s. I already cut this from
+820 ms once; both numbers are rules in the sheet if you want it faster still.
+
+## Pass 19 — the bar is drawn, not stacked
+
+### Official emotion colours, project-wide
+Taken from `sources/Bars_Reference_001.svg`, which also fixes the gradient order —
+the reference puts the six at even 20% stops:
+
+| | | | | | |
+|---|---|---|---|---|---|
+| ANGER `#e53859` | SURPRISE `#724082` | DISGUST `#56a36a` | JOY `#fcc336` | SADNESS `#3d66c1` | FEAR `#929fa5` |
+
+Set once in `tools/build_workbook.py` → workbook → `data.js`, and once in the CSS
+`:root`. Everything downstream — stations, rings, bubbles, cards, particles, backdrop
+tints — reads through `emoHex()`, so it all followed. Audited: no placeholder hex
+survives anywhere in `src`, `styles`, `tools` or `data.js`.
+
+### The bar is now a pixel canvas
+It was a stack of `<div>`s with a squiggle image laid *over* it. Your mockup needs the
+bar's **actual silhouette** to undulate, which divs cannot do. `src/gauge.js` draws it
+per-pixel on a 134×22 canvas upscaled ×2.6 with `image-rendering: pixelated` — the same
+technique `src/rings.js` already uses for the layer rings, so pixelation is inherent
+rather than a filter.
+
+Ported from the reference SVG:
+- **Scalloped silhouette** — the reference chains alternating bezier arcs; a half-period
+  sine reads identically and costs nothing. Mirrored top and bottom, so the bar pinches
+  and bulges.
+- **The charge fill's own wave** — much longer and shallower than the silhouette's.
+- **Arc texture** — big semicircles (radius 12.6, spacing 3.1) struck from centres
+  marching along the bar, so only a shallow slice of each shows. In the reference they
+  run the full length at 11% color-dodge; they only *read* against the unlit stretch,
+  which is what you asked for, so that is where they are drawn.
+- **The white crescent** is the rounded end-cap of the charge capsule.
+- **Mint end caps** at zero and at the stamina ceiling, replacing the chevrons.
+- **Destroyed capacity** as the reference's plum-rimmed box.
+
+Every constant — canvas size, wave amplitudes and periods, band fraction, arc spacing
+and radius, cap size — is a rule in the spreadsheet.
+
+### Deviations from the reference, on purpose
+- **The rainbow stays fixed to the bar and is revealed by the charge**, rather than being
+  squeezed into the filled portion as the static mockup shows. That was your earlier
+  explicit instruction ("gradient always screen wide, only visible in the charged part"),
+  and a still image cannot distinguish the two.
+- **The charge fill is ~0.82 of the bar interior**, per the reference — superseding the
+  "one third as thick" from last pass. Say the word if you want the thinner band back;
+  it is one rule (`ecBandFrac`).
+- **Caps are ~1.8× the bar height**, not the reference's ~2.5×, which would have cost
+  another ~30px of screen per bar.
+
+### ⚠ Bug caught during the rewrite
+Driving the bar from the 12 fps tick meant calling `renderStats()` there — but `rings.js`
+ticks **once at load, before `view.js` is parsed**. That threw, `setFps(12)` never ran,
+and the whole animation loop died: rings blank, nothing moved. Fixed by splitting the
+canvas repaint (`redrawGauges()`, guarded) from the DOM work.
+
+## Pass 18 — charge band, wave bracket
+
+- **Emotional Charge is now a slim band, one third the bar's height, centred
+  inside Mental Stamina.** The two quantities no longer read as the same object:
+  MS is the container, EC is the thing riding inside it. The spend and incoming-
+  charge previews ride the same band; the destroyed-capacity hatching and the
+  unlit capacity still fill the full height, because those are stamina.
+- **The white MS bracket is a wave** — a tiled pixel squiggle top and bottom,
+  drifting slowly in opposite directions, in the spirit of Android's media
+  scrubber but stepped so it stays in the same visual language as everything
+  else. Generated in `src/art.js` like the warning glyph, exposed as `--wavepat`.
+
+### ⚠ Tooling — stale modules were silently ignored
+Chasing why the wave would not appear turned up something worse than the wave:
+the browser was serving a **cached `src/art.js` from before the edit** (3,332
+bytes against the server's 4,059). The code was correct and simply never ran.
+Now that behaviour is split across a dozen files this is a trap that will bite
+repeatedly, and `Cache-Control: no-store` does not fix it — that governs
+responses the browser is *about* to make, while an entry already cached under
+older headers is still reused.
+
+`tools/serve.py` is the fix: a dev server that sends no-store **and rewrites
+`index.html` on the fly so every local asset URL carries its own modification
+time**. A changing URL cannot be served from cache. Files on disk are untouched,
+so nothing ships with query strings in it.
+
+```bash
+python3 tools/serve.py        # http://localhost:8177
+```
+
+## Pass 17 — cooldowns, shifting layers, charge interrupts
+
+### The emotion set changed
+The colours you asked for (red, purple, green, yellow, blue, light-grey Fear) are
+the **dialogue sheet's** six, not the ones the game was running. So the set is now
+**Anger · Disgust · Sadness · Fear · Joy · Surprise**, replacing Apathy, Nostalgia
+and Calm. This settles the open question the GDD flags in §7.3 — and it makes all
+**120 dialogue lines reachable**; 60 of them previously belonged to emotions no
+enemy could have.
+
+### Cooldowns
+`cooldown` is live in the abilities sheet, set to **1 turn on everything a player
+chooses** (0 on the Overload-forced ones, which you do not choose). Using an
+ability stamps `cooldown + 1` and every stamp ticks down once at round end, so a
+cooldown of 1 means *not next turn, yes the turn after*. Cards grey out and show
+`COOLDOWN n`. The enemy AI respects its own cooldowns.
+
+### Layers re-shuffle every round
+Both sides' layer queues are re-ordered at the start of each round, so the same
+opening never works twice — the profitable emotion moves.
+
+### Charging hands the opponent a turn
+**My reading of the rule, since the lines resolve one after the other:** while a
+unit holds on a charge segment, the *opponent* acts out of turn — their next
+unspent station fires immediately. If that station is itself a charge segment,
+their charge advances by one instead. Charging is now a real gamble rather than
+just a delay. Verified: 4 interrupts in one automated battle.
+
+This is why each unit carries a `cursor` — both lines are now consumed across the
+whole round rather than strictly one then the other.
+
+### The enemy charges too
+It has all three heavy abilities, and `aiChargeBias` (0.55) makes it prefer a
+charged one when it can afford it — it opened one test battle with two heavies
+filling all six slots.
+
+### Interface
+- **Warm dark grey neutrals.** The interface no longer competes with the palette:
+  colour is reserved for the six emotions, with `--muted` for secondary text and
+  `--ok` for shields — deliberately *not* an emotion colour, since light grey now
+  means Fear.
+- **The EMOTIONS panel is a 2-column grid** of cards with much larger symbols and
+  charge segments.
+- **Shields ride the attack lines** — the player's sitting on top of theirs, the
+  enemy's just under theirs — large, glowing, rolling through a wave.
+- EC and DMG pills got pixel-rounded corners.
+
+## Toolchain
+
+| Command | What it does |
+|---|---|
+| `python3 tools/serve.py` | local dev server on :8177 — **use this, not `http.server`** |
+| `python3 tools/build_data.py <csv-folder>` | spreadsheet CSV export → `data.js` |
+| `python3 tools/build_music.py "sources/Theme Song 8_bit.mid"` | `.mid` → `music.js` |
+| `python3 tools/build_workbook.py` | rebuilds `config/avui-config.xlsx` **structure** — run only when adding a sheet or column; it overwrites balancing done in Sheets |
+
+Read **`ARCHITECTURE.md`** before adding anything.
+
+## Pass 16 — quality pass: structure for growth
+
+**See `ARCHITECTURE.md`** — where things live and where a new thing goes.
+
+### The file was 1,514 lines. Now it is markup.
+`index.html` held markup, 400 lines of CSS and 1,000 lines of JavaScript. It is
+now markup plus a documented load order. Behaviour moved to fourteen files in
+`src/`, styles to `styles/game.css`. The split was done mechanically and verified
+byte-identical before anything was changed, so the move carried no behaviour risk
+on its own.
+
+### Ability kinds are a registry, not an if-chain
+`applyAbility` was a chain of `if(ab.kind==="…")` with `DAMAGE` as the silent
+fallthrough — a typo'd kind became an attack. It is now one line that dispatches
+into `src/kinds.js`. Adding a kind is one `Kinds.define()` and nothing in
+`battle.js` changes.
+
+### ⚠ Bug the registry exposed: projections ignored most kinds
+`simulate()` — which drives **the build-phase preview and the enemy AI** — began
+with `if(ab.kind!=="DAMAGE") continue;`. So `SHIELD`, `CHARGE`, `SELFHARM` and
+`FEED` were invisible to both: queueing a Recharge showed no charge gain on your
+bar, an Overload-forced Feed showed no heal on theirs, and the AI valued all of
+them at zero. Every kind now declares its own `project()` beside its `run()`, so
+a new kind is correct in previews **by construction**. The projection also covers
+*both* sides now, so abilities acting on you preview on your own bar.
+
+### Hooks for mechanics that cut across the turn loop
+`src/hooks.js` — statuses, passives and synergies can attach to `round:start`,
+`damage:dealt`, `layer:broken`, `unit:defeated` and six more instead of editing
+the loop. Verified firing in a real battle: 23 `station:fire`, 13 `damage:dealt`,
+10 `layer:broken`, 1 `unit:defeated`.
+
+### CSS cleaned
+Later passes had appended overrides rather than editing rules in place. Removed
+two dead rules — including a whole chevron-tiling background that a later
+`content:none` had killed, along with the `--chevpat` generator still building it
+every load — folded three split rules together, and dropped a duplicate keyframe.
+Cascade order is otherwise untouched, so nothing moved visually.
+
 ## Pass 15 — audio mix, and two real bugs
 
 ### Audio
@@ -194,7 +593,7 @@ parsed in the browser, so it works from `file://` as well as from a server, and 
 through the same bit-crusher as the sound effects.
 
 ```
-python3 tools/build_music.py "Theme Song 8_bit.mid"
+python3 tools/build_music.py "sources/Theme Song 8_bit.mid"
 ```
 
 Track names pick the voice: lead guitars → square, bass → triangle, drums → noise, and so on

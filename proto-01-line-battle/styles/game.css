@@ -1,0 +1,520 @@
+/* =====================================================================
+   NEURO-METRO: AVUI — stylesheet
+   ---------------------------------------------------------------------
+   Section order matters: later rules are meant to win. Sections run
+   tokens -> frame -> battle HUD -> stage -> lanes -> panel -> effects ->
+   screens. When adding a rule, put it in its section rather than at the
+   end, so the cascade stays something you can reason about.
+   ===================================================================== */
+:root{
+  /* the six emotions — the ONLY saturated colour in the interface */
+  --anger:#e53859; --surprise:#724082; --disgust:#56a36a;
+  --joy:#fcc336;   --sadness:#3d66c1;  --fear:#929fa5;
+  --mint:#b0ffe1;                  /* the player's bar: stroke, caps, arcs   */
+  --rose:#ffc2cd;                  /* the enemy's bar, same role             */
+  /* neutral warm-grey ramp: the UI must never compete with an emotion */
+  --void:#0f0d0b; --dark:#1d1a16; --panel:#2b2620; --panelHi:#3d362e;
+  --line:#5c5348; --ink:#f4efe4;
+  --muted:#9a8f80;                 /* disabled and secondary text          */
+  --ok:#f4efe4;                    /* shields: deliberately NOT an emotion */
+  --deadred:#2a0d09;
+  --px:2px; --r1:2px; --r2:4px;
+  --bevel: inset 1px 1px 0 rgba(255,255,255,.13), inset -1px -1px 0 rgba(0,0,0,.45);
+  --drop: drop-shadow(1px 2px 0 rgba(8,6,4,.75));
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--void); color:var(--ink);
+  font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
+  font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  -webkit-font-smoothing:none; -webkit-tap-highlight-color:transparent;
+  user-select:none; -webkit-user-select:none}
+.pxr{clip-path:polygon(
+  var(--r2) 0, calc(100% - var(--r2)) 0,
+  calc(100% - var(--r2)) var(--r1), calc(100% - var(--r1)) var(--r1),
+  calc(100% - var(--r1)) var(--r2), 100% var(--r2),
+  100% calc(100% - var(--r2)), calc(100% - var(--r1)) calc(100% - var(--r2)),
+  calc(100% - var(--r1)) calc(100% - var(--r1)), calc(100% - var(--r2)) calc(100% - var(--r1)),
+  calc(100% - var(--r2)) 100%, var(--r2) 100%,
+  var(--r2) calc(100% - var(--r1)), var(--r1) calc(100% - var(--r1)),
+  var(--r1) calc(100% - var(--r2)), 0 calc(100% - var(--r2)),
+  0 var(--r2), var(--r1) var(--r2), var(--r1) var(--r1), var(--r2) var(--r1))}
+.pxr-sh{filter:var(--drop)}
+
+.phone{position:relative; width:100vw; height:100dvh; max-width:420px; max-height:920px;
+  background:var(--dark); overflow:hidden; display:flex; flex-direction:column}
+@media (min-width:520px) and (min-height:760px){
+  .phone{border-radius:30px; border:3px solid var(--line);
+    box-shadow:0 0 0 10px var(--dark),0 0 0 12px var(--line),0 22px 52px rgba(0,0,0,.7);
+    height:min(92dvh,880px)}
+  .phone::after{content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+    width:62px; height:4px; border-radius:2px; background:var(--void); z-index:60}
+  .screen{padding-top:20px}
+}
+.screen{display:flex; flex-direction:column; height:100%; padding:7px 7px 8px; gap:5px;
+  position:relative; overflow:hidden; transition:filter 1.4s linear}
+.panel,.lane-wrap,.tray,.depart,.btnrow,.pstrip{position:relative; z-index:3}
+.stage{position:relative; z-index:1}
+.panel{border:var(--px) solid var(--line); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,var(--panelHi) 0%,var(--panel) 58%,var(--dark) 100%)}
+
+/* ============ GAUGE ============ */
+.unit{padding:4px 11px}
+.gwrap{position:relative; height:106px}
+/* The bar is a pixel canvas, not a stack of divs — see src/gauge.js. Upscaled
+   with nearest-neighbour so the wave edges stay chunky rather than smoothed. */
+.gaugecv{position:absolute; left:0; right:0; top:24px; width:100%; height:58px;
+  image-rendering:pixelated}
+/* Only the living bar glows. Spent capacity sits on its own canvas underneath
+   with no filter at all, so the mint / rose bloom stops where the bar does. */
+#pGauge{filter:drop-shadow(0 0 5px rgba(176,255,225,.55)) drop-shadow(0 0 16px rgba(176,255,225,.28))}
+#eGauge{filter:drop-shadow(0 0 5px rgba(255,194,205,.55)) drop-shadow(0 0 16px rgba(255,194,205,.28))}
+.gaugecv.dead{filter:none; z-index:0}
+/* Charge is drawn as a slim centred band inside the stamina bar, so the two
+   quantities never read as the same object. One third of the bar's height. */
+.p .e @keyframes pulse{from{opacity:.55}to{opacity:.95}}
+@keyframes wavedrift{from{background-position:0 0} to{background-position:16px 0}}
+/* a hot filament at the leading edge of the charge */
+/* value tags stay large — they are the only numbers on screen */
+.tag{position:absolute; transform:translateX(-50%); padding:2px 7px; font-size:17px;
+  color:#0c0a16; letter-spacing:.02em; white-space:nowrap; z-index:12; line-height:1.2;
+  transition:left .22s steps(6); box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7)}
+.tag.ms{top:0; background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0)}
+@keyframes rainbow{from{background-position:0 0} to{background-position:-50vw 0}}
+.tag.ec{bottom:0; color:#0c0a16;
+  background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+    var(--joy),var(--sadness),var(--fear),var(--anger));
+  background-size:50vw 100%; background-repeat:repeat-x;
+  animation:floaty 3.4s ease-in-out infinite alternate, rainbow 7s linear infinite;
+  box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 12px rgba(255,255,255,.5)}
+.tag.ec.overcharged{box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 18px var(--anger);
+  outline:var(--px) solid var(--anger); outline-offset:1px}
+
+.hide{display:none !important}
+
+/* ============ STAGE ============ */
+.stage{flex:1; min-height:78px; display:flex; align-items:center; justify-content:center}
+.sprwrap{position:relative; width:min(52vw,186px); height:min(52vw,186px);
+  animation:hover 3.6s ease-in-out infinite alternate}
+.sprwrap canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated}
+#sprOut{z-index:2}
+#sprIn{z-index:1}
+/* the player's layers: a very large circle, so only a gentle arc crosses the strip */
+.pstrip{position:relative; width:100%; aspect-ratio:120/32; flex:none}
+.pstrip canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated}
+#pRingsOut{z-index:2}
+#pRingsIn{z-index:1}
+
+.bigtag{position:absolute; left:50%; z-index:22; transform:translateX(-50%);
+  padding:3px 9px; font-size:13px; letter-spacing:.09em; color:#0c0a16;
+  box-shadow:var(--bevel), 1px 2px 0 rgba(6,4,14,.7); white-space:nowrap; pointer-events:none;
+  animation:tagIn .9s steps(6) forwards}
+.bigtag.dmg{background:linear-gradient(180deg,#ff8b7f,var(--anger) 55%,#b32a1e); font-size:19px}
+.bigtag.absorb{background:linear-gradient(180deg,#ffe08a,var(--joy) 55%,#c98f16)}
+.bigtag.block{background:linear-gradient(180deg,#ffffff,var(--ok) 55%,#9a8f80)}
+.bigtag.off{background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0)}
+@keyframes tagIn{
+  0%{opacity:0; transform:translateX(-50%) scale(.5)}
+  25%{opacity:1; transform:translateX(-50%) scale(1.14)}
+  40%{transform:translateX(-50%) scale(1)}
+  80%{opacity:1; transform:translateX(-50%) scale(1)}
+  100%{opacity:0; transform:translateX(-50%) scale(1.04)}}
+
+.shake{animation:shk .24s steps(1) 1}
+@keyframes shk{0%{transform:translate(0,0)}12%{transform:translate(-4px,2px)}25%{transform:translate(4px,-2px)}
+  37%{transform:translate(-3px,-2px)}50%{transform:translate(3px,2px)}62%{transform:translate(-2px,1px)}
+  75%{transform:translate(2px,-1px)}87%{transform:translate(-1px,0)}100%{transform:translate(0,0)}}
+.flash{position:absolute; inset:0; background:var(--ink); opacity:0; pointer-events:none; z-index:34}
+.flash.on{animation:fla .1s steps(2) 1}
+@keyframes fla{0%{opacity:.42}100%{opacity:0}}
+.screen.slowmo{filter:saturate(1.5) contrast(1.15)}
+.screen.slowmo .gauge.clash{box-shadow:0 0 22px var(--ink),0 0 44px var(--anger); transform:scale(1.06)}
+.pt{position:absolute; z-index:36; pointer-events:none; box-shadow:1px 1px 0 rgba(6,4,14,.8)}
+.wave{position:absolute; z-index:35; width:26px; height:26px; pointer-events:none;
+  border:3px solid var(--ink); border-radius:50%; box-shadow:0 0 18px var(--ink)}
+
+/* ============ LANES ============ */
+/* summoned shields ride the attack line itself — the player's above theirs,
+   the enemy's below theirs — rolling through a wave one after the next */
+.shieldrow{position:absolute; left:0; right:0; display:flex; justify-content:center;
+  gap:10px; z-index:8; pointer-events:none}
+.shieldrow.above{bottom:100%; margin-bottom:-10px}
+.shieldrow.below{top:100%; margin-top:-10px}
+.shieldrow .sh{width:32px; height:32px; color:var(--ok);
+  filter:drop-shadow(0 0 7px var(--ok)) drop-shadow(0 0 20px rgba(244,239,228,.6));
+  animation:shwave 1.9s ease-in-out infinite; animation-delay:var(--d,0s)}
+.shieldrow .sh svg{width:100%; height:100%; display:block}
+@keyframes shwave{
+  0%,100%{transform:translateY(0) scale(1)}
+  50%{transform:translateY(-8px) scale(1.14)}}
+
+.lane{position:relative; overflow:hidden; height:38px; display:flex; align-items:center;
+  background:var(--void); border:var(--px) solid var(--line); box-shadow:var(--bevel)}
+.lane.zoom{height:60px}
+.track{display:flex; align-items:center; gap:0; padding:0 6px; position:relative;
+  transition:transform .3s steps(6); will-change:transform}
+.link{flex:none; width:9px; height:5px; background:currentColor; box-shadow:0 1px 0 rgba(6,4,14,.7)}
+.lane.zoom .link{width:14px; height:7px}
+.link.dead{color:var(--line); box-shadow:none; opacity:.7;
+  background:repeating-linear-gradient(90deg,var(--line) 0 3px,transparent 3px 6px)}
+.term{flex:none; width:0; height:0; border-right:6px solid currentColor;
+  border-top:5px solid transparent; border-bottom:5px solid transparent; filter:var(--drop)}
+.term.dead{color:var(--line); filter:none; opacity:.55}
+#pLane .term{border-right:0; border-left:6px solid currentColor}
+#pLane.zoom .term{border-left-width:9px}
+.lane.zoom .term{border-right-width:9px; border-top-width:7px; border-bottom-width:7px}
+.station{position:relative; flex:none; width:28px; height:28px;
+  transition:width .3s steps(4),height .3s steps(4),transform .18s steps(3),filter .18s linear}
+.lane.zoom .station{width:46px; height:46px; animation:none}
+.station svg{width:100%; height:100%; display:block}
+.station.dragging{opacity:.6; z-index:5; transform:translateY(-3px) scale(1.08)}
+.station.active{filter:drop-shadow(0 0 9px currentColor) drop-shadow(0 0 20px currentColor) brightness(1.45);
+  transform:scale(1.3); z-index:6}
+.station.spent{opacity:.18}
+/* an ability landing on your line: it jumps and flashes white */
+.station.added{animation:stationAdd .38s cubic-bezier(.2,1.4,.4,1) both !important}
+@keyframes stationAdd{
+  0%  {transform:translateY(-16px) scale(1.5); filter:brightness(6) saturate(0)}
+  45% {transform:translateY(-7px)  scale(1.2); filter:brightness(3) saturate(.4)}
+  100%{transform:translateY(0)     scale(1);   filter:brightness(1) saturate(1)}}
+/* idle: a wave of swell-and-glow travelling along the line, plus a bobbing
+   float on the same phase. Player waves left to right, enemy right to left. */
+.lane .station{animation:stationIdle 2.4s ease-in-out infinite; animation-delay:var(--d,0s)}
+@keyframes stationIdle{
+  0%,100%{transform:translateY(0) scale(1); filter:none}
+  45%{transform:translateY(-4px) scale(1.10);
+      filter:drop-shadow(0 0 7px currentColor) brightness(1.2)}}
+.station.active,.station.spent,.station.dragging{animation:none !important}
+.station.ghost{opacity:.85}
+.station.locked{animation:lockPulse .6s steps(2) infinite alternate !important}
+@keyframes lockPulse{
+  from{filter:drop-shadow(0 0 5px var(--anger)) saturate(1.6)}
+  to  {filter:drop-shadow(0 0 13px var(--anger)) brightness(1.4) saturate(2)}}
+
+/* ============ TRAY ============ */
+.tray{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:5px}
+.abil{display:flex; align-items:center; justify-content:center; gap:4px; padding:5px 3px; cursor:pointer;
+  border:var(--px) solid currentColor; box-shadow:var(--bevel);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark))}
+.abil svg{width:15px; height:15px; flex:none}
+.abil .d{font-size:9px; color:var(--ink); letter-spacing:.01em}
+.abil:active{transform:translate(1px,1px)}
+.abil.dis{color:var(--muted); opacity:.38; pointer-events:none}
+.abil.dis .d{color:var(--muted)}
+.depart{width:100%; padding:8px; font:inherit; font-size:11px; letter-spacing:.22em; cursor:pointer;
+  color:var(--void); border:var(--px) solid var(--ink); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,#ffe08a,var(--joy) 55%,#c98f16)}
+.depart:active{transform:translate(1px,1px)}
+.depart.rest{background:linear-gradient(180deg,#c4b9a8,var(--muted) 55%,#5f574b); color:var(--ink)}
+.over{position:absolute; inset:0; background:rgba(12,10,22,.94); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px; z-index:40}
+.over h1{font-size:19px; letter-spacing:.22em}
+.over.win h1{color:var(--ok); text-shadow:1px 2px 0 var(--void),0 0 14px var(--ok)}
+.over.lose h1{color:var(--anger); text-shadow:1px 2px 0 var(--void),0 0 14px var(--anger)}
+
+/* ---- rainbow charge: gradient is screen-wide, only visible where charge reaches ---- */
+/* one tile is half the screen and starts and ends on the same hue, and the
+   animation shifts by exactly one tile — so the loop is seamless */
+@keyframes rainbow{from{background-position:0 0} to{background-position:-50vw 0}}
+/* ---- destroyed capacity: bigger warning glyph, drifting diagonally ---- */
+@keyframes warndrift{from{background-position:0 0} to{background-position:16px 16px}}
+/* ---- markers ---- */
+/* ---- taking damage: the whole gauge block shakes and flashes magenta ---- */
+.gflash{position:absolute; inset:-5px; background:#ff3ba7; opacity:0; pointer-events:none;
+  z-index:20; mix-blend-mode:screen}
+.gwrap.hurt{animation:gshake .1s steps(2) 5}
+.gwrap.hurt .gflash{animation:magenta .1s steps(2) 5}
+@keyframes magenta{0%{opacity:.9} 100%{opacity:0}}
+@keyframes gshake{0%{transform:translate(-6px,2px)}50%{transform:translate(6px,-2px)}100%{transform:translate(0,0)}}
+/* ---- value tags: anchor holds the position, the tag itself idles ---- */
+.tanchor{position:absolute; z-index:12; transition:left .22s steps(6)}
+.tanchor.ms{top:0} .tanchor.ec{bottom:0}
+.tag{position:static; transform:none; animation:floaty 3.4s ease-in-out infinite alternate}
+.tanchor.ec .tag{animation-delay:-1.7s}
+@keyframes floaty{from{transform:translateY(2px)} to{transform:translateY(-3px)}}
+/* ---- flying ability ---- */
+.flyer{position:absolute; z-index:30; pointer-events:none;
+  filter:drop-shadow(0 0 14px currentColor) drop-shadow(0 0 30px currentColor) brightness(1.4)}
+.flyer svg{width:100%; height:100%; display:block}
+/* ---- shield break ---- */
+.shbreak{position:absolute; z-index:28; width:26px; height:26px; color:var(--ok); pointer-events:none;
+  filter:drop-shadow(0 0 10px var(--ok))}
+.shbreak svg{width:100%; height:100%}
+/* ---- charge segment station ---- */
+.station.chg{opacity:.9}
+/* ---- temporary slot, bought by the OPPONENT's charging: dashed, and turning ---- */
+.station.bonus::after{content:""; position:absolute; inset:-5px; border-radius:50%;
+  border:2px dashed currentColor; opacity:.95; pointer-events:none;
+  animation:bonusSpin 3.4s linear infinite}
+.station.bonus.ghost{opacity:1}
+/* the dashed ring is off-palette on purpose: a temporary slot belongs to no
+   emotion, so it must not borrow one's colour */
+.station.bonus::after{border-color:var(--ink)}
+/* flying in from the opponent's side, one at a time, so the grant is legible */
+.station.bonus.arriving{animation:slotArrive .42s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes slotArrive{
+  from{transform:translate(var(--ax,0px),var(--ay,-46px)) scale(.3); opacity:0}
+  60% {opacity:1}
+  to  {transform:translate(0,0) scale(1); opacity:1}}
+@keyframes bonusSpin{from{transform:rotate(0deg)} to{transform:rotate(360deg)}}
+/* ---- the EMOTIONS panel ---- */
+.btnrow{display:grid; grid-template-columns:1fr 1fr; gap:5px}
+.abilpanel{height:0; opacity:0; overflow:hidden; position:relative; z-index:3;
+  border:0 solid var(--line); box-shadow:var(--bevel); flex:none;
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 40%,var(--dark));
+  transition:height .46s cubic-bezier(.16,1,.3,1), opacity .28s ease,
+             border-width .46s cubic-bezier(.16,1,.3,1)}
+.abilpanel.open{height:33dvh; opacity:1; border-width:var(--px)}
+/* A closed panel still ran 8 floating depictions and 7 rainbow pills every frame,
+   stealing time from the 12 fps clock for something nobody could see. */
+.abilpanel:not(.open) *{animation-play-state:paused !important}
+/* Paged, not scrolled: four to a page, swiped with a pointer. `touch-action:pan-y`
+   keeps the horizontal axis ours while leaving vertical scrolling to the page. */
+.abilscroll{height:calc(100% - 18px); overflow:hidden; position:relative; touch-action:pan-y}
+.abpages{display:flex; height:100%; will-change:transform;
+  transition:transform .34s cubic-bezier(.16,1,.3,1)}
+.abpage{flex:0 0 100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-auto-rows:1fr; gap:6px; padding:6px; align-content:start}
+/* position dots: the one you are on simply grows */
+.abdots{position:absolute; left:0; right:0; bottom:3px; height:14px;
+  display:flex; align-items:center; justify-content:center; gap:7px; z-index:4}
+.abdot{width:5px; height:5px; background:var(--line); cursor:pointer;
+  box-shadow:1px 1px 0 rgba(6,4,14,.7); transition:all .22s ease}
+.abdot.on{width:10px; height:10px; background:var(--ink)}
+/* triangles are indicators that a page exists that way, nothing more */
+.abarrow{position:absolute; top:50%; width:0; height:0; opacity:0; z-index:4;
+  pointer-events:none; transition:opacity .22s ease;
+  animation:abBob 1.5s ease-in-out infinite alternate}
+.abarrow.show{opacity:.75; pointer-events:auto; cursor:pointer}
+.abarrow.l{left:3px;  border:7px solid transparent; border-right-color:var(--ink)}
+.abarrow.r{right:3px; border:7px solid transparent; border-left-color:var(--ink)}
+@keyframes abBob{from{transform:translateY(-11px)} to{transform:translateY(3px)}}
+.abrow{position:relative; display:flex; flex-direction:column; align-items:center;
+  justify-content:space-evenly; gap:2px; padding:5px 5px 5px 22px; overflow:hidden;
+  cursor:pointer; border:var(--px) solid var(--emo,var(--line)); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark))}
+/* the veil does the obscuring, so the row itself must NOT also be dimmed */
+.abrow.cool{pointer-events:none}
+/* ---- shots: how many more times this can be added to the line ----
+   They do not refill each turn; emptying them is what starts the cooldown. */
+.shots{position:absolute; left:5px; top:50%; transform:translateY(-50%); z-index:2;
+  display:flex; flex-direction:column; gap:5px}
+.shot{width:11px; height:11px; background:var(--emo,var(--ink));
+  box-shadow:1px 1px 0 rgba(6,4,14,.75)}
+.shot.spent{background:var(--line); opacity:.4; box-shadow:none}
+/* ---- cooldown takes the WHOLE box and shows only the turns left ---- */
+.cdveil{position:absolute; inset:0; z-index:3; display:none;
+  align-items:center; justify-content:center; background:rgba(9,8,7,.93)}
+.abrow.cool .cdveil{display:flex}
+.cdnum{font-size:52px; font-weight:900; line-height:1; color:var(--emo,var(--ink));
+  opacity:.55; filter:saturate(.5) brightness(1.7)}
+.abrow:active{background:rgba(92,83,72,.28)}
+.abrow.dis{opacity:.34; pointer-events:none}
+/* the depiction floats, so the box has something alive in it */
+.abline{display:flex; align-items:center; justify-content:center; gap:0; flex:none;
+  animation:abFloat 2.2s ease-in-out infinite alternate; animation-delay:var(--fd,0s)}
+@keyframes abFloat{from{transform:translateY(-4px)} to{transform:translateY(4px)}}
+.abrow.cool .abline{animation:none}
+.abline .station{width:52px; height:52px}
+.abline .station.chg{width:30px; height:30px}
+.abline .link{width:11px; height:6px}
+.abinfo{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0}
+.abname{font-size:14px; letter-spacing:.09em; text-align:center}
+.pills{display:flex; gap:4px; justify-content:center}
+.pill{font-size:12px; padding:2px 7px; color:#0c0a16; box-shadow:var(--bevel),1px 1px 0 rgba(6,4,14,.7)}
+.pill.rain{background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+    var(--joy),var(--sadness),var(--fear),var(--anger));
+  background-size:50vw 100%; background-repeat:repeat-x; animation:rainbow 7s linear infinite}
+.pill.wht{background:linear-gradient(180deg,#fff,var(--ink) 60%,#c9c3b0)}
+
+/* ---------- background: darkens toward the top ---------- */
+.phone{background:linear-gradient(180deg,#08080c 0%,#100e1c 30%,#171331 62%,var(--dark) 100%)}
+/* ---------- enemy: hovers, and lights the floor beneath it ---------- */
+.enemyholder{position:relative; display:flex; align-items:center; justify-content:center}
+@keyframes hover{from{transform:translateY(7px)} to{transform:translateY(-15px)}}
+.floorwrap{position:absolute; inset:0; opacity:0; transition:opacity .9s ease; pointer-events:none; z-index:-1}
+.floorwrap.lit{opacity:1}
+.floorlight{position:absolute; left:50%; bottom:-30px; width:78%; height:26px; pointer-events:none;
+  background:radial-gradient(ellipse at center, currentColor 0%, transparent 68%);
+  animation:floorpulse 3.6s ease-in-out infinite alternate; z-index:-1}
+/* down = tight and bright, up = wide and faint, exactly counter to the hover */
+@keyframes floorpulse{
+  from{transform:translateX(-50%) scale(.68); opacity:.9;  filter:blur(2px)}
+  to  {transform:translateX(-50%) scale(1.45); opacity:.22; filter:blur(7px)}}
+/* ---------- deferred hits: indicators, the ball, the crash ----------
+   Hits accumulate as pills during a line, then each morphs into a ball of
+   light that arcs into the bar. The bar only moves when a ball lands. */
+.ind{position:absolute; z-index:24; padding:4px 11px; font-size:18px; font-weight:900;
+  letter-spacing:.01em; color:#0c0a16;
+  white-space:nowrap; pointer-events:none;
+  transform:translate(-50%,-50%) scale(var(--sc,1));
+  box-shadow:var(--bevel),3px 3px 0 rgba(6,4,14,.85);
+  --anims:indIn .22s steps(3) both,
+          indFloat 1.05s ease-in-out infinite alternate,
+          indBreathe var(--bd,1700ms) ease-in-out infinite alternate;
+  animation:var(--anims)}
+@keyframes indIn{from{opacity:0} to{opacity:1}}
+/* the tag holds its place and counts up; --sc rides in the keyframes because a
+   transform animation would otherwise wipe the inline scale */
+@keyframes indFloat{
+  from{transform:translate(-50%,calc(-50% + 15px)) scale(var(--sc,1))}
+  to  {transform:translate(-50%,calc(-50% - 16px)) scale(var(--sc,1))}}
+/* breathes harder AND faster the more it is holding (--gl, --bd from fx.js) */
+@keyframes indBreathe{
+  from{filter:drop-shadow(0 0 calc(2px * var(--gl,1)) rgba(255,255,255,.45)) brightness(1)}
+  to  {filter:drop-shadow(0 0 calc(9px * var(--gl,1)) rgba(255,255,255,.95)) brightness(1.4)}}
+/* a kick each time another hit folds into the total */
+.ind.bump{--anims:indBump .2s steps(3),
+           indFloat 1.05s ease-in-out infinite alternate,
+           indBreathe var(--bd,1700ms) ease-in-out infinite alternate}
+@keyframes indBump{
+  from{transform:translate(-50%,-50%) scale(calc(var(--sc,1) * 1.4))}
+  to  {transform:translate(-50%,-50%) scale(var(--sc,1))}}
+/* the same flat mint / rose as the bars' wavy stroke, and the same bloom */
+.ind.ms-p{background:var(--mint);
+  filter:drop-shadow(0 0 5px rgba(176,255,225,.55)) drop-shadow(0 0 16px rgba(176,255,225,.28))}
+.ind.ms-e{background:var(--rose);
+  filter:drop-shadow(0 0 5px rgba(255,194,205,.55)) drop-shadow(0 0 16px rgba(255,194,205,.28))}
+/* the breathing animation drives `filter`, so the bloom has to live in the
+   keyframes too or it is wiped the moment the animation starts */
+/* ONE drop-shadow per keyframe, not two — an animated `filter` repaints every
+   frame and two blurred shadows on four tags at once was measurably costing us
+   the frame budget. */
+@keyframes indBreatheP{
+  from{filter:drop-shadow(0 0 calc(5px * var(--gl,1)) rgba(176,255,225,.6)) brightness(1)}
+  to  {filter:drop-shadow(0 0 calc(14px * var(--gl,1)) rgba(176,255,225,.45)) brightness(1.12)}}
+@keyframes indBreatheE{
+  from{filter:drop-shadow(0 0 calc(5px * var(--gl,1)) rgba(255,194,205,.6)) brightness(1)}
+  to  {filter:drop-shadow(0 0 calc(14px * var(--gl,1)) rgba(255,194,205,.45)) brightness(1.12)}}
+.ind.ms-p{--anims:indIn .22s steps(3) both,
+          indFloat 1.05s ease-in-out infinite alternate,
+          indBreatheP var(--bd,1700ms) ease-in-out infinite alternate}
+.ind.ms-e{--anims:indIn .22s steps(3) both,
+          indFloat 1.05s ease-in-out infinite alternate,
+          indBreatheE var(--bd,1700ms) ease-in-out infinite alternate}
+/* pointy: a rectangle that ends in sideways triangles. clip-path clips
+   box-shadow, so the drop is a filter instead — and the filter is animated, so
+   it has to ride in the keyframes (see indBreatheEC). */
+.ind.ec{color:#fff; padding:4px 20px;
+  background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+    var(--joy),var(--sadness),var(--fear),var(--anger));
+  background-size:50vw 100%; background-repeat:repeat-x; box-shadow:none;
+  clip-path:polygon(0 50%, 13px 0, calc(100% - 13px) 0, 100% 50%,
+                    calc(100% - 13px) 100%, 13px 100%);
+  --anims:rainbow 7s linear infinite,
+          indIn .22s steps(3) both,
+          indFloat 1.05s ease-in-out infinite alternate,
+          indBreatheEC var(--bd,1700ms) ease-in-out infinite alternate;
+  animation:var(--anims)}
+@keyframes indBreatheEC{
+  from{filter:drop-shadow(0 0 calc(3px * var(--gl,1)) rgba(255,255,255,.55)) brightness(1)}
+  to  {filter:drop-shadow(0 0 calc(11px * var(--gl,1)) rgba(255,255,255,.95)) brightness(1.4)}}
+.ball{position:absolute; z-index:25; width:48px; height:48px; border-radius:50%;
+  pointer-events:none; box-shadow:0 0 26px currentColor,0 0 60px currentColor;
+  background:radial-gradient(circle,#fff 0%,currentColor 55%,transparent 72%)}
+.crash{position:absolute; z-index:26; pointer-events:none;
+  box-shadow:1px 1px 0 rgba(6,4,14,.8)}
+
+/* ---------- OVERLOAD: the container itself starts to fail ---------- */
+.panel.overloaded{animation:overloadEdge .28s steps(1) infinite}
+@keyframes overloadEdge{
+  0%  {border-color:var(--anger);    box-shadow:var(--bevel),0 0 16px var(--anger)}
+  17% {border-color:var(--surprise); box-shadow:var(--bevel),0 0 16px var(--surprise)}
+  34% {border-color:var(--disgust);  box-shadow:var(--bevel),0 0 16px var(--disgust)}
+  51% {border-color:var(--joy);      box-shadow:var(--bevel),0 0 16px var(--joy)}
+  68% {border-color:var(--sadness);  box-shadow:var(--bevel),0 0 16px var(--sadness)}
+  85% {border-color:var(--fear);     box-shadow:var(--bevel),0 0 16px var(--fear)}}
+.bigtag.overload{background:linear-gradient(180deg,#fff,var(--anger) 55%,#7a1024);
+  color:#fff; text-shadow:2px 2px 0 #000; font-size:30px; letter-spacing:.16em}
+
+/* ---------- enemy defeat: the layers come apart and fall ---------- */
+.fallring{position:absolute; border-style:solid; border-color:currentColor; border-radius:50%;
+  z-index:33; pointer-events:none; filter:drop-shadow(0 0 12px currentColor)}
+/* ---------- opening sequence ---------- */
+/* the enemy speaks before the interface arrives, so the bubble must be exempt
+   from the pre-intro blackout too */
+.screen.preintro > *:not(.intro):not(.flash):not(.stage):not(.title):not(.howto):not(.bubblewrap){opacity:0}
+.intro{position:absolute; inset:0; z-index:70; overflow:hidden; background:#000}
+.intro.clear{background:transparent}
+.introrail{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(135deg);
+  transform-origin:50% 50%; width:2200px; height:120px}
+.introtrack{position:absolute; left:50%; top:50%; transform:translateY(-50%); height:100%}
+.introtrack .rail{position:absolute; left:-1600px; width:3200px; top:50%; height:12px;
+  transform:translateY(-50%); background:#fff; box-shadow:0 0 22px #fff, 0 0 60px rgba(255,255,255,.6)}
+.introstation{position:absolute; top:50%; width:78px; height:78px; transform:translate(-50%,-50%);
+  border:12px solid #fff; border-radius:50%; background:#000;
+  box-shadow:0 0 26px #fff, 0 0 70px rgba(255,255,255,.5), inset 0 0 14px rgba(255,255,255,.55)}
+/* black circle, but with a blazing leading edge so the wipe is legible on black */
+/* sized to just cover the screen diagonal, so its edge sweeps visibly */
+.introwipe{position:absolute; left:50%; top:50%; width:118vmax; height:118vmax; border-radius:50%;
+  background:#000; transform:translate(-50%,-50%) scale(0);
+  box-shadow:0 0 0 7px #fff, 0 0 46px 12px #fff}
+
+/* ---------- enemy dialogue ----------
+   The wrapper is unclipped so the tail and the drop shadow can escape; the
+   body and the black stroke behind it are two stacked pixel-cornered plates. */
+.bubblewrap{position:absolute; left:50%; transform:translateX(-50%); width:86%; max-width:360px;
+  z-index:80; pointer-events:none; filter:drop-shadow(5px 7px 0 rgba(0,0,0,.9))}
+.bubbleborder{position:absolute; inset:-4px; background:#000; z-index:0}
+.bubble{position:relative; z-index:1; padding:11px 14px; background:var(--c);
+  color:#fff; text-shadow:2px 2px 0 #000, 3px 3px 0 rgba(0,0,0,.55);
+  font-size:12.5px; line-height:1.5; letter-spacing:.03em; text-transform:none; font-weight:700}
+.tail{position:absolute; top:-19px; width:0; height:0; z-index:2; transform:translateX(-50%);
+  border-left:15px solid transparent; border-right:15px solid transparent;
+  border-bottom:19px solid #000}
+.tail::after{content:""; position:absolute; left:-10px; top:5px; width:0; height:0;
+  border-left:10px solid transparent; border-right:10px solid transparent;
+  border-bottom:13px solid var(--c)}
+/* ---------- the persona's name, hanging over the enemy ---------- */
+.personaname{position:absolute; left:50%; top:-30px; white-space:nowrap; z-index:4;
+  font-size:12px; letter-spacing:.24em; color:var(--c); min-height:1em;
+  text-shadow:2px 2px 0 #000, 0 0 16px currentColor;
+  animation:namefloat 4.6s ease-in-out infinite alternate; pointer-events:none}
+.personaname.typing{font-size:15px;
+  animation:namefloat 4.6s ease-in-out infinite alternate, nameGlow .5s steps(2) infinite alternate}
+@keyframes nameGlow{
+  from{text-shadow:2px 2px 0 #000, 0 0 10px currentColor}
+  to  {text-shadow:2px 2px 0 #000, 0 0 26px currentColor, 0 0 52px currentColor}}
+@keyframes namefloat{
+  from{transform:translateX(-50%) translateY(0)}
+  to  {transform:translateX(-50%) translateY(-8px)}}
+
+/* ---------- title screen ---------- */
+.title{position:absolute; inset:0; z-index:90; background:#000; display:flex;
+  align-items:center; justify-content:center; transition:opacity .5s ease}
+.title.gone{opacity:0; pointer-events:none}
+.titlewrap{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center}
+.titlemain{font-size:26px; letter-spacing:.30em; color:#fff;
+  text-shadow:2px 3px 0 #000, 0 0 24px rgba(255,255,255,.55)}
+.titlesub{font-size:52px; letter-spacing:.20em; color:var(--anger); margin-top:-2px;
+  text-shadow:3px 4px 0 #000, 0 0 30px var(--anger)}
+.titletag{font-size:9px; letter-spacing:.30em; color:var(--muted); margin-top:6px}
+.confront{margin-top:34px; padding:13px 22px; font:inherit; font-size:12px; letter-spacing:.18em;
+  cursor:pointer; color:var(--void); border:var(--px) solid var(--ink); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,#ffe08a,var(--joy) 55%,#c98f16);
+  animation:confrontPulse 1.6s ease-in-out infinite alternate}
+.confront:active{transform:translate(1px,1px)}
+@keyframes confrontPulse{
+  from{box-shadow:var(--bevel), 0 0 10px rgba(255,198,61,.5)}
+  to  {box-shadow:var(--bevel), 0 0 26px rgba(255,198,61,.95)}}
+
+/* ---------- how to play ---------- */
+.howto{position:absolute; inset:0; z-index:92; background:#000; display:none;
+  flex-direction:column; align-items:center; justify-content:center; gap:7px;
+  padding:12px 13px; overflow-y:auto}
+.step .v em{font-style:normal; color:var(--joy)}
+.howlead{font-size:13px; letter-spacing:.04em; color:var(--muted); text-align:center;
+  line-height:1.4; text-transform:none; margin-top:-4px}
+.howto.show{display:flex}
+.howto h2{font-size:19px; letter-spacing:.20em; color:var(--ink); text-shadow:2px 2px 0 #000}
+.steps{display:flex; flex-direction:column; gap:6px; width:100%; max-width:340px}
+.step{display:flex; align-items:center; gap:11px; padding:8px 11px;
+  border:var(--px) solid var(--line); box-shadow:var(--bevel);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark))}
+.step .num{flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  font-size:19px; color:var(--void); background:var(--c);
+  box-shadow:var(--bevel),1px 1px 0 rgba(0,0,0,.8)}
+.step .txt{display:flex; flex-direction:column; gap:1px; min-width:0}
+.step .k{font-size:18px; letter-spacing:.13em; color:var(--c)}
+.step .v{font-size:15px; letter-spacing:.01em; color:var(--ink); text-transform:none; line-height:1.3}

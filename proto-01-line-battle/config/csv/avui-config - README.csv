@@ -1,0 +1,38 @@
+NEURO-METRO: AVUI — GAME CONFIG
+This workbook is the source of truth for all game content. The prototype reads no
+"content values of its own — every number, ability, unit and rule comes from here."
+HOW THE ROUND TRIP WORKS
+1.  Edit any sheet in Google Sheets.
+"2.  File > Download > Comma-separated values, one CSV per sheet."
+3.  Put the CSVs in a folder and run:  python3 tools/build_data.py <folder>
+4.  That regenerates data.js. Reload the prototype. Nothing else to touch.
+COLUMN STATUS — the row under each header
+LIVE      (green)   the prototype reads this column today. Renaming it breaks the game.
+planned   (yellow)  reserved for design you have not built yet. Inert until wired up;
+                    safe to fill in early. Tell me when you want one activated.
+CONVENTIONS
+"ids          UPPER_SNAKE. Referenced by other sheets, so renaming one means updating"
+             every sheet that points at it. The 'checks' sheet catches broken references.
+lists        pipe-separated in a single cell:  ATK_ANGER|ATK_JOY|DEFEND
+booleans     1 or 0  (TRUE/FALSE also accepted)
+blank        means 'none' / 'typeless'. An ability with no emotion never matches a layer.
+"*            wildcard, in the matchups sheet only. Matches any emotion."
+enabled      set to 0 to switch a row off without deleting it.
+ADDING THINGS — no code needed
+"a new ability      add a row to 'abilities', then add its id to a unit's pool"
+a new enemy        add a row to 'units'
+"a new emotion      add a row to 'emotions' with a hex colour, then matchup rows for it"
+a new synergy      add a row to 'matchups' — this is the main lever for interactions
+retune anything    'rules'
+SHEETS
+emotions         the six emotional types and their palette colours
+abilities        everything a unit can do
+matchups         attack emotion x layer emotion -> damage and charge. Your synergy table.
+"units            player and enemies: stats, starting layers, ability pool"
+layer_types      per-layer properties. Reserved — layers are plain emotions today.
+status_effects   buffs and debuffs. Reserved.
+"synergies        line-level combos (sequences, counts, positions). Reserved."
+"dialogue         what each enemy says, per persona and battle state"
+rules            global tunables
+sounds           runtime-synthesised SFX. No audio files.
+checks           live validation. Every row should read OK.

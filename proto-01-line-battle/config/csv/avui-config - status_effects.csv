@@ -1,0 +1,4 @@
+RESERVED. Buffs and debuffs. Reference an id from abilities.status_apply or matchups.status_apply.,,,,,,,,,,,,,,
+id,name,duration,dmg_taken_mult,dmg_dealt_mult,ec_gain_mult,ms_per_turn,ec_per_turn,blocks_actions,stacking,max_stacks,icon,color,enabled,notes
+planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned
+EXAMPLE_NUMB,Numb,1,1,1,0.5,0,0,0,REFRESH,1,SHIELD,#929fa5,0,"EXAMPLE ROW — halves charge gained. enabled=0, so it is ignored."

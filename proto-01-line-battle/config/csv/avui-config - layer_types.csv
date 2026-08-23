@@ -1,0 +1,4 @@
+"RESERVED. Layers are plain emotions today — units.layers holds emotion ids. This sheet exists for when a layer needs properties of its own (taking several hits to break, doing something when it breaks, or granting a passive while it is outermost).",,,,,,,,,,,
+id,emotion,display_name,durability,on_break_effect,on_break_value,passive_effect,passive_value,regrow_delay_ms,tags,enabled,notes
+planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned
+EXAMPLE_BRITTLE_ANGER,ANGER,Brittle Anger,1,EC_TO_OWNER,10,DMG_TAKEN_MULT,1.25,380,EXAMPLE,0,"EXAMPLE ROW — shows the intended format. enabled=0, so it is ignored."
