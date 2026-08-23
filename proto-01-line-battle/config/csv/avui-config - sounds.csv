@@ -3,6 +3,8 @@ id,wave,f0,f1,dur,gain,echo,description
 LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
 tap,square,980,1460,80,0.46,0.3,Adding an ability to the line.
 place,square,620,1760,130,0.4,0.35,The station lands on your line and flashes white.
+sheatheE,sawtooth,1500,220,150,0.3,0.22,Enemy UI element drawn into place. Lower.
+sheatheP,sawtooth,2100,340,140,0.28,0.22,Player UI element drawn into place. Higher.
 slot,triangle,300,1500,150,0.3,0.45,A temporary slot flies in from the opponent.
 remove,square,520,220,90,0.34,0.24,Removing a station.
 depart,sawtooth,240,70,420,0.26,0.45,The line departs and charge is spent.

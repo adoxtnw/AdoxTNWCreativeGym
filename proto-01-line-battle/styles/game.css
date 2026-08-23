@@ -126,7 +126,7 @@ body{background:var(--void); color:var(--ink);
   37%{transform:translate(-3px,-2px)}50%{transform:translate(3px,2px)}62%{transform:translate(-2px,1px)}
   75%{transform:translate(2px,-1px)}87%{transform:translate(-1px,0)}100%{transform:translate(0,0)}}
 .flash{position:absolute; inset:0; background:var(--ink); opacity:0; pointer-events:none; z-index:34}
-.flash.on{animation:fla .1s steps(2) 1}
+.flash.on{animation:fla .1s steps(2) 1}   /* still used by the death clash, not by the opening */
 @keyframes fla{0%{opacity:.42}100%{opacity:0}}
 .screen.slowmo{filter:saturate(1.5) contrast(1.15)}
 .screen.slowmo .gauge.clash{box-shadow:0 0 22px var(--ink),0 0 44px var(--anger); transform:scale(1.06)}
@@ -416,6 +416,49 @@ body{background:var(--void); color:var(--ink);
 .crash{position:absolute; z-index:26; pointer-events:none;
   box-shadow:1px 1px 0 rgba(6,4,14,.8)}
 
+/* ---------- status tags: what is currently wrong with a unit ---------- */
+.statusrow{display:flex; gap:7px; justify-content:center; flex-wrap:wrap;
+  min-height:0; margin:0; padding:0;
+  position:relative; z-index:6}   /* .stage paints at z-index 1 and would bury these */
+.statusrow.on{margin:4px 0}
+/* A long, hard black drop — pure #000, no blur — and an inner glow that breathes
+   in the status's own colour. The glow is an inset shadow so it reads as light
+   coming from inside the tag rather than a halo around it. */
+.stag{position:relative; display:flex; align-items:center; gap:6px; padding:5px 11px;
+  font-size:13px; letter-spacing:.08em; color:#0c0a16; cursor:pointer;
+  background:var(--sc2,var(--ink));
+  box-shadow:var(--bevel), 5px 6px 0 #000, 9px 11px 0 #000;
+  animation:stagIn .2s steps(3) both, stagBreathe 1.15s ease-in-out infinite alternate}
+.stag svg{width:16px; height:16px; display:block; fill:#0c0a16}
+.stag b{font-size:14px}
+.stag:active{transform:translate(1px,1px)}
+@keyframes stagIn{from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none}}
+@keyframes stagBreathe{
+  from{box-shadow:var(--bevel), 5px 6px 0 #000, 9px 11px 0 #000,
+       inset 0 0 6px rgba(255,255,255,.35), 0 0 4px var(--sc2,var(--ink))}
+  to  {box-shadow:var(--bevel), 5px 6px 0 #000, 9px 11px 0 #000,
+       inset 0 0 17px rgba(255,255,255,.95), 0 0 16px var(--sc2,var(--ink))}}
+
+/* ---------- tooltips ---------- */
+.tipveil{position:absolute; inset:0; z-index:96; display:none}
+.tipveil.on{display:block}
+.tip{position:absolute; z-index:97; display:none; max-width:80%; padding:9px 11px;
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 55%,var(--dark));
+  border:var(--px) solid var(--line); box-shadow:var(--bevel), 4px 5px 0 #000;
+  text-transform:none; letter-spacing:.01em}
+.tip.on{display:block; animation:tipIn .16s steps(3) both}
+@keyframes tipIn{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+.tiphead{font-size:12px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:5px}
+.tipbody{font-size:11px; line-height:1.55; color:var(--ink); font-weight:700}
+.tipturns{margin-top:7px; font-size:10px; letter-spacing:.13em; color:var(--muted);
+  text-transform:uppercase}
+.tip .kw{font-weight:900}
+.tip .em{font-weight:900; color:#fff}
+.tip .kw.rain{background-image:linear-gradient(90deg,var(--anger),var(--surprise),
+    var(--disgust),var(--joy),var(--sadness),var(--fear),var(--anger));
+  background-size:50vw 100%; -webkit-background-clip:text; background-clip:text;
+  color:transparent; animation:rainbow 7s linear infinite}
+
 /* ---------- OVERLOAD: the container itself starts to fail ---------- */
 .panel.overloaded{animation:overloadEdge .28s steps(1) infinite}
 @keyframes overloadEdge{
@@ -440,16 +483,25 @@ body{background:var(--void); color:var(--ink);
 .introrail{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(135deg);
   transform-origin:50% 50%; width:2200px; height:120px}
 .introtrack{position:absolute; left:50%; top:50%; transform:translateY(-50%); height:100%}
-.introtrack .rail{position:absolute; left:-1600px; width:3200px; top:50%; height:12px;
-  transform:translateY(-50%); background:#fff; box-shadow:0 0 22px #fff, 0 0 60px rgba(255,255,255,.6)}
-.introstation{position:absolute; top:50%; width:78px; height:78px; transform:translate(-50%,-50%);
-  border:12px solid #fff; border-radius:50%; background:#000;
-  box-shadow:0 0 26px #fff, 0 0 70px rgba(255,255,255,.5), inset 0 0 14px rgba(255,255,255,.55)}
-/* black circle, but with a blazing leading edge so the wipe is legible on black */
-/* sized to just cover the screen diagonal, so its edge sweeps visibly */
-.introwipe{position:absolute; left:50%; top:50%; width:118vmax; height:118vmax; border-radius:50%;
-  background:#000; transform:translate(-50%,-50%) scale(0);
-  box-shadow:0 0 0 7px #fff, 0 0 46px 12px #fff}
+/* The line is a PIXEL canvas, not DOM boxes: border-radius and box-shadow give
+   smooth, anti-aliased edges, which read as the wrong medium next to the rings
+   and the gauges. Same technique as src/rings.js — draw small, upscale hard. */
+#introCv{position:absolute; left:-1599px; top:50%; transform:translateY(-50%);
+  width:3198px; height:96px; image-rendering:pixelated;   /* 533 x 6 exactly */
+  filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 30px rgba(255,255,255,.55))}
+/* The wipe is the CURTAIN, not a disc: opaque black with a transparent hole that
+   grows, so the battle background is revealed through it. Painted per pixel, so
+   its thick leading ring is as chunky as the metro line's. */
+.introwipe{position:absolute; left:0; top:0; image-rendering:pixelated;
+  pointer-events:none; z-index:2}
+/* once the mask takes over, the intro's own black has to get out of the way */
+.intro.masking{background:transparent}
+/* The rail is a sibling of the wipe canvas inside .intro, so wherever the mask is
+   transparent the rail shows THROUGH it instead of the background. It has to be
+   gone the moment the mask takes over. */
+.intro.masking .introrail{display:none}
+/* held back until its own entrance animation starts */
+.drawin{opacity:0}
 
 /* ---------- enemy dialogue ----------
    The wrapper is unclipped so the tail and the drop shadow can escape; the
@@ -484,13 +536,40 @@ body{background:var(--void); color:var(--ink);
 .title{position:absolute; inset:0; z-index:90; background:#000; display:flex;
   align-items:center; justify-content:center; transition:opacity .5s ease}
 .title.gone{opacity:0; pointer-events:none}
-.titlewrap{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center}
+.titlewrap{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
+  width:100%; padding:0 0 10px}
+/* ---- Barcelona's current moment, above the logo ---- */
+.moment{font-size:10px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
+  padding:0 14px 10px; min-height:13px; text-wrap:balance}
+/* ---- screen-wide square frame ----
+   `isolation` matters: without it the glow's colour-dodge would blend with the
+   black page behind rather than with the logo, and dodge against black is a
+   no-op — the effect would silently not exist. */
+.logoframe{position:relative; width:100%; aspect-ratio:1/1; overflow:hidden;
+  isolation:isolate; border-top:var(--px) solid var(--line);
+  border-bottom:var(--px) solid var(--line); background:#000}
+.logoimg{width:100%; height:100%; object-fit:cover; display:block;
+  filter:url(#logoWave)}          /* faint, permanent swim */
+/* the glow drifts through the six emotions and breathes in opacity */
+.logoglow{position:absolute; inset:-6%; pointer-events:none; mix-blend-mode:color-dodge;
+  background:radial-gradient(ellipse 58% 48% at 50% 46%, currentColor 0%,
+             rgba(0,0,0,0) 68%);
+  animation:logoHue 23s linear infinite, logoBreathe 7.5s ease-in-out infinite alternate}
+@keyframes logoHue{
+  0%{color:var(--anger)}    17%{color:var(--surprise)} 34%{color:var(--disgust)}
+  50%{color:var(--joy)}     67%{color:var(--sadness)}  84%{color:var(--fear)}
+  100%{color:var(--anger)}}
+@keyframes logoBreathe{from{opacity:.14} to{opacity:.40}}
+/* ---- the blurb, between the logo and the buttons ---- */
+.blurb{font-size:10px; line-height:1.6; letter-spacing:.02em; color:#6a6257;
+  text-transform:none;      /* prose, not a label — the global rule uppercases everything */
+  max-width:31ch; margin:12px auto 0; padding:0 14px; text-wrap:pretty}
 .titlemain{font-size:26px; letter-spacing:.30em; color:#fff;
   text-shadow:2px 3px 0 #000, 0 0 24px rgba(255,255,255,.55)}
 .titlesub{font-size:52px; letter-spacing:.20em; color:var(--anger); margin-top:-2px;
   text-shadow:3px 4px 0 #000, 0 0 30px var(--anger)}
 .titletag{font-size:9px; letter-spacing:.30em; color:var(--muted); margin-top:6px}
-.confront{margin-top:34px; padding:13px 22px; font:inherit; font-size:12px; letter-spacing:.18em;
+.confront{margin-top:16px; padding:13px 22px; font:inherit; font-size:12px; letter-spacing:.18em;
   cursor:pointer; color:var(--void); border:var(--px) solid var(--ink); box-shadow:var(--bevel);
   background:linear-gradient(180deg,#ffe08a,var(--joy) 55%,#c98f16);
   animation:confrontPulse 1.6s ease-in-out infinite alternate}

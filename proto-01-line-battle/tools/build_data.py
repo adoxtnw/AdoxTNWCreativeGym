@@ -8,12 +8,13 @@ In Google Sheets: File > Download > Comma-separated values, once per sheet.
 Google names them like "avui-config - abilities.csv"; this matches on the part
 after the last " - ", so you can drop the whole export folder in as-is.
 
-Sheets that are reserved (layer_types, status_effects, synergies) and the
-README/checks sheets are ignored — nothing reads them yet.
+Sheets that are reserved (layer_types, synergies) and the README/checks sheets
+are ignored — nothing reads them yet.
 """
 import sys, os, glob, re, csv, io
 
-TABLES = ["emotions", "abilities", "matchups", "units", "dialogue", "rules", "sounds"]
+TABLES = ["emotions", "abilities", "matchups", "units", "dialogue", "rules", "sounds",
+          "status_effects", "moments"]
 
 # spreadsheet-side balancing helpers — meaningless at runtime, so they are
 # stripped rather than shipped into data.js
@@ -28,6 +29,8 @@ HEADER_COMMENTS = {
  "units":     "layers are outermost-first and rotate as they take hits. pool = usable abilities.",
  "rules":     "global tunables, read by name.",
  "sounds":    "synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.",
+ "moments":   "title-screen mood line. day is MON..SUN or *; hours are BARCELONA local,\n   to_hour exclusive, and a band may wrap past midnight. Highest priority wins.",
+ "status_effects": "one row per status. Abilities apply these by id via status_apply.\n   block_regen = layers held down; miss_chance = attacks the victim fluffs;\n   self_hits = the victim turns one of its own attacks on itself each turn.",
  "dialogue":  "what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one\n   persona at random from the rows matching the enemy's emotion.",
 }
 
@@ -142,6 +145,8 @@ const RULES     = Object.fromEntries(parseCSV(DATA.rules).map(r=>[r.key,r.value]
 const SOUNDS    = byId(parseCSV(DATA.sounds));
 const MATCHUPS  = parseCSV(DATA.matchups);
 const DIALOGUE  = parseCSV(DATA.dialogue);
+const STATUSES  = byId(parseCSV(DATA.status_effects).filter(r=>r.enabled));
+const MOMENTS   = parseCSV(DATA.moments).filter(r=>r.enabled);
 '''
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write(js)

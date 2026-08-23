@@ -110,6 +110,18 @@ function buildEnemyLine(){
      && cooldownLeft(e,shieldAb.id)===0 && usesLeft(e,shieldAb)>0 && placeEntries(e,shieldAb)){
     ec-=shieldAb.cost;
   }
+  /* Debuffs are worth a slot only if the target is not already suffering them.
+     Without this the AI never touches a DEBUFF at all — its scoring is built on
+     damage per slot, and a debuff deals none, so it would always lose the
+     comparison and an ability like Blinded by Hate would sit in the pool unused. */
+  const affordable=a=>a.cost<=ec && ((a.charge||0)+1)<=emptySlots(e)
+                      && cooldownLeft(e,a.id)===0 && usesLeft(e,a)>0;
+  const debuffs=e.pool.filter(a=>a.kind==="DEBUFF" && affordable(a) && !hasStatus(p,a.status_apply));
+  if(debuffs.length && Math.random()<RULES.aiDebuffChance){
+    const d=debuffs[Math.floor(Math.random()*debuffs.length)];
+    if(placeEntries(e,d)) ec-=d.cost;
+  }
+
   let guard=0;
   while(emptySlots(e)>0 && guard++<40){
     const room=emptySlots(e);
@@ -142,6 +154,24 @@ function buildEnemyLine(){
     else if(best.hits_layer&&layers.length) layers.shift();
   }
 }
+/* SAD and anything else carrying `self_hits`: at the end of the round the victim
+   turns one of its OWN attacks on itself. Restricted to DAMAGE abilities on
+   purpose — "one of their abilities" picked from the whole pool would sometimes
+   hand them a shield, which is not a punishment. */
+async function runSelfHits(u, onEnemy){
+  let n = 0;
+  for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) n += (STATUSES[k].self_hits || 0);
+  if(!n) return;
+  const pool = u.pool.filter(a => a.kind === "DAMAGE");
+  if(!pool.length) return;
+  for(let i = 0; i < n; i++){
+    if(u.ms <= 0) return;
+    const ab = pool[Math.floor(Math.random() * pool.length)];
+    bigTag("SELF HARM", "off");
+    await applyAbility(u, u, ab, !onEnemy, null);   // actor and target are the same unit
+    await settle(u);
+  }
+}
 function endCheck(){
   if(S.enemy.ms<=0){ Hooks.emit("unit:defeated",{unit:S.enemy,byPlayer:true});  finish("win");  return true; }
   if(S.player.ms<=0){ Hooks.emit("unit:defeated",{unit:S.player,byPlayer:false}); finish("lose"); return true; }
@@ -172,9 +202,14 @@ async function depart(){
   await settleAll();                       // and now the player's
   if(endCheck()){S.busy=false;return;}
   commitUses(S.player); commitUses(S.enemy);   // what departed is now really spent
+  await runSelfHits(S.enemy, true);
+  if(endCheck()){S.busy=false;return;}
+  await runSelfHits(S.player, false);
+  if(endCheck()){S.busy=false;return;}
   await Hooks.emit("round:end",{round:S.round});
   await regrowLayers(S.player); await regrowLayers(S.enemy);
   tickCooldowns(S.player); tickCooldowns(S.enemy);
+  tickStatuses(S.player);  tickStatuses(S.enemy);
   shuffleLayers(S.player); shuffleLayers(S.enemy);
   S.round++;
   /* Each side's charging buys the OTHER side room next turn. Recomputed from

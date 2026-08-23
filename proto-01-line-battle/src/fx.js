@@ -258,15 +258,21 @@ async function breakLayer(u){
   l.flash=Math.ceil(RULES.layerFlashMs/(1000/12))+1;
   sfx("breaklayer");
   await sleep(RULES.layerFlashMs);
-  u.layers.shift(); u.broken.push(l);
+  u.layers.shift();
+  /* Grown layers are temporary: they are simply gone, never filed for regrowth. */
+  if(!l.temp) u.broken.push(l);
   await Hooks.emit("layer:broken",{unit:u,layer:l});
   await sleep(RULES.layerGapMs);
 }
 async function regrowLayers(u){
   if(!u.broken.length) return;
-  for(const l of u.broken){ l.flash=0; l.pos=RULES.maxLayers; u.layers.push(l); }
-  const count=u.broken.length;
-  u.broken.length=0;
+  /* A status may be holding some of them down — those stay in `broken` and get
+     another chance next round, once it has worn off. */
+  const held = Math.min(regenBlocked(u), u.broken.length);
+  const back = u.broken.splice(0, u.broken.length - held);
+  if(!back.length){ bigTag("ROTTING", "off"); await sleep(RULES.layerGapMs); return; }
+  for(const l of back){ l.flash=0; l.pos=RULES.maxLayers; u.layers.push(l); }
+  const count=back.length;
   await Hooks.emit("layers:regrown",{unit:u,count});
   sfx("regrow");
   await sleep(RULES.layerRegrowMs);

@@ -4,11 +4,15 @@
    file:// as well as from a static host. Load order is fixed in index.html;
    every file shares one global scope. */
 
-applyPersona(); buildPanel(); applyOverload(S.player); buildEnemyLine(); render();
+renderMoment(); applyPersona(); buildPanel(); wireTips(); applyOverload(S.player); buildEnemyLine(); render();
 $("howtoBtn").addEventListener("click",()=>{ $("howto").classList.add("show"); sfx("tap"); });
 $("howtoBack").addEventListener("click",()=>{ $("howto").classList.remove("show"); sfx("tap"); });
 $("confrontBtn").addEventListener("click",()=>{
-  startMusic();                                  // the tap is also the gesture that unlocks audio
+  /* This tap is the one gesture the platform gives us: audio unlock, fullscreen
+     and the wake lock all have to be requested from inside it. */
+  startMusic();
+  goFullscreen();
+  keepAwake();
   const t=$("title");
   t.classList.add("gone");
   setTimeout(()=>t.remove(),520);

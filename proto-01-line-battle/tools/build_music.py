@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """
+SUPERSEDED. The theme is now two recorded WAV files (audio/theme-opening.wav and
+audio/theme-loop.wav) played back through Web Audio, not a MIDI synthesised at
+runtime. Kept only so the original .mid in sources/ can still be inspected.
+
 Convert a .mid into music.js — a plain note list the prototype's own WebAudio
 synth plays back. No MIDI parsing happens in the browser, and no audio file is
 fetched, so it works from file:// as well as from a server.

@@ -94,7 +94,7 @@ const EW=64, PW=RULES.playerCanvasW, PH=RULES.playerCanvasH;
 const E_CFG={baseR:RULES.enemyRingBaseR,  spacing:RULES.enemyRingSpacing,  breathe:RULES.enemyRingBreathe};
 const P_CFG={baseR:RULES.playerRingBaseR, spacing:RULES.playerRingSpacing, breathe:RULES.playerRingBreathe};
 let t=0, frozen=false, timer=null, glowCache={};
-let stepMs=1000/12, acc=0, lastTs=0, rafId=0;
+let stepMs=1000/12, acc=0, lastTs=0, rafId=0, lastTickAt=0, watchdog=null;
 function applyGlow(el,u,px){
   const e=u.layers.length?u.layers[0].e:null;
   const key=el.id+":"+e;
@@ -121,26 +121,32 @@ function tick(){
   if(fl && fl.dataset.e!==String(oe)){ fl.dataset.e=String(oe); fl.style.color=emoHex(oe); }
   applyGlow($("pRingsOut"),S.player,4);
 }
-/* Driven by requestAnimationFrame with a fixed step, NOT setInterval.
-   setInterval(tick, 83) drifts: measured gaps averaged 115ms and spiked to 334ms
-   against a nominal 83ms, which is what made the animation read as skippy and
-   jump at the end of a move. rAF lands the step on real compositor frames, and
-   the accumulator is clamped to one step so a long stall cannot spiral into a
-   burst of catch-up ticks.
-   A backgrounded tab stops rAF entirely — that is fine here, because tick() only
-   draws. Everything that must keep progressing is sequenced through waitAnim,
-   which races its own timer. */
+/* A fixed step driven by requestAnimationFrame, with a timer as backstop.
+   setInterval(tick, 83) on its own drifts: measured gaps averaged 115ms and
+   spiked to 334ms against a nominal 83ms, which is what made the animation read
+   as skippy and jump at the end of a move. rAF lands the step on real compositor
+   frames instead, and the accumulator is clamped to one step so a long stall
+   cannot spiral into a burst of catch-up ticks.
+   But rAF is SUSPENDED OUTRIGHT on a hidden tab — not throttled, stopped — which
+   would freeze the bar tweens mid-resolution. So a watchdog timer keeps stepping
+   the clock whenever rAF has gone quiet. Visible: rAF drives and the watchdog
+   never fires. Hidden: the watchdog alone keeps the simulation moving. */
+function step(){ lastTickAt = performance.now(); tick(); }
 function frame(ts){
   rafId = requestAnimationFrame(frame);
   if(!lastTs){ lastTs = ts; return; }
   acc += ts - lastTs; lastTs = ts;
   if(acc < stepMs) return;
   acc = Math.min(acc - stepMs, stepMs);      // never bank more than one frame
-  tick();
+  step();
 }
 function setFps(f){
   stepMs = 1000/f;
   if(!rafId){ lastTs = 0; acc = 0; rafId = requestAnimationFrame(frame); }
+  if(watchdog) clearInterval(watchdog);
+  watchdog = setInterval(()=>{
+    if(performance.now() - lastTickAt > stepMs * 2.5) step();
+  }, stepMs);
+  timer = watchdog;                          // truthy while the clock is running
 }
-tick(); setFps(12);
-timer = 1;                                   // kept truthy: "the clock is running"
+step(); setFps(12);

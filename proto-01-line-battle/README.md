@@ -20,6 +20,195 @@ A single self-contained `index.html`. No build step, no dependencies, no network
 | Remove from the line | Tap a node in the line |
 | Resolve the turn | **DEPART** |
 
+## Pass 28 — the opening, actually fixed
+
+Pass 27's opening was broken in three separate ways. All three shared one root cause:
+**things were visible that should not have been yet.**
+
+### The metro line showed through the mask
+The wipe canvas and the rail are both children of `.intro`. A mask reveals what is
+behind *its own element* — so the transparent hole showed the rail sitting underneath
+it, not the background. The rail is now removed the instant the mask takes over.
+
+### The entity showed through, then flashed away
+`.stage` is deliberately exempt from the preintro blackout so the enemy can rise while
+it is still on. Nothing else hid it, so the entity sat there fully visible behind the
+curtain, got revealed early by the hole, and then appeared to vanish when its own
+entrance restarted it from `opacity:0`. The stage is now explicitly hidden until the
+rise.
+
+### The interface flashed in, then moved
+Removing `preintro` reveals every element at once. Each then animated in turn, so the
+later ones sat fully visible for hundreds of milliseconds before their entrance ran.
+Every element is now held hidden until its own animation begins, and `revealInterface`
+lifts the blackout itself rather than having it lifted beforehand.
+
+### Verified by timeline
+| moment | rail | stage | ePanel | pPanel | btnrow |
+|---|---|---|---|---|---|
+| boot | block | 1.00 | 0 | 0 | 0 |
+| wipe start | block | **0.00** | 0 | 0 | 0 |
+| wipe mid | **none** | 0.00 | 0 | 0 | 0 |
+| reveal start | gone | 1.00 | 0 | 0 | 0 |
+| ePanel enters | gone | 1.00 | **0.00** | 0 | 0 |
+| btnrow enters | gone | 1.00 | 1.00 | **1.00** | **0.00** |
+
+Each element is still at zero when its own entrance begins. Full battle to completion
+afterwards, no errors.
+
+## Pass 27 — tooltips, the real wipe, and the interface drawing itself in
+
+### Tooltips
+**Long-press an ability**, **tap a status**. Both blurbs live in the spreadsheet
+(`abilities.blurb`, `status_effects.blurb`) and carry two marks: `*text*` for emphasis
+and `{TOKEN}` for a colour-coded keyword — `{ANGER}` in anger red, `{EC}` on the moving
+rainbow, `{MS}` in stamina mint. An unknown token degrades to plain ink.
+
+The long press cooperates with the page swipe: movement past the drag threshold cancels
+it, and once the tooltip is open the click that follows is swallowed so the press does
+not also place the ability. Verified: short tap places and opens nothing; long press
+opens and places nothing. Anything else on screen closes it.
+
+### Status tags moved and grew
+Now **below the enemy's attack line** and **above yours**. Bigger (27px tall), with a
+long hard **pure-black** double drop and a **breathing inner glow** in the status's own
+colour. Tapping one explains it and says how many turns are left.
+
+They also needed `z-index` — `.stage` paints at z-index 1 and was burying them.
+
+### The wipe is an actual mask now
+It was a black disc growing on a black field, which is exactly why it never read as
+revealing anything. The wipe canvas is now the **curtain itself**: opaque black
+everywhere, **transparent inside the circle**, so the battle background is revealed
+through the hole. Its leading edge is a thick ring drawn at the same 1/6 scale as the
+metro line, so the stroke is pixelated and heavy instead of a hairline.
+
+Measured across the sweep: curtain 8562 -> 1120 px, transparent hole 0 -> 6916 px, ring
+present in every frame.
+
+### The interface draws itself in
+The white flash is gone. Each element now arrives like a blade leaving its sheath — a
+hard directional clip-wipe with a bright edge — **enemy first from the top, then yours
+from below**, overlapping so the next starts before the last lands. Lower-pitched sound
+for the enemy (`sheatheE`), higher for you (`sheatheP`). Verified: 3 enemy elements then
+5 player ones, strictly in that order.
+
+### Phone behaviour
+Fullscreen and a **wake lock** are requested from the CONFRONT EMOTION tap — the one
+gesture the platform gives us. Fullscreen is gated on a coarse pointer, so a desktop
+browser is not yanked fullscreen by a prototype. Leaving the app **suspends the
+AudioContext** rather than stopping the music, so the theme resumes exactly where it
+left off; stopping and restarting would lose the opening/loop handoff.
+
+### Verified
+Full battle to completion, no errors, no strays, shot invariant held.
+
+## Pass 26 — the real theme, and a title screen
+
+### The theme is two files now, joined seamlessly
+`audio/theme-opening.wav` (14.75s) plays once; `audio/theme-loop.wav` (73.72s) loops
+for ever. Both are decoded to PCM up front and the loop is **scheduled on the audio
+clock** at exactly `t0 + opening.duration` — an `ended` handler or a timer would leave
+an audible seam. Measured: opening starts at 11.648s, loop at 26.40125s, **gap of
+exactly 0**.
+
+`fetch` is blocked on `file://`, so there is an `<audio>`-element fallback for opening
+the page straight off disk. That one cannot be gapless — the trade is stated rather
+than hidden. The old MIDI theme is gone (`music.js` deleted).
+
+### Title screen
+The logo sits in a **screen-wide square frame**, carrying two effects:
+
+- a **colour-dodged glow** drifting through all six emotion hexes and breathing in
+  opacity (0.14 -> 0.40). The frame is `isolation: isolate` — without it the dodge
+  would blend against the black page instead of the logo, and dodge against black is
+  a no-op, so the effect would silently not exist.
+- a permanent **faint swim** from an SVG turbulence + displacement filter.
+
+Below it, the blurb. Above it, **Barcelona's current moment**: "Barcelona, Monday, too
+late to be anything but honest."
+
+The 28 phrases live in a new **`moments` sheet** — banded by Barcelona local hour, with
+weekday-specific lines (Friday night: *a night to finally be free*) that outrank the
+everyday ones by priority. Verified: **no uncovered hour** across all 7x24 combinations.
+
+**On "get it from an API":** the clock is `Intl.DateTimeFormat` with
+`timeZone: "Europe/Madrid"`, not a network time service. It reads Barcelona's true
+local time — through DST, from the browser's own IANA database — for a player in any
+timezone, costs nothing, and still works off disk. A remote clock would be one more
+thing to fail and no more correct. `barcelonaNow()` is the single swap point if you
+want a networked source.
+
+### Two details
+- **The intro line is pixelated.** It was DOM boxes with `border-radius` and
+  `box-shadow` — smooth, anti-aliased, the wrong medium next to the rings and gauges.
+  It is now rasterised by hand into a 533x16 canvas (`ctx.arc` would have
+  anti-aliased the rings straight back). Verified: **only two luminance values, 0 and
+  255, zero anti-aliased pixels**, upscaled by exactly 6.
+- **The entity scales from its own centre.** The entrance ran on `#stage`, which is
+  `flex:1` and far taller than the sprite, so it pivoted about the stage's centre and
+  read as growing out of its bottom-left corner. It now runs on `.enemyholder`, whose
+  box *is* the sprite's box — confirmed `transform-origin: 93px 93px` on a 186x186 box.
+
+### Note on size
+The WAVs are 15MB and I left them untouched rather than quietly re-encoding your
+audio. That is most of the package. Say the word and I will convert them.
+
+## Pass 25 — statuses, grown layers, and the clock
+
+### The clock: measured, then fixed
+The animation was skippy because `setInterval(tick, 83)` **drifts**. Measured over a
+battle: gaps averaged **115ms and spiked to 334ms** against a nominal 83ms, while
+`tick()` itself only cost **1.1ms**. The work was never the problem; the scheduling was.
+
+The clock is now a fixed step driven by `requestAnimationFrame`, so it lands on real
+compositor frames, with the accumulator clamped to one step so a stall cannot spiral
+into catch-up ticks.
+
+**A regression I caught doing this:** rAF is *suspended outright* on a hidden tab, not
+throttled — my first version froze the game completely when the tab lost focus. There
+is now a watchdog timer that steps the clock whenever rAF has gone quiet, so a hidden
+tab keeps simulating (at the browser's throttled timer rate) instead of stopping dead.
+
+Also: a **closed Emotions panel was still running 19 animations** every frame — 8
+floating depictions and 7 rainbow pills nobody could see. They are paused while it is
+closed, measured at 37 running -> 18.
+
+### New abilities
+| Ability | Emotion | What it does |
+|---|---|---|
+| **Bile** | Disgust | Grows an extra Disgust layer |
+| **Bristle** | Anger | Grows an extra Anger layer |
+| **Rot** | Disgust | For 2 turns the target cannot regrow **2** of its broken layers |
+| **Self-Harm** | Sadness | For 2 turns the target turns one of its **own attacks on itself** each round |
+| **Blinded by Hate** | Anger | *(enemy)* The target **misses half** its attacks for 2 turns |
+
+**Grown layers are temporary**: `breakLayer` never files them for regrowth, so once
+broken they are gone for good.
+
+Statuses live in the `status_effects` sheet — `block_regen`, `miss_chance`, `self_hits`
+— and every reader sums across whatever is active, so adding a status is a row plus one
+reader. Active statuses show as **small pixel tags** with the applying ability's symbol
+and the rounds left, under the enemy's gauge and over yours.
+
+### The AI had to be taught
+`buildEnemyLine` scores abilities on **damage per slot**, so a DEBUFF scores zero and
+would never be picked — Blinded by Hate would have sat in the enemy's pool unused. It
+now gets an explicit branch, gated on `aiDebuffChance` and on the target not already
+carrying that status.
+
+### Verified
+Temp layers: breaking a grown layer files nothing, and it does not come back. Rot: 3
+broken layers, only 1 regrew while 2 were held, still held the next round, all 3 back
+on expiry. Self-Harm: enemy 250 -> 215 from its own attack. Blinded: 0.5 when applied,
+0 when clean, **sampled 0.505 over 4000 trials**. Full battle to completion, no errors,
+shot invariant held.
+
+**Not observed in play:** the miss never actually fired during a battle run, because the
+enemy applies Blinded late and the scripted player was rarely attacking while carrying
+it. The roll itself is proven by the 4000-trial test, but it has not yet been seen
+mid-fight.
+
 ## Pass 24 — the tap bug, and a pass on the look
 
 ### Bug: tapping an ability did nothing

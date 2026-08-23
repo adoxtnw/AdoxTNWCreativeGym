@@ -1,38 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
 <!-- NEURO-METRO: AVUI — combat prototype
      Markup only. Styles live in styles/, behaviour in src/.
      Classic scripts, not modules, so this still opens from file://. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#191534">
-<meta property="og:site_name" content="NEURO-METRO: AVUI">
-<meta property="og:title" content="NEURO-METRO: AVUI">
-<meta property="og:description" content="Who laughed, who cried, who was riding with a heartbreak besides someone with newfound illusion? What emotions were left behind... in Neuro Metro, AVUI">
-<meta property="og:image" content="https://adoxtnw.github.io/AdoxTNWCreativeGym/proto-01-line-battle/og-image.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:type" content="image/png">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:site" content="NEURO-METRO: AVUI">
-<meta name="twitter:title" content="NEURO-METRO: AVUI">
-<meta name="twitter:description" content="Who laughed, who cried, who was riding with a heartbreak besides someone with newfound illusion? What emotions were left behind... in Neuro Metro, AVUI">
-<meta name="twitter:image" content="https://adoxtnw.github.io/AdoxTNWCreativeGym/proto-01-line-battle/og-image.png">
-<title>NEURO-METRO: AVUI</title>
+<title>NEURO-METRO: AVUI — proto 01</title>
 <link rel="stylesheet" href="styles/game.css">
-</head>
-<body>
+
 <div class="phone">
  <div class="screen preintro" id="screen">
   <div class="flash" id="flash"></div>
   <div class="indwrap" id="indE" style="top:30%"></div>
   <div class="indwrap" id="indP" style="top:56%"></div>
-  <div class="title" id="title"><div class="titlewrap">
-    <div class="titlemain">NEURO-METRO</div>
-    <div class="titlesub">AVUI</div>
-    <div class="titletag">PARAL&middot;LEL SPIN-OFF &middot; COMBAT PROTOTYPE</div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="logoWave" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="7" result="n">
+      <animate attributeName="baseFrequency" dur="19s" repeatCount="indefinite"
+               values="0.008 0.014; 0.013 0.008; 0.008 0.014"/>
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="7"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</defs></svg>
+<div class="title" id="title"><div class="titlewrap">
+    <div class="moment" id="momentLine"></div>
+    <!-- screen-wide square frame: the logo, a colour-dodged glow that drifts
+         through the emotions, and a turbulence filter that keeps the image
+         faintly swimming. -->
+    <div class="logoframe">
+      <img class="logoimg" id="logoImg" src="art/logo.png" alt="NEURO-METRO: AVUI">
+      <div class="logoglow"></div>
+    </div>
+    <div class="blurb">Who laughed, who cried, who was riding with a heartbreak
+      besides someone with newfound illusion? What emotions were left behind&hellip;
+      in Neuro Metro, AVUI</div>
     <button class="confront pxr pxr-sh" id="confrontBtn">CONFRONT EMOTION</button>
     <button class="confront rest pxr pxr-sh" id="howtoBtn"
       style="margin-top:9px;background:linear-gradient(180deg,#b3a7d0,var(--apathy) 55%,#5d5378);color:var(--ink);animation:none">HOW TO PLAY</button>
@@ -61,9 +62,9 @@
   </div>
   <div class="intro" id="intro">
     <div class="introrail"><div class="introtrack" id="introTrack">
-      <div class="rail"></div>
+      <canvas id="introCv"></canvas>
     </div></div>
-    <div class="introwipe" id="introWipe"></div>
+    <canvas class="introwipe" id="introWipe"></canvas>
   </div>
 
   <div class="panel unit pxr pxr-sh" id="ePanel">
@@ -77,6 +78,7 @@
   </div>
   <div class="lane-wrap"><div class="lane pxr" id="eLane"><div class="track" id="eTrack"></div></div>
     <div class="shieldrow below" id="eShields"></div></div>
+  <div class="statusrow" id="eStatus"></div>
 
   <div class="stage" id="stage">
     <div class="enemyholder">
@@ -87,6 +89,7 @@
   </div>
 
   <div class="pstrip" id="pstrip"><canvas id="pRingsIn"></canvas><canvas id="pRingsOut"></canvas></div>
+  <div class="statusrow" id="pStatus"></div>
   <div class="lane-wrap"><div class="shieldrow above" id="pShields"></div>
     <div class="lane pxr" id="pLane"><div class="track" id="pTrack"></div></div></div>
   <div class="abilpanel pxr" id="abilPanel">
@@ -110,17 +113,19 @@
 
   </div>
  </div>
+  <div class="tipveil" id="tipVeil"></div>
+  <div class="tip pxr" id="tip"></div>
 </div>
 
 
 <!-- ================= LOAD ORDER =================
      Every file shares one global scope, so order is the dependency graph.
-     GENERATED (do not hand-edit; rebuild from the spreadsheet / the .mid):
+     GENERATED (do not hand-edit; rebuild from the spreadsheet):
        data.js   <- tools/build_data.py   config/avui-config.xlsx
-       music.js  <- tools/build_music.py  "Theme Song 8_bit.mid"
+     The theme is no longer synthesised: audio/theme-opening.wav plays once and
+     audio/theme-loop.wav is scheduled to start the sample it ends.
      ============================================== -->
 <script src="data.js"></script>
-<script src="music.js"></script>
 
 <!-- foundations: no dependencies beyond the data tables -->
 <script src="src/util.js"></script>
@@ -144,5 +149,3 @@
 <script src="src/battle.js"></script>
 <script src="src/screens.js"></script>
 <script src="src/main.js"></script>
-</body>
-</html>

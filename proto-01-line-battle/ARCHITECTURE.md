@@ -49,6 +49,13 @@ src/
 Add a row to the **abilities** sheet. If its `kind` already exists, you are done
 — no code. Point a unit's `pool` at its id.
 
+### Adding a status
+Add a row to `status_effects`, point an ability's `status_apply` / `status_duration`
+at it, and add ONE reader for whatever column it introduces. Existing statuses keep
+working because every reader sums across all active statuses rather than naming one.
+Note the AI needs teaching too: `buildEnemyLine` scores on damage-per-slot, so a
+DEBUFF scores zero and would never be chosen — it gets its own explicit branch.
+
 ### Adding an ability *kind*
 One `Kinds.define()` in `src/kinds.js`. Each kind declares **two** things:
 
@@ -96,6 +103,14 @@ Events: `battle:start`, `round:start`, `round:end`, `line:depart`,
 - **`unit.lineCap` / `unit.maxBonus`** come from the unit's own row (`line_cap`,
   `max_bonus_slots`), not from a global — the two sides are tuned separately. The
   `RULES` values of the same name are only the fallback when a row leaves them blank.
+- **`unit.statuses`** is `{statusId: roundsLeft}`. What a status DOES lives in the
+  `status_effects` sheet, not in code: `block_regen` holds broken layers down,
+  `miss_chance` makes attacks fluff, `self_hits` turns one of the victim's own
+  attacks on itself each round end. Readers (`regenBlocked`, `missChance`,
+  `runSelfHits`) sum over whatever statuses are active, so adding a status is
+  adding a row plus one reader — no existing code changes.
+- **`layer.temp`** marks a layer GROWN by an ADDLAYER ability. `breakLayer` never
+  files a temp layer into `broken`, so it is gone for good rather than regrowing.
 - **`unit.used`** is `{abilityId: shotsSpent}`. An ability may only be added to the
   line while it has shots left (`usesLeft`), and shots **carry over between turns** —
   nothing refills at end of round. Emptying the pool is what puts the ability on
@@ -145,6 +160,30 @@ Bar geometry is ported from `sources/Bars_Reference_001.svg`. Its measurements a
 recorded at the top of `src/gauge.js`; every derived constant is a rule in the
 spreadsheet, not a literal in the renderer.
 
+## The theme is two files
+
+`audio/theme-opening.wav` plays once; `audio/theme-loop.wav` loops for ever. The
+handoff has to be **seamless**, so both are decoded to PCM up front and the loop is
+scheduled on the audio clock at exactly `t0 + opening.duration`. That is
+sample-accurate — an `ended` handler or a `setTimeout` would leave an audible seam.
+`fetch` is blocked on `file://`, so a `<audio>`-element fallback covers opening the
+page straight off disk; it cannot be gapless, and that is the trade.
+
+The MIDI theme this replaced is gone (`music.js` deleted, `tools/build_music.py`
+marked superseded).
+
+## Tooltips and blurbs
+
+Player-facing text lives in the sheet (`abilities.blurb`, `status_effects.blurb`), never
+in code, and carries two marks: `*text*` for emphasis and `{TOKEN}` for a colour-coded
+keyword. `tipMarkup()` in `view.js` resolves them against `KW_COLOR`; an unknown token
+degrades to plain ink rather than breaking the tooltip. Abilities open on a long press
+(`longPressMs`), statuses on a tap; anything else on screen closes it.
+
+The long press has to cooperate with the page swipe: movement past the drag threshold
+cancels the timer, and once a tooltip has opened the click that follows is swallowed so
+the press does not also place the ability.
+
 ## Conventions
 
 - **Never `setPointerCapture` on pointerdown if a click has to land underneath.**
@@ -170,6 +209,34 @@ spreadsheet, not a literal in the renderer.
   lanes; four rather than three because with three, the 2nd and 5th pill of a
   line share a lane at neighbouring x and overlap.
 
+- **Pixel art is drawn small and upscaled by a WHOLE number.** `rings.js`,
+  `gauge.js` and the intro line all rasterise at a low logical size and scale up
+  with `image-rendering: pixelated`. A non-integral factor (3200/533 = 6.004)
+  makes nearest-neighbour widen the odd column to 7px and the edges crawl — the
+  intro canvas is 3198px wide precisely so the factor is exactly 6.
+- **Scale an entity by its OWN box, not its container.** The entrance animation
+  used to run on `#stage`, which is `flex:1` and far taller than the sprite, so it
+  pivoted about the stage's centre and read as growing out of its bottom-left
+  corner. It runs on `.enemyholder`, whose box is the sprite's box.
+- **A mask reveals what is BEHIND its own element, not behind the page.** The wipe
+  canvas and the metro rail are both children of `.intro`, so the transparent hole
+  showed the rail sitting underneath rather than the background. Anything that must
+  not be revealed has to be *out* of the masked element, not merely under it.
+- **Nothing may sit waiting behind a curtain.** `.stage` is exempt from the preintro
+  blackout so the enemy can rise while it is still on — which meant the entity was
+  fully visible behind the wipe and got revealed early, then flashed as its own
+  entrance restarted it from `opacity:0`.
+- **A staged entrance must hide its elements BEFORE the blackout lifts.** Removing
+  `preintro` reveals everything at once; without a per-element hold the later ones
+  sit visible for hundreds of milliseconds and then animate, which reads as a flash
+  followed by things moving for no reason.
+- **A growing shape does not reveal anything — a mask does.** The opening wipe was
+  a black disc expanding over a black field, which is why it never read. The wipe
+  canvas is now the CURTAIN itself: opaque black everywhere, transparent inside the
+  circle, so the battle background shows through the hole.
+- **Anything sequenced during the opening must not depend on rAF.** It is suspended
+  outright on a hidden tab, so `wipeReveal` runs on a timer with a safety timeout;
+  otherwise the opening hangs for ever on a backgrounded tab.
 - **Serve with `tools/serve.py`, never `python3 -m http.server`.** It stamps each
   local asset URL with its modification time. Without that, browsers happily run
   a cached copy of a module you just edited — the code is right, it simply never

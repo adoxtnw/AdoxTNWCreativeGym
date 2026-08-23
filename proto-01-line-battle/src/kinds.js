@@ -56,6 +56,14 @@ Kinds.define("DAMAGE", {
       renderStats(); await sleep(380); return;
     }
 
+    /* Blinded by Hate and anything else carrying miss_chance: the swing is taken
+       and simply misses. Rolled here, in run(), NOT in project() — a preview that
+       gambled would show the player a number the game then contradicts. */
+    if(Math.random() < missChance(actor)){
+      bigTag("MISS", "off"); sfx("block");
+      renderStats(); await sleep(420); return;
+    }
+
     const lay = target.layers[0] || null;
     const m = matchup(lay ? lay.e : null, ab.emotion);
     const dealt = Math.min(Math.round(ab.power * m.dmg), target.ms);
@@ -126,5 +134,33 @@ Kinds.define("FEED", {
     queueDelta(target, "MS", healed);
     bigTag("FED THE ENEMY", "off"); sfx("regrow");
     await sleep(520);
+  }
+});
+
+/* ---------- ADDLAYER: grow yourself another layer ----------
+   Grown layers are TEMPORARY (`temp`): breakLayer never files them into `broken`,
+   so once they are gone they never come back. */
+Kinds.define("ADDLAYER", {
+  project({A, ab}){ for(let i = 0; i < (ab.power || 1); i++) A.layers.push(ab.emotion); },
+  async run({actor, ab}){
+    const n = ab.power || 1;
+    for(let i = 0; i < n; i++)
+      actor.layers.push({e: ab.emotion, pos: actor.layers.length, flash: 0, temp: true});
+    actor.layers.forEach((l, i) => { l.pos = i; });
+    bigTag("+" + n + " LAYER", "block"); sfx("regrow");
+    renderStats(); await sleep(460);
+  }
+});
+
+/* ---------- DEBUFF: hang a status on the target ---------- */
+Kinds.define("DEBUFF", {
+  /* No ms/ec movement, so the AI values it at zero — deliberate for now. Give it
+     a heuristic here if the enemy should ever learn to use debuffs well. */
+  project(){},
+  async run({target, ab, onEnemy}){
+    const st = applyStatus(target, ab.status_apply, ab.status_duration);
+    if(!st){ return; }
+    bigTag(st.name.toUpperCase(), "off"); sfx("breaklayer");
+    renderStats(); await sleep(520);
   }
 });

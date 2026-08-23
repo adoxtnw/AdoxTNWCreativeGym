@@ -11,7 +11,9 @@ const ICONS={
   SPARK:["...xx...","...xx...","x..xx..x",".xxxxxx.",".xxxxxx.","x..xx..x","...xx...","...xx..."],
   SHIELD:["xxxxxxxx","xxxxxxxx","xx....xx","xx....xx","xx....xx",".xx..xx.","..xxxx..","...xx..."],
   CHARGE:["...xx...","..xxxx..",".xxxxxx.","xxxxxxxx","...xx...","...xx...","...xx...","...xx..."],
-  WARN :["...xx...","...xx...","..xxxx..","..x..x..",".xx..xx.",".x.xx.x.","xx.xx.xx","xxxxxxxx"]
+  WARN :["...xx...","...xx...","..xxxx..","..x..x..",".xx..xx.",".x.xx.x.","xx.xx.xx","xxxxxxxx"],
+  ROT  :["..xxxx..",".x.xx.x.","xx.xx.xx","xxxxxxxx","x.xxxx.x","xx....xx",".x.xx.x.","..x..x.."],
+  EYE  :["........",".xxxxxx.","x..xx..x","x.xxxx.x","x.xxxx.x","x..xx..x",".xxxxxx.","........"]
 };
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));

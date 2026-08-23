@@ -44,6 +44,22 @@ function renderShields(){
   put($("pShields"), S.player.shield);
   put($("eShields"), S.enemy.shield);
 }
+/* Active statuses sit as small pixel tags against the unit they afflict — under
+   the enemy's gauge, over yours — each showing the symbol of the ability that
+   applied it and how many rounds are left. */
+function renderStatuses(){
+  for(const [u, id] of [[S.enemy,"eStatus"], [S.player,"pStatus"]]){
+    const host = $(id); if(!host) continue;
+    const keys = Object.keys(u.statuses).filter(k => u.statuses[k] > 0 && STATUSES[k]);
+    host.innerHTML = keys.map(k => {
+      const st = STATUSES[k];
+      return `<div class="stag pxr" data-k="${k}" style="--sc2:${st.color}">`+
+             `<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${iconSVG(st.icon)}</svg>`+
+             `<span>${st.name.toUpperCase()}</span><b>${u.statuses[k]}</b></div>`;
+    }).join("");
+    host.classList.toggle("on", keys.length > 0);
+  }
+}
 function renderStats(){
   const p=S.player, e=S.enemy, building=S.phase==="BUILD";
   /* One dry run covers both bars, so abilities that act on the player — a
@@ -63,6 +79,7 @@ function renderStats(){
     tagMs:$("eTagMs"), tagEc:$("eTagEc"),
     tagMsA:$("eTagMsA"), tagEcA:$("eTagEcA")});
   renderShields();
+  renderStatuses();
 }
 /* ghosts sit on the LEFT: taps prepend, so that is where the next one lands */
 /* Draws the line in travel order. `dir > 0` means it moves right, so the
@@ -128,7 +145,7 @@ function abilRowHTML(a){
    Four abilities to a page, swiped with a pointer so the same gesture works
    under a finger and under a mouse. Position is shown by dots; the triangles
    are only indicators that another page exists that way. */
-let abPage = 0, abDragMoved = 0;
+let abPage = 0, abDragMoved = 0, abLongPressed = false;
 const abPageCount = () => Math.max(1, Math.ceil(S.player.pool.length / RULES.abilPageSize));
 
 function gotoPage(p, animate){
@@ -150,8 +167,31 @@ function buildPanel(){
   $("abPages").innerHTML = html;
   $("abDots").innerHTML  = Array.from({length:n}, (_,i)=>`<div class="abdot" data-p="${i}"></div>`).join("");
 
+  /* Long-press opens the ability's tooltip. It has to cooperate with the swipe:
+     any movement past the drag threshold cancels the timer, and once the tooltip
+     has opened the click that follows is swallowed so the press does not also
+     place the ability. */
+  $("abPages").querySelectorAll(".abrow").forEach(el=>{
+    let held=null;
+    const cancel = () => { if(held){ clearTimeout(held); held=null; } };
+    el.addEventListener("pointerdown", () => {
+      cancel();
+      held = setTimeout(() => {
+        held = null;
+        if(abDragMoved > 8) return;             // it turned into a swipe
+        abLongPressed = true;
+        showTip(abilityTip(ABILITIES[el.dataset.a]), el);
+      }, RULES.longPressMs);
+    });
+    el.addEventListener("pointermove", () => { if(abDragMoved > 8) cancel(); });
+    el.addEventListener("pointerup", cancel);
+    el.addEventListener("pointercancel", cancel);
+    el.addEventListener("pointerleave", cancel);
+  });
+
   $("abPages").querySelectorAll(".abrow").forEach(el=>el.addEventListener("click",()=>{
     if(S.phase!=="BUILD") return;
+    if(abLongPressed){ abLongPressed=false; return; }   // that press opened a tooltip
     if(abDragMoved > 8) return;                 // that was a swipe, not a tap
     const a=ABILITIES[el.dataset.a], p=S.player;
     if(lineCost(p)+a.cost>p.ec) return;
@@ -221,3 +261,72 @@ function renderTray(){
   btn.textContent=empty?"REST \u25B6":"DEPART \u25B6";
 }
 function render(){renderStats();renderLines();renderTray();}
+
+/* ================= TOOLTIPS =================
+   Long-press an ability, tap a status. Blurbs live in the spreadsheet and carry
+   two marks: *text* for emphasis and {TOKEN} for a colour-coded keyword. Keeping
+   the markup this thin means writers never touch HTML, and an unknown token
+   degrades to plain ink rather than breaking the tooltip. */
+const KW_COLOR = {
+  MS:"#b0ffe1", EC:null, LAYER:"#f4efe4", LAYERS:"#f4efe4",
+  OVERLOAD:"#e53859",
+  ANGER:"#e53859", SURPRISE:"#724082", DISGUST:"#56a36a",
+  JOY:"#fcc336",   SADNESS:"#3d66c1",   FEAR:"#929fa5"
+};
+const esc = t => t.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function tipMarkup(text){
+  return esc(text || "")
+    .replace(/\{([A-Z_]+)\}/g, (_, k) => {
+      const c = KW_COLOR[k];
+      if(c === null) return `<b class="kw rain">${k}</b>`;      // EC gets the ramp
+      return `<b class="kw" style="color:${c || "var(--ink)"}">${k}</b>`;
+    })
+    .replace(/\*(.+?)\*/g, '<b class="em">$1</b>');
+}
+function showTip(html, anchorEl){
+  const tip = $("tip"), veil = $("tipVeil");
+  tip.innerHTML = html;
+  tip.classList.add("on"); veil.classList.add("on");
+  /* Placed against the screen, then nudged back inside it — a tooltip that runs
+     off a 375px phone is worse than one that is slightly off-centre. */
+  const sr = $("screen").getBoundingClientRect(), ar = anchorEl.getBoundingClientRect();
+  tip.style.left = "0px"; tip.style.top = "0px";
+  const tr = tip.getBoundingClientRect();
+  let x = (ar.left - sr.left) + ar.width/2 - tr.width/2;
+  let y = (ar.top  - sr.top) - tr.height - 10;
+  if(y < 6) y = (ar.bottom - sr.top) + 10;                 // no room above: go below
+  x = Math.max(6, Math.min(x, sr.width - tr.width - 6));
+  y = Math.max(6, Math.min(y, sr.height - tr.height - 6));
+  tip.style.left = Math.round(x) + "px";
+  tip.style.top  = Math.round(y) + "px";
+  sfx("tap");
+}
+function hideTip(){ $("tip").classList.remove("on"); $("tipVeil").classList.remove("on"); }
+
+function abilityTip(a){
+  return `<div class="tiphead" style="color:${abAccent(a)}">${a.name.toUpperCase()}</div>`+
+         `<div class="tipbody">${tipMarkup(a.blurb)}</div>`;
+}
+function statusTip(st, turns){
+  return `<div class="tiphead" style="color:${st.color}">${st.name.toUpperCase()}</div>`+
+         `<div class="tipbody">${tipMarkup(st.blurb)}</div>`+
+         `<div class="tipturns">${turns} ${turns===1?"TURN":"TURNS"} LEFT</div>`;
+}
+
+/* One listener for the whole screen: any tap that is not on the tooltip closes it. */
+function wireTips(){
+  $("tipVeil").addEventListener("pointerdown", e=>{ e.preventDefault(); hideTip(); });
+  $("screen").addEventListener("pointerdown", e=>{
+    if($("tip").classList.contains("on") && !e.target.closest("#tip")) hideTip();
+  }, true);
+  /* Statuses open on a plain tap — they are small and read-only. */
+  for(const id of ["eStatus","pStatus"]){
+    const host = $(id); if(!host) continue;
+    host.addEventListener("click", e=>{
+      const tag = e.target.closest(".stag"); if(!tag) return;
+      const u = id === "eStatus" ? S.enemy : S.player;
+      const st = STATUSES[tag.dataset.k]; if(!st) return;
+      showTip(statusTip(st, u.statuses[tag.dataset.k] || 0), tag);
+    });
+  }
+}

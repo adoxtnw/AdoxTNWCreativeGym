@@ -18,7 +18,7 @@ function makeUnit(id){
     /* `used[abilityId]` is how many of an ability's shots are already spent.
        Shots CARRY OVER between turns — the pool only refills once the ability
        has been emptied and served its cooldown. */
-    used:{},
+    used:{}, statuses:{},
     cooldowns:{}, cursor:0, hurtFlash:0, dir:r.line_dir||1,
     /* The bar renders shownMs/shownEc, not ms/ec. Hits land in `pending` during
        a line and are walked onto the bar afterwards, so the player can watch
@@ -96,6 +96,34 @@ function commitUses(u){
   }
 }
 const chargeCount = u => u.line.filter(e => e && e.charge).length;
+
+/* ---------- statuses ----------
+   `unit.statuses` is {statusId: roundsLeft}. The row in the status_effects sheet
+   says what a status DOES; nothing here knows about any particular one, so adding
+   a status is adding a row plus whatever reads its column. */
+const hasStatus = (u, id) => (u.statuses[id] || 0) > 0;
+const statusRow = id => STATUSES[id];
+function applyStatus(u, id, turns){
+  if(!id || !STATUSES[id]) return null;
+  const n = turns || STATUSES[id].duration || 1;
+  u.statuses[id] = Math.max(u.statuses[id] || 0, n);    // REFRESH, never stack
+  return STATUSES[id];
+}
+function tickStatuses(u){
+  for(const k in u.statuses) if(--u.statuses[k] <= 0) delete u.statuses[k];
+}
+/* How many broken layers a status is currently holding down. */
+function regenBlocked(u){
+  let n = 0;
+  for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) n += (STATUSES[k].block_regen || 0);
+  return n;
+}
+/* Fraction of this unit's attacks that miss outright. */
+function missChance(u){
+  let m = 0;
+  for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) m = Math.max(m, STATUSES[k].miss_chance || 0);
+  return m;
+}
 
 /* ---------- cooldowns ----------
    `cooldown` on an ability is how many WHOLE TURNS it must sit out. Cooldown is no

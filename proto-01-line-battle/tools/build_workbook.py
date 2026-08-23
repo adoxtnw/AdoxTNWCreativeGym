@@ -139,10 +139,10 @@ sheet("emotions",
 ABIL_COLS = ["id","name","emotion","cost","kind","power","charge","hits_layer","icon",
              "target","reach","self_ms","self_ec","ec_push_target","ec_drain_target",
              "heal","shield_gain","pierce_shield","ignore_layer","repeat","cooldown",
-             "uses","status_apply","status_chance","status_duration",
+             "uses","blurb","status_apply","status_chance","status_duration",
              "combo_tag","requires_prev_tag","synergy_group","wild_target",
              "rarity","unlock","enabled","suggested_cost","cost_delta","notes"]
-ABIL_LIVE = {"id","name","emotion","cost","kind","power","charge","hits_layer","icon","self_ms","cooldown","uses"}
+ABIL_LIVE = {"id","name","emotion","cost","kind","power","charge","hits_layer","icon","self_ms","cooldown","uses","blurb","status_apply","status_duration"}
 def ab(**k):
     row = {c:"" for c in ABIL_COLS}
     row.update(dict(target="ENEMY", reach="SINGLE", charge=0, repeat=1, cooldown=1,
@@ -152,21 +152,37 @@ def ab(**k):
                     heal=0, shield_gain=0, wild_target="LOWEST_MS", rarity="COMMON"))
     row.update(k); return row
 ABILS = [
- ab(id="ATK_ANGER",  name="Anger",  emotion="ANGER",   cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BOLT"),
- ab(id="ATK_SADNESS",name="Sadness",emotion="SADNESS", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="DROP"),
- ab(id="ATK_JOY",    name="Joy",    emotion="JOY",     cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="SPARK"),
- ab(id="DEFEND",     name="Defend", emotion="",        cost=10, kind="SHIELD", power=1,  hits_layer=0, icon="SHIELD",
+ ab(id="ATK_ANGER", blurb='A straight {ANGER} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',  name="Anger",  emotion="ANGER",   cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BOLT"),
+ ab(id="ATK_SADNESS", blurb='A straight {SADNESS} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',name="Sadness",emotion="SADNESS", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="DROP"),
+ ab(id="ATK_JOY", blurb='A straight {JOY} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',    name="Joy",    emotion="JOY",     cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="SPARK"),
+ ab(id="DEFEND", blurb='Raises a guard. The next hit against you is *blocked* outright instead of costing {MS}.',     name="Defend", emotion="",        cost=10, kind="SHIELD", power=1,  hits_layer=0, icon="SHIELD",
     target="SELF", wild_target="SELF", shield_gain=1),
- ab(uses=2, id="HVY_ANGER",  name="Rage",   emotion="ANGER",   cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BOLT"),
- ab(uses=2, id="HVY_SADNESS",name="Grief",  emotion="SADNESS", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="DROP"),
- ab(uses=2, id="HVY_JOY",    name="Mania",  emotion="JOY",     cost=60, kind="DAMAGE", power=130,charge=3, hits_layer=1, icon="SPARK"),
- ab(id="RECHARGE",   name="Recharge",emotion="",       cost=0,  kind="CHARGE", power=20, hits_layer=0, icon="CHARGE",
+ ab(uses=2, id="HVY_ANGER", blurb='Heavy {ANGER}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.',  name="Rage",   emotion="ANGER",   cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BOLT"),
+ ab(uses=2, id="HVY_SADNESS", blurb='Heavy {SADNESS}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.',name="Grief",  emotion="SADNESS", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="DROP"),
+ ab(uses=2, id="HVY_JOY", blurb='Heavy {JOY}. Three *charge* segments and the hardest hit in the pool. Slow, loud, and expensive in every sense.',    name="Mania",  emotion="JOY",     cost=60, kind="DAMAGE", power=130,charge=3, hits_layer=1, icon="SPARK"),
+ ab(id="RECHARGE", blurb='Buys {EC} with your own {MS}. Gains charge and lowers your ceiling at the same time — watch the {OVERLOAD} line.',   name="Recharge",emotion="",       cost=0,  kind="CHARGE", power=20, hits_layer=0, icon="CHARGE",
     target="SELF", wild_target="SELF", self_ms=5,
     notes="Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling."),
- ab(cooldown=0, uses=0, id="SELF_HARM",  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
+ ab(id="GEN_DISGUST", blurb='Grows one extra {DISGUST} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.', name="Bile",   emotion="DISGUST", cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
+    target="SELF", wild_target="SELF", uses=2,
+    notes="Grows one extra Disgust layer. Grown layers are TEMPORARY: once broken they never regrow."),
+ ab(id="GEN_ANGER", blurb='Grows one extra {ANGER} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.',   name="Bristle",emotion="ANGER",   cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
+    target="SELF", wild_target="SELF", uses=2,
+    notes="Grows one extra Anger layer. Grown layers are TEMPORARY: once broken they never regrow."),
+ ab(id="ROT", blurb='{DISGUST} rot. For *2 turns* the target cannot regrow *2* of its broken {LAYERS}.',         name="Rot",    emotion="DISGUST", cost=25, kind="DEBUFF",   power=0, hits_layer=0, icon="ROT",
+    uses=2, status_apply="NO_REGEN", status_duration=2,
+    notes="For 2 turns the target cannot regrow 2 of its broken layers."),
+ ab(id="INFLICT_SAD", blurb='{SADNESS} turned inward. For *2 turns* the target uses one of its own attacks *on itself* at the end of every round.', name="Self-Harm", emotion="SADNESS", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="DROP",
+    uses=2, status_apply="SAD", status_duration=2,
+    notes="Each round end the target turns one of its own attacks on itself. NOTE: distinct from "
+          "SELF_HARM, which is the Overload-forced station."),
+ ab(id="BLIND", blurb='{ANGER} blots out aim. For *2 turns* the target *misses half* of its attacks.',       name="Blinded by Hate", emotion="ANGER", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="EYE",
+    uses=2, status_apply="BLINDED", status_duration=2,
+    notes="ENEMY ability. The target misses half its attacks for 2 turns."),
+ ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Forced onto your line by {OVERLOAD}. Costs you {MS} and cannot be removed.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
     target="SELF", wild_target="SELF", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed."),
- ab(cooldown=0, uses=0, id="FEED",       name="Feed",    emotion="",       cost=0,  kind="FEED",     power=30, hits_layer=0, icon="DROP",
+ ab(cooldown=0, uses=0, id="FEED", blurb='Forced onto your line by {OVERLOAD}. *Heals your opponent* and cannot be removed.',       name="Feed",    emotion="",       cost=0,  kind="FEED",     power=30, hits_layer=0, icon="DROP",
     target="ENEMY", wild_target="AS_WRITTEN", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed."),
 ]
@@ -213,11 +229,11 @@ U_COLS = ["id","name","emotion","max_ms","start_ec_pct","layers","pool","line_di
 U_LIVE = {"id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir","line_cap","max_bonus_slots"}
 UNITS_ROWS = [
  dict(id="player", name="You", emotion="", max_ms=400, start_ec_pct=0.40,
-      layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY", line_dir=1,
+      layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD", line_dir=1,
       line_cap=3, max_bonus_slots=6,
       ai_profile="", init=10, start_shield=0, max_layers_override="", tags="PLAYER", enabled=1, notes=""),
  dict(id="enemy", name="The Commuter", emotion="ANGER", max_ms=250, start_ec_pct=0.40,
-      layers="ANGER|ANGER|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY", line_dir=-1,
+      layers="ANGER|ANGER|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND", line_dir=-1,
       line_cap=3, max_bonus_slots=6,
       ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0, max_layers_override="",
       tags="ENEMY", enabled=1, notes="AI reads the matchups sheet, so retuning it retunes the AI."),
@@ -241,16 +257,33 @@ sheet("layer_types", LT_COLS, set(),
          "when it breaks, or granting a passive while it is outermost)."))
 
 # ───────────────────────────── status_effects (reserved) ─────────────────────────────
-SE_COLS = ["id","name","duration","dmg_taken_mult","dmg_dealt_mult","ec_gain_mult",
-           "ms_per_turn","ec_per_turn","blocks_actions","stacking","max_stacks",
-           "icon","color","enabled","notes"]
-sheet("status_effects", SE_COLS, set(),
-  [dict(id="EXAMPLE_NUMB", name="Numb", duration=1, dmg_taken_mult=1, dmg_dealt_mult=1,
-        ec_gain_mult=0.5, ms_per_turn=0, ec_per_turn=0, blocks_actions=0, stacking="REFRESH",
-        max_stacks=1, icon="SHIELD", color="#929fa5", enabled=0,
-        notes="EXAMPLE ROW — halves charge gained. enabled=0, so it is ignored.")],
-  widths={"notes":54},
-  notes="RESERVED. Buffs and debuffs. Reference an id from abilities.status_apply or matchups.status_apply.")
+SE_COLS = ["id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits",
+           "dmg_taken_mult","dmg_dealt_mult","ec_gain_mult","ms_per_turn","ec_per_turn",
+           "blocks_actions","stacking","max_stacks","enabled","notes"]
+SE_LIVE = {"id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits","enabled"}
+def se(**k):
+    row = {c:"" for c in SE_COLS}
+    row.update(dict(duration=2, block_regen=0, miss_chance=0, self_hits=0,
+                    dmg_taken_mult=1, dmg_dealt_mult=1, ec_gain_mult=1,
+                    ms_per_turn=0, ec_per_turn=0, blocks_actions=0,
+                    stacking="REFRESH", max_stacks=1, enabled=1))
+    row.update(k); return row
+SE_ROWS = [
+ se(id="NO_REGEN", name="Rotting", duration=2, icon="ROT", color="#56a36a", block_regen=2,
+    blurb="*2* of your broken {LAYERS} are being held down. They stay broken until this wears off.",
+    notes="Holds this many broken layers down: they stay broken while it lasts."),
+ se(id="SAD",      name="Sad",     duration=2, icon="DROP", color="#3d66c1", self_hits=1,
+    blurb="At the end of every round one of your own attacks is turned *on yourself*.",
+    notes="Each round end the victim turns one of its OWN attacks on itself."),
+ se(id="BLINDED",  name="Blinded", duration=2, icon="EYE", color="#e53859", miss_chance=0.5,
+    blurb="{ANGER} has blotted out your aim. *Half* of your attacks miss outright.",
+    notes="The victim fluffs this fraction of its attacks."),
+]
+sheet("status_effects", SE_COLS, SE_LIVE, SE_ROWS,
+  widths={"notes":52},
+  notes=("One row per status. Abilities apply these by id through status_apply / "
+         "status_duration. Add a status by adding a row and teaching Kinds what reads it."))
+
 
 # ───────────────────────────── synergies (reserved) ─────────────────────────────
 SY_COLS = ["id","name","trigger","subject","operator","value","window","effect",
@@ -288,12 +321,16 @@ RULES = [
  ("lowHpTalkPct",0.2,"Fraction of max MS below which the winning / losing lines fire."),
  ("overloadSlotPer",0.25,"Every this-much overflow (as a fraction of max MS) forces one more corrupted slot."),
  ("aiVarietyChance",0.22,"Chance the AI takes a random affordable attack instead of its best one."),
+ ("aiDebuffChance",0.5,"Chance the AI spends a slot on a debuff the target is not already suffering."),
  ("aiChargeBias",0.55,"Chance the AI prefers an ability with charge segments when it can afford one."),
  ("shuffleLayersEachRound",1,"Re-order every unit's layer queue at the start of each round."),
  ("chargeGrantsSlots",1,"Each charge segment in a line grants the OPPONENT one temporary slot next turn."),
  ("maxBonusSlots",6,"FALLBACK cap on temporary slots, used only if a unit row leaves max_bonus_slots blank."),
  ("abilPageSize",4,"Abilities shown per page in the Emotions panel."),
 ("slotArriveMs",260,"Gap between one temporary slot flying in and the next."),
+ ("unsheathMs",340,"How long one interface element takes to draw itself into place."),
+ ("unsheathGapMs",110,"Gap before the next element starts — smaller than unsheathMs, so they overlap."),
+ ("longPressMs",420,"How long an ability must be held before its tooltip opens."),
  ("swipeMinPx",36,"How far a pointer must travel across the panel to count as a page swipe."),
  ("tagGrowth",0.85,"How much an accumulating tag grows once it holds a full max-MS worth of change."),
  ("tagBreathSlowMs",1700,"Breathing period of an accumulating tag holding almost nothing."),
@@ -320,6 +357,8 @@ RULES = [
  ("barTweenMs",1000,"How long a bar takes to travel to its new value once a hit lands."),
  ("overloadHoldMs",2000,"How long the OVERLOAD tag and its slow motion last."),
  ("ecScrollSpeed",0.0022,"How fast the charge gradient drifts along the bar."),
+ ("themeOpening","audio/theme-opening.wav","Theme part 1: plays once."),
+ ("themeLoop","audio/theme-loop.wav","Theme part 2: loops for ever, scheduled to start the instant part 1 ends."),
  ("musicFadeMs",900,"How quickly the theme fades out when the battle ends."),
  ("musicVolume",0.30,"Theme level. Lower this if the sound effects are getting buried."),
  ("sfxVolume",1.05,"Sound-effect level, mixed against musicVolume."),
@@ -352,6 +391,8 @@ sheet("rules", ["key","value","description"], {"key","value"},
 SND = [
  ("tap","square",980,1460,80,0.46,0.30,"Adding an ability to the line."),
  ("place","square",620,1760,130,0.40,0.35,"The station lands on your line and flashes white."),
+ ("sheatheE","sawtooth",1500,220,150,0.30,0.22,"Enemy UI element drawn into place. Lower."),
+ ("sheatheP","sawtooth",2100,340,140,0.28,0.22,"Player UI element drawn into place. Higher."),
  ("slot","triangle",300,1500,150,0.30,0.45,"A temporary slot flies in from the opponent."),
  ("remove","square",520,220,90,0.34,0.24,"Removing a station."),
  ("depart","sawtooth",240,70,420,0.26,0.45,"The line departs and charge is spent."),
@@ -387,6 +428,54 @@ if os.path.exists(_dlg_src):
                          state=r["State"].strip().upper(),
                          line=r["Dialogue Line"].strip(),
                          enabled=1, notes=""))
+# ───────────────────────────── moments ─────────────────────────────
+# The title screen names Barcelona's current moment. `day` is a weekday or "*",
+# and from_hour/to_hour are BARCELONA local hours, to_hour exclusive; a band that
+# wraps past midnight (22 -> 5) is written as from=22 to=5. Higher priority wins,
+# so a Friday-night line beats the everyday one; ties are picked at random.
+MOM_COLS = ["id","day","from_hour","to_hour","phrase","priority","enabled","notes"]
+MOM_LIVE = {"id","day","from_hour","to_hour","phrase","priority","enabled"}
+def mo(i, day, a, b, phrase, pri=0):
+    return dict(id=i, day=day, from_hour=a, to_hour=b, phrase=phrase,
+                priority=pri, enabled=1, notes="")
+MOMENTS = [
+ # ---- everyday, by band ----
+ mo("dawn_1","*",5,7,"the first light is still deciding"),
+ mo("dawn_2","*",5,7,"nobody has spoken yet today"),
+ mo("morn_1","*",7,10,"early morning"),
+ mo("morn_2","*",7,10,"the early carriages are full of unfinished sleep"),
+ mo("morn_3","*",7,10,"everyone is already late"),
+ mo("mid_1","*",10,13,"middle of the day"),
+ mo("mid_2","*",10,13,"the light is flat and honest"),
+ mo("noon_1","*",13,16,"all afternoon ahead"),
+ mo("noon_2","*",13,16,"the long slow part of the day"),
+ mo("late_1","*",16,19,"the afternoon is running out"),
+ mo("late_2","*",16,19,"everyone is going somewhere they did not choose"),
+ mo("dusk_1","*",19,21,"somber twilight"),
+ mo("dusk_2","*",19,21,"the hour the day admits what it was"),
+ mo("night_1","*",21,24,"the night is getting loud"),
+ mo("night_2","*",21,24,"the last trains are filling up"),
+ mo("small_1","*",0,5,"the madrugada, and still moving"),
+ mo("small_2","*",0,5,"too late to be anything but honest"),
+ # ---- weekday specifics ----
+ mo("mon_morn","MON",5,10,"monday, and the week already weighs something",2),
+ mo("mon_dusk","MON",19,24,"the longest monday of the month",2),
+ mo("wed_mid","WED",10,16,"the week is stuck exactly in the middle",2),
+ mo("thu_late","THU",16,21,"almost, but not yet",2),
+ mo("fri_dusk","FRI",19,21,"a night to finally be free",2),
+ mo("fri_night","FRI",21,24,"a night to finally be free",2),
+ mo("fri_small","FRI",0,5,"friday refusing to end",2),
+ mo("sat_mid","SAT",10,16,"a saturday with nothing owed to anyone",2),
+ mo("sat_night","SAT",21,24,"the city is pretending it never has to work again",2),
+ mo("sun_mid","SUN",10,16,"a sunday that stretches too far",2),
+ mo("sun_dusk","SUN",19,24,"sunday dusk, and monday already breathing on it",2),
+]
+sheet("moments", MOM_COLS, MOM_LIVE, MOMENTS,
+  widths={"phrase":54,"notes":30},
+  notes=("Title-screen mood line: \"Barcelona, <weekday>, <phrase>.\" day is MON..SUN "
+         "or * for any. Hours are Barcelona local, to_hour exclusive; a band may wrap "
+         "past midnight. Highest priority wins, ties are random."))
+
 sheet("dialogue", ["emotion","persona","state","line","enabled","notes"],
   {"emotion","persona","state","line"}, _dlg,
   widths={"line":92,"persona":20,"notes":20},
@@ -429,7 +518,7 @@ for r,(label,exp,formula) in enumerate(CHECKS, 4):
 ck.column_dimensions["A"].width = 56
 for col,w in (("B",12),("C",12),("D",12)): ck.column_dimensions[col].width = w
 
-WB._sheets.sort(key=lambda s: ["README","emotions","abilities","matchups","units","dialogue",
+WB._sheets.sort(key=lambda s: ["README","emotions","abilities","matchups","units","dialogue","moments",
   "layer_types","status_effects","synergies","rules","sounds","checks"].index(s.title))
 WB.save(os.path.join(HERE, "..", "config", "avui-config.xlsx"))
 print("saved")

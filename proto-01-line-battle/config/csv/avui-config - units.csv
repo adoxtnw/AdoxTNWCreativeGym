@@ -1,5 +1,5 @@
 One row per combatant. 'layers' is outermost-first and rotates as it takes hits. 'pool' is which abilities this unit may use. Add enemies by adding rows.,,,,,,,,,,,,,,,,
 id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
 LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,planned,planned,planned,planned,planned,planned
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,1,3,6,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,-1,3,6,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."
+player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."

@@ -25,17 +25,22 @@ FEAR,Fear,fear,#929fa5,#1a1e20,FEA,"Cold, freezing, evasive.",1,`,
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
    (never matches a layer) · hits_layer = whether a hit rotates the target's queue.  */
-abilities: `id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
-ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
-ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,,0,0,,,,LOWEST_MS,COMMON,,1,
-DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,
-HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
-HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
-HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,,0,0,,,,LOWEST_MS,COMMON,,1,
-RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,1,3,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
-SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
-FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
+abilities: `id,name,emotion,cost,kind,power,charge,hits_layer,icon,target,reach,self_ms,self_ec,ec_push_target,ec_drain_target,heal,shield_gain,pierce_shield,ignore_layer,repeat,cooldown,uses,blurb,status_apply,status_chance,status_duration,combo_tag,requires_prev_tag,synergy_group,wild_target,rarity,unlock,enabled,notes
+ATK_ANGER,Anger,ANGER,20,DAMAGE,35,0,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,"A straight {ANGER} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.",,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_SADNESS,Sadness,SADNESS,20,DAMAGE,35,0,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,"A straight {SADNESS} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.",,0,0,,,,LOWEST_MS,COMMON,,1,
+ATK_JOY,Joy,JOY,20,DAMAGE,35,0,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,"A straight {JOY} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.",,0,0,,,,LOWEST_MS,COMMON,,1,
+DEFEND,Defend,,10,SHIELD,1,0,0,SHIELD,SELF,SINGLE,0,0,0,0,0,1,0,0,1,1,3,Raises a guard. The next hit against you is *blocked* outright instead of costing {MS}.,,0,0,,,,SELF,COMMON,,1,
+HVY_ANGER,Rage,ANGER,45,DAMAGE,90,2,1,BOLT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Heavy {ANGER}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.",,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_SADNESS,Grief,SADNESS,45,DAMAGE,90,2,1,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Heavy {SADNESS}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.",,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Heavy {JOY}. Three *charge* segments and the hardest hit in the pool. Slow, loud, and expensive in every sense.",,0,0,,,,LOWEST_MS,COMMON,,1,
+RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,1,3,Buys {EC} with your own {MS}. Gains charge and lowers your ceiling at the same time — watch the {OVERLOAD} line.,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
+GEN_DISGUST,Bile,DISGUST,15,ADDLAYER,1,0,0,ROT,SELF,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Grows one extra {DISGUST} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.",,0,0,,,,SELF,COMMON,,1,Grows one extra Disgust layer. Grown layers are TEMPORARY: once broken they never regrow.
+GEN_ANGER,Bristle,ANGER,15,ADDLAYER,1,0,0,ROT,SELF,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Grows one extra {ANGER} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.",,0,0,,,,SELF,COMMON,,1,Grows one extra Anger layer. Grown layers are TEMPORARY: once broken they never regrow.
+ROT,Rot,DISGUST,25,DEBUFF,0,0,0,ROT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,{DISGUST} rot. For *2 turns* the target cannot regrow *2* of its broken {LAYERS}.,NO_REGEN,0,2,,,,LOWEST_MS,COMMON,,1,For 2 turns the target cannot regrow 2 of its broken layers.
+INFLICT_SAD,Self-Harm,SADNESS,30,DEBUFF,0,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,{SADNESS} turned inward. For *2 turns* the target uses one of its own attacks *on itself* at the end of every round.,SAD,0,2,,,,LOWEST_MS,COMMON,,1,"Each round end the target turns one of its own attacks on itself. NOTE: distinct from SELF_HARM, which is the Overload-forced station."
+BLIND,Blinded by Hate,ANGER,30,DEBUFF,0,0,0,EYE,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,{ANGER} blots out aim. For *2 turns* the target *misses half* of its attacks.,BLINDED,0,2,,,,LOWEST_MS,COMMON,,1,ENEMY ability. The target misses half its attacks for 2 turns.
+SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Forced onto your line by {OVERLOAD}. Costs you {MS} and cannot be removed.,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
+FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Forced onto your line by {OVERLOAD}. *Heals your opponent* and cannot be removed.,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
 
 /* --- matchups ---
    attack emotion x layer emotion. '*' is a wildcard, 'NONE' means the target has
@@ -54,8 +59,8 @@ FEAR,FEAR,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks 
 /* --- units ---
    layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
 units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,1,3,6,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY,-1,3,6,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
 
 /* --- dialogue ---
    what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one
@@ -202,12 +207,16 @@ dialogueHoldMs,3000,How long a finished line stays on screen before it fades.,,,
 lowHpTalkPct,0.2,Fraction of max MS below which the winning / losing lines fire.,,,
 overloadSlotPer,0.25,Every this-much overflow (as a fraction of max MS) forces one more corrupted slot.,,,
 aiVarietyChance,0.22,Chance the AI takes a random affordable attack instead of its best one.,,,
+aiDebuffChance,0.5,Chance the AI spends a slot on a debuff the target is not already suffering.,,,
 aiChargeBias,0.55,Chance the AI prefers an ability with charge segments when it can afford one.,,,
 shuffleLayersEachRound,1,Re-order every unit's layer queue at the start of each round.,,,
 chargeGrantsSlots,1,Each charge segment in a line grants the OPPONENT one temporary slot next turn.,,,
 maxBonusSlots,6,"FALLBACK cap on temporary slots, used only if a unit row leaves max_bonus_slots blank.",,,
 abilPageSize,4,Abilities shown per page in the Emotions panel.,,,
 slotArriveMs,260,Gap between one temporary slot flying in and the next.,,,
+unsheathMs,340,How long one interface element takes to draw itself into place.,,,
+unsheathGapMs,110,"Gap before the next element starts — smaller than unsheathMs, so they overlap.",,,
+longPressMs,420,How long an ability must be held before its tooltip opens.,,,
 swipeMinPx,36,How far a pointer must travel across the panel to count as a page swipe.,,,
 tagGrowth,0.85,How much an accumulating tag grows once it holds a full max-MS worth of change.,,,
 tagBreathSlowMs,1700,Breathing period of an accumulating tag holding almost nothing.,,,
@@ -234,6 +243,8 @@ settleStepMs,70,Pause between one hit landing on a bar and the next setting off.
 barTweenMs,1000,How long a bar takes to travel to its new value once a hit lands.,,,
 overloadHoldMs,2000,How long the OVERLOAD tag and its slow motion last.,,,
 ecScrollSpeed,0.0022,How fast the charge gradient drifts along the bar.,,,
+themeOpening,audio/theme-opening.wav,Theme part 1: plays once.,,,
+themeLoop,audio/theme-loop.wav,"Theme part 2: loops for ever, scheduled to start the instant part 1 ends.",,,
 musicFadeMs,900,How quickly the theme fades out when the battle ends.,,,
 musicVolume,0.3,Theme level. Lower this if the sound effects are getting buried.,,,
 sfxVolume,1.05,"Sound-effect level, mixed against musicVolume.",,,
@@ -262,6 +273,8 @@ crusherSteps,12,"Audio bit-crusher quantisation. Low = Atari harsh, high = SNES-
 sounds: `id,wave,f0,f1,dur,gain,echo,description
 tap,square,980,1460,80,0.46,0.3,Adding an ability to the line.
 place,square,620,1760,130,0.4,0.35,The station lands on your line and flashes white.
+sheatheE,sawtooth,1500,220,150,0.3,0.22,Enemy UI element drawn into place. Lower.
+sheatheP,sawtooth,2100,340,140,0.28,0.22,Player UI element drawn into place. Higher.
 slot,triangle,300,1500,150,0.3,0.45,A temporary slot flies in from the opponent.
 remove,square,520,220,90,0.34,0.24,Removing a station.
 depart,sawtooth,240,70,420,0.26,0.45,The line departs and charge is spent.
@@ -275,7 +288,49 @@ regrow,triangle,120,520,300,0.16,0.4,The broken layer regrows at the back.
 clash,noise,240,240,1500,0.4,0.65,Death: the chevrons meet.
 speak,square,620,540,42,0.09,0.12,One letter of dialogue appearing.
 win,square,440,1320,620,0.24,0.55,Victory.
-lose,sawtooth,320,50,950,0.28,0.6,Defeat.`
+lose,sawtooth,320,50,950,0.28,0.6,Defeat.`,
+
+/* --- status_effects ---
+   one row per status. Abilities apply these by id via status_apply.
+   block_regen = layers held down; miss_chance = attacks the victim fluffs;
+   self_hits = the victim turns one of its own attacks on itself each turn.  */
+status_effects: `id,name,duration,icon,color,blurb,block_regen,miss_chance,self_hits,dmg_taken_mult,dmg_dealt_mult,ec_gain_mult,ms_per_turn,ec_per_turn,blocks_actions,stacking,max_stacks,enabled,notes
+NO_REGEN,Rotting,2,ROT,#56a36a,*2* of your broken {LAYERS} are being held down. They stay broken until this wears off.,2,0,0,1,1,1,0,0,0,REFRESH,1,1,Holds this many broken layers down: they stay broken while it lasts.
+SAD,Sad,2,DROP,#3d66c1,At the end of every round one of your own attacks is turned *on yourself*.,0,0,1,1,1,1,0,0,0,REFRESH,1,1,Each round end the victim turns one of its OWN attacks on itself.
+BLINDED,Blinded,2,EYE,#e53859,{ANGER} has blotted out your aim. *Half* of your attacks miss outright.,0,0.5,0,1,1,1,0,0,0,REFRESH,1,1,The victim fluffs this fraction of its attacks.`,
+
+/* --- moments ---
+   title-screen mood line. day is MON..SUN or *; hours are BARCELONA local,
+   to_hour exclusive, and a band may wrap past midnight. Highest priority wins.  */
+moments: `id,day,from_hour,to_hour,phrase,priority,enabled,notes
+dawn_1,*,5,7,the first light is still deciding,0,1,
+dawn_2,*,5,7,nobody has spoken yet today,0,1,
+morn_1,*,7,10,early morning,0,1,
+morn_2,*,7,10,the early carriages are full of unfinished sleep,0,1,
+morn_3,*,7,10,everyone is already late,0,1,
+mid_1,*,10,13,middle of the day,0,1,
+mid_2,*,10,13,the light is flat and honest,0,1,
+noon_1,*,13,16,all afternoon ahead,0,1,
+noon_2,*,13,16,the long slow part of the day,0,1,
+late_1,*,16,19,the afternoon is running out,0,1,
+late_2,*,16,19,everyone is going somewhere they did not choose,0,1,
+dusk_1,*,19,21,somber twilight,0,1,
+dusk_2,*,19,21,the hour the day admits what it was,0,1,
+night_1,*,21,24,the night is getting loud,0,1,
+night_2,*,21,24,the last trains are filling up,0,1,
+small_1,*,0,5,"the madrugada, and still moving",0,1,
+small_2,*,0,5,too late to be anything but honest,0,1,
+mon_morn,MON,5,10,"monday, and the week already weighs something",2,1,
+mon_dusk,MON,19,24,the longest monday of the month,2,1,
+wed_mid,WED,10,16,the week is stuck exactly in the middle,2,1,
+thu_late,THU,16,21,"almost, but not yet",2,1,
+fri_dusk,FRI,19,21,a night to finally be free,2,1,
+fri_night,FRI,21,24,a night to finally be free,2,1,
+fri_small,FRI,0,5,friday refusing to end,2,1,
+sat_mid,SAT,10,16,a saturday with nothing owed to anyone,2,1,
+sat_night,SAT,21,24,the city is pretending it never has to work again,2,1,
+sun_mid,SUN,10,16,a sunday that stretches too far,2,1,
+sun_dusk,SUN,19,24,"sunday dusk, and monday already breathing on it",2,1,`
 };
 
 /* --- CSV reader: handles quoted fields, so notes may contain commas ---- */
@@ -319,3 +374,5 @@ const RULES     = Object.fromEntries(parseCSV(DATA.rules).map(r=>[r.key,r.value]
 const SOUNDS    = byId(parseCSV(DATA.sounds));
 const MATCHUPS  = parseCSV(DATA.matchups);
 const DIALOGUE  = parseCSV(DATA.dialogue);
+const STATUSES  = byId(parseCSV(DATA.status_effects).filter(r=>r.enabled));
+const MOMENTS   = parseCSV(DATA.moments).filter(r=>r.enabled);

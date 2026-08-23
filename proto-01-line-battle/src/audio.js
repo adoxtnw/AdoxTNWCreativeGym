@@ -83,29 +83,53 @@ function playNote(tr,when,dur,n,v){
   src.connect(g); g.connect(musicBus);
   src.start(when); src.stop(when+dur+0.09);
 }
-function schedMusic(){
-  if(!musicOn||!actx) return;
-  const now=actx.currentTime;
-  if(now > musicStart + MUSIC.length){ musicStart += MUSIC.length; musicIdx.fill(0); }
-  const ahead=now+0.30;
-  MUSIC.tracks.forEach((tr,ti)=>{
-    let i=musicIdx[ti];
-    while(i<tr.notes.length && musicStart+tr.notes[i][0] <= ahead){
-      const [t,d,n,v]=tr.notes[i];
-      const when=musicStart+t;
-      if(when>now-0.05) playNote(tr,when,d,n,v);
-      i++;
-    }
-    musicIdx[ti]=i;
-  });
+/* ================= THEME =================
+   Two files, not one: an opening that plays once and a body that loops. The
+   handoff must be seamless, so both are decoded to PCM up front and the loop is
+   SCHEDULED on the audio clock at exactly `t0 + opening.duration`. That is
+   sample-accurate — an `ended` handler or a timer would leave an audible seam.
+
+   fetch() is blocked on file://, so when decoding fails we fall back to plain
+   <audio> elements. Those cannot be gapless, but the prototype still has music
+   when opened straight from disk. */
+let musicBufs=null, musicLoad=null, musicSrcs=[], musicEls=[];
+
+function loadMusic(){
+  if(musicLoad) return musicLoad;
+  const get = url => fetch(url).then(r=>{ if(!r.ok) throw new Error(url); return r.arrayBuffer(); })
+                               .then(b=>actx.decodeAudioData(b));
+  musicLoad = Promise.all([get(RULES.themeOpening), get(RULES.themeLoop)])
+    .then(([opening, loop]) => (musicBufs = {opening, loop}))
+    .catch(() => null);
+  return musicLoad;
 }
-function startMusic(){
-  initAudio(); if(!actx||musicOn||typeof MUSIC==="undefined") return;
-  if(actx.state==="suspended") actx.resume();
+
+/* file:// fallback — audible seam at the handoff, but it plays. */
+function startMusicEls(){
+  const a=new Audio(RULES.themeOpening), b=new Audio(RULES.themeLoop);
+  a.volume=b.volume=RULES.musicVolume; b.loop=true; b.preload="auto";
+  a.addEventListener("ended",()=>{ if(musicOn) b.play().catch(()=>{}); });
+  a.play().catch(()=>{});
+  musicEls=[a,b];
+}
+
+async function startMusic(){
+  initAudio(); if(!actx||musicOn) return;
+  if(actx.state==="suspended"){ try{ await actx.resume(); }catch(_){} }
   musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume; musicBus.connect(master);
-  musicOn=true; musicStart=actx.currentTime+0.06; musicIdx=MUSIC.tracks.map(()=>0);
-  schedMusic(); musicTimer=setInterval(schedMusic,50);
+  musicOn=true;
+  const bufs=await loadMusic();
+  if(!musicOn) return;                       // stopped while it was still decoding
+  if(!bufs){ startMusicEls(); return; }
+  const t0=actx.currentTime + 0.08;
+  const open=actx.createBufferSource();
+  open.buffer=bufs.opening; open.connect(musicBus); open.start(t0);
+  const loop=actx.createBufferSource();
+  loop.buffer=bufs.loop; loop.loop=true; loop.connect(musicBus);
+  loop.start(t0 + bufs.opening.duration);    // the seam, placed on the audio clock
+  musicSrcs=[open, loop];
 }
+
 /* The graph — context, buses, crusher curve and the noise buffer — is built
    while the title screen is up, so CONFRONT EMOTION only has to resume it and
    the theme starts on the tap rather than after it. The context begins
@@ -113,9 +137,13 @@ function startMusic(){
 initAudio();
 window.addEventListener("pointerdown",initAudio,{once:true});
 function stopMusic(fadeMs){
-  if(!musicOn||!actx||!musicBus) return;
+  if(!musicOn) return;
   musicOn=false;
   if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
+  musicEls.forEach(el=>{ try{ el.pause(); }catch(_){} }); musicEls=[];
+  const kill=musicSrcs; musicSrcs=[];
+  setTimeout(()=>kill.forEach(sr=>{ try{ sr.stop(); }catch(_){} }), (fadeMs||RULES.musicFadeMs)+120);
+  if(!actx||!musicBus) return;
   const bus=musicBus, t0=actx.currentTime, dur=(fadeMs||RULES.musicFadeMs)/1000;
   musicBus=null;
   try{
@@ -125,3 +153,43 @@ function stopMusic(fadeMs){
   }catch(_){}
   setTimeout(()=>{ try{ bus.disconnect(); }catch(_){} }, (fadeMs||RULES.musicFadeMs)+150);
 }
+
+/* ================= DEVICE =================
+   Phone housekeeping, all of it gated on a real user gesture because that is what
+   the platforms require: fullscreen and the wake lock can only be requested from
+   inside a tap handler. */
+let wakeLock = null;
+
+async function goFullscreen(){
+  /* Only on a touch device: a desktop browser being yanked fullscreen by a game
+     it just opened is obnoxious, and this prototype is played on a desktop too. */
+  const touch = matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints > 0;
+  if(!touch) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if(req){ try{ await req.call(el, {navigationUI:"hide"}); }catch(_){} }
+}
+
+async function keepAwake(){
+  if(!navigator.wakeLock) return;                 // iOS Safari < 16.4, and others
+  try{
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", ()=>{ wakeLock = null; });
+  }catch(_){}
+}
+
+/* Leaving the app silences it. The AudioContext is suspended rather than the
+   music stopped, so the theme resumes exactly where it left off — stopping and
+   restarting would lose the opening/loop handoff. */
+document.addEventListener("visibilitychange", async ()=>{
+  if(document.hidden){
+    if(actx && actx.state === "running"){ try{ await actx.suspend(); }catch(_){} }
+    musicEls.forEach(el=>{ try{ el.pause(); }catch(_){} });
+  }else{
+    if(actx && actx.state === "suspended" && musicOn){ try{ await actx.resume(); }catch(_){} }
+    /* The <audio> fallback path is not resumed: it is only reached on file://,
+       where the handoff is already imperfect, and restarting mid-track would be
+       worse than the silence. The Web Audio path above resumes exactly. */
+    if(!wakeLock) keepAwake();                    // the lock is dropped on hide
+  }
+});
