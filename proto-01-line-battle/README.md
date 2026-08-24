@@ -20,6 +20,58 @@ A single self-contained `index.html`. No build step, no dependencies, no network
 | Remove from the line | Tap a node in the line |
 | Resolve the turn | **DEPART** |
 
+## Pass 29 — the theme was going through the bit-crusher
+
+### What was wrong
+The music was routed through the **sound-effects** chain: a 12-step bit-crusher and a
+7.2 kHz lowpass. Those exist to make the synthesised blips crunchy. The theme has been
+on that path since the beginning — and it did not matter, because the theme *was* a
+MIDI played on square waves, and squares already sit at the quantiser's extremes, so
+crushing them was very nearly a no-op.
+
+Replacing it with a recorded mix (Pass 26) changed that completely, and I did not move
+the routing.
+
+Rendered offline through the real chain:
+
+| path | distinct sample levels | HF energy |
+|---|---|---|
+| clean | **52,915** | 0.0000323 |
+| through the crusher | **783** | 0.000182 — **5.6x**, pure aliasing |
+| + the 7.2 kHz lowpass | 7,678 | 0.0000168 — **half** the clean HF |
+
+783 levels is roughly 2-3 bits: at `musicVolume 0.3 x master 0.7` the mix only spans
+about 2.5 of the quantiser's 12 steps. That is the crunch and the distortion. The
+lowpass then removes everything above 7.2 kHz — hats, cymbals, high leads — which is
+the "muted instruments".
+
+### The fix
+A second output bus. Recorded audio goes straight out; synthesised effects keep the
+crusher.
+
+```
+sfxBus  -> master -> crusher -> lowpass -> destination
+musicBus ---------------------> cleanBus -> destination
+```
+
+`cleanBus` carries the same 0.7 gain as `master`, so **the level is unchanged** —
+effective music gain is 0.21 before and after. Verified on the live graph: with the
+theme playing, 7.2-12 kHz now sits only 8.8 dB under the mid band, a natural rolloff
+rather than a filter cliff.
+
+I also ruled out mono-downmix cancellation as a cause — summing L+R loses only 0.48 dB,
+so nothing in the track is phase-cancelling.
+
+### Honest limit
+This bug degraded the theme on **every** platform, not just Android. I cannot explain
+from here why it was tolerable on desktop and obvious on the Pixel — most likely a
+small speaker emphasises exactly the midrange where 2-bit quantisation noise sits — and
+I cannot verify an Android-only factor without the device.
+
+If it still sounds wrong on the phone, run **`audioReport()`** in a console there: it
+reports sample rate, channel counts, latency, whether the theme decoded, and whether
+the `<audio>` fallback is in play. That is the part that cannot be checked from a desktop.
+
 ## Pass 28 — the opening, actually fixed
 
 Pass 27's opening was broken in three separate ways. All three shared one root cause:

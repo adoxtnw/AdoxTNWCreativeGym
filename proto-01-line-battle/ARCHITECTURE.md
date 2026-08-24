@@ -160,6 +160,28 @@ Bar geometry is ported from `sources/Bars_Reference_001.svg`. Its measurements a
 recorded at the top of `src/gauge.js`; every derived constant is a rule in the
 spreadsheet, not a literal in the renderer.
 
+## Two output buses, and why
+
+```
+sfxBus  -> master -> crusher (12-step) -> lowpass 7.2kHz -> destination
+musicBus ------------------------------> cleanBus -------> destination
+```
+
+The crusher and the lowpass are what make the SYNTHESISED effects crunchy. Anything
+already recorded must take `cleanBus` instead. This was not obvious while the theme
+was a MIDI played on square waves: squares already sit at the quantiser's extremes,
+so crushing them was very nearly a no-op, and the theme rode the SFX chain harmlessly
+for twenty passes. A recorded mix does not survive it — measured, that chain took the
+theme from ~52,900 distinct sample levels to ~780 and multiplied its high-frequency
+energy by 5.6 in aliasing.
+
+`cleanBus` carries the same 0.7 gain as `master`, so moving the music across changed
+its level not at all.
+
+**`audioReport()`** dumps what the platform actually gave us — sample rate, channel
+counts, latency, whether the element fallback is in play. Run it in a console on the
+device when audio misbehaves somewhere you cannot attach a debugger.
+
 ## The theme is two files
 
 `audio/theme-opening.wav` plays once; `audio/theme-loop.wav` loops for ever. The

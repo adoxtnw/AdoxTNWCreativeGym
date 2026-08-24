@@ -5,7 +5,7 @@
    every file shares one global scope. */
 
 /* ================= AUDIO — synthesised, crunchy, echoing ================= */
-let actx=null, master=null, sfxBus=null, delay=null, noiseBuf=null;
+let actx=null, master=null, sfxBus=null, cleanBus=null, delay=null, noiseBuf=null;
 function crushCurve(steps){
   const n=1024, c=new Float32Array(n);
   for(let i=0;i<n;i++){ const x=i/(n-1)*2-1; c[i]=Math.round(x*steps)/steps; }
@@ -26,6 +26,18 @@ function initAudio(){
   const dOut=actx.createGain(); dOut.gain.value=0.75;
   delay.connect(dOut); dOut.connect(crusher);
   master.connect(crusher); crusher.connect(lp); lp.connect(actx.destination);
+  /* A CLEAN bus, straight out, for anything already recorded.
+     The crusher and the 7.2 kHz lowpass exist to make the SYNTHESISED effects
+     crunchy. While the theme was a MIDI played on square waves that was fine —
+     squares already sit at the quantiser's extremes, so crushing them was very
+     nearly a no-op. A recorded mix is not: measured, the same chain collapsed the
+     theme from ~52,900 distinct sample levels to ~780 (about 2-3 bits, because at
+     0.3 x 0.7 it only spans ~2.5 of the quantiser's 12 steps), multiplied its
+     high-frequency energy by 5.6 as aliasing, and then the lowpass removed half
+     of what was genuinely up there. Same gain as `master`, so the level is
+     unchanged — only the damage is gone. */
+  cleanBus=actx.createGain(); cleanBus.gain.value=0.7;
+  cleanBus.connect(actx.destination);
   const len=actx.sampleRate*1.2;
   noiseBuf=actx.createBuffer(1,len,actx.sampleRate);
   const d=noiseBuf.getChannelData(0);
@@ -116,7 +128,8 @@ function startMusicEls(){
 async function startMusic(){
   initAudio(); if(!actx||musicOn) return;
   if(actx.state==="suspended"){ try{ await actx.resume(); }catch(_){} }
-  musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume; musicBus.connect(master);
+  musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume;
+  musicBus.connect(cleanBus);          // recorded audio bypasses the crusher
   musicOn=true;
   const bufs=await loadMusic();
   if(!musicOn) return;                       // stopped while it was still decoding
@@ -193,3 +206,24 @@ document.addEventListener("visibilitychange", async ()=>{
     if(!wakeLock) keepAwake();                    // the lock is dropped on hide
   }
 });
+
+
+/* Run `audioReport()` in a console on the device if the theme still sounds wrong:
+   it says what the platform actually gave us, which is the part that cannot be
+   checked from a desktop. */
+function audioReport(){
+  if(!actx) initAudio();
+  return {
+    sampleRate: actx && actx.sampleRate,
+    state: actx && actx.state,
+    baseLatency: actx && actx.baseLatency,
+    outputLatency: actx && actx.outputLatency,
+    destChannels: actx && actx.destination.channelCount,
+    destMaxChannels: actx && actx.destination.maxChannelCount,
+    themeDecoded: !!musicBufs,
+    themeChannels: musicBufs && musicBufs.loop.numberOfChannels,
+    themeRate: musicBufs && musicBufs.loop.sampleRate,
+    usingElementFallback: musicEls.length > 0,
+    musicVolume: RULES.musicVolume
+  };
+}
