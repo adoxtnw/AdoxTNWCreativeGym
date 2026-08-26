@@ -1,0 +1,8 @@
+"What can appear around the train during a ride. `chance` is rolled per element every travelRollSecs; max_on_screen caps how many exist at once, max_per_trip how many one ride may ever produce. life_min/life_max in seconds. `drift` is speed relative to the track (>1 reads as nearer the camera). These are BASES: the target station's `spawn` column scales them, and so will weather and time of day when those exist.",,,,,,,,,,,,,,,,
+id,name,kind,motion,chance,max_on_screen,max_per_trip,life_min,life_max,size,drift,worth,payload,amount,lock_secs,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
+TRACK_SEGMENT,Track Segment,SEGMENT,FLYBY,0.25,8,0,6,9,11,1.15,1,NONE,0,0,1,"Bridges the link. 0 in max_per_trip means UNLIMITED. Its life is longer than a crossing on purpose: a segment must stay tappable until it leaves the bottom, never fade out mid-screen."
+CRYSTAL_SHARD,Crystal Shard,CRYSTAL,FLYBY,0.09,2,0,6,9,12,1.0,0,CRYSTAL,1,0,1,A rotating prism in the line's own colour. Rare on purpose.
+SETTLED_ECHO,Settled Echo,LOOT,PARALLEL,0.12,3,12,4.0,8.0,10,0.15,0,ITEM,1,0,1,Holds station alongside the train for a while. Rolls an item.
+EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.1,2,4,5.0,15.0,13,0.45,0,NONE,0,0,1,Floats past. Tap to pick the fight; ignore it and it leaves.
+HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.05,1,2,8.0,14.0,14,0.3,0,NONE,0,5,1,Locks on. When the countdown runs out it forces the encounter.

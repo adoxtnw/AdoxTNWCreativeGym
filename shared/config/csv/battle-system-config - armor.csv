@@ -1,0 +1,7 @@
+"Emotional Armor. `ms_mod` is ADDED to the player's base MaxMS; layer1/layer2 are the Emotional Layers it grants in battle (blank = none). One passive per piece. cost/trade_in are for the Wandering Store, which is not built yet.",,,,,,,,,,
+id,name,tier,ms_mod,layer1,layer2,passive,cost,trade_in,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
+ARM_SCARS,Calloused Scars,1,80,ANGER,,PAS_THICKSKIN,,,1,"Starter. One layer, and it is the one that hits back."
+ARM_SHELL,Apathetic Shell,2,120,DISGUST,FEAR,PAS_NUMB,120 DISGUST + 60 FEAR,ARM_SCARS,1,"Two layers. Slow to feel anything, which is the point."
+ARM_GLASSES,Rose-Tinted Glasses,2,60,JOY,SURPRISE,PAS_DENIAL,140 JOY + 40 SURPRISE,ARM_SCARS,1,"Least stamina, brightest layers."
+ARM_SHOULDERS,Heavy Shoulders,3,150,SADNESS,ANGER,PAS_ENDURE,220 SADNESS + 90 ANGER,ARM_SHELL,1,Carries the most and moves the slowest.

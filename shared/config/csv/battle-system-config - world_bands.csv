@@ -1,0 +1,12 @@
+"day / hour / weather -> multipliers on a station's live attributes. EVERY matching row multiplies, so BASE is the floor and the rest stack onto it. Hours are Barcelona local, to_hour exclusive, and a band may wrap past midnight. Weather comes from WorldState (stubbed today, a real API later).",,,,,,,,,,,
+id,day,from_hour,to_hour,weather,fog,density,aggro,diltransience,priority,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,LIVE,planned
+BASE,*,0,24,*,1,1,1,1,0,1,The floor everything else multiplies onto.
+NIGHT,*,23,5,*,1.8,1.35,1.4,1.15,2,1,"Late trains. Thicker, meaner, longer."
+DAWN,*,5,8,*,1.3,0.8,0.7,0.95,2,1,"Thin crowds, low threat."
+RUSH_AM,MON|TUE|WED|THU|FRI,8,10,*,0.8,1.25,1.1,0.9,3,1,Packed and quick.
+RUSH_PM,MON|TUE|WED|THU|FRI,18,21,*,0.9,1.3,1.2,0.9,3,1,Packed and fraying.
+WEEKEND,SAT|SUN,0,24,*,1.1,0.9,0.85,1.1,1,1,"Slower, stranger."
+RAIN,*,0,24,RAIN,1.6,1.1,1.05,1.2,4,1,Wet track. Poor visibility.
+STORM,*,0,24,STORM,2.2,1.4,1.5,1.35,5,1,Everything is worse.
+CLEAR,*,0,24,CLEAR,0.85,1,1,0.95,4,1,You can see what is coming.

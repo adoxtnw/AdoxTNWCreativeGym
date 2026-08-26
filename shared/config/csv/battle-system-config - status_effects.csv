@@ -1,0 +1,7 @@
+One row per status. Abilities apply these by id through status_apply / status_duration. Add a status by adding a row and teaching Kinds what reads it.,,,,,,,,,,,,,,,,,,,
+id,name,duration,icon,color,blurb,block_regen,miss_chance,self_hits,crit_mult,dmg_taken_mult,dmg_dealt_mult,ec_gain_mult,ms_per_turn,ec_per_turn,blocks_actions,stacking,max_stacks,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,planned,planned,planned,planned,planned,planned,planned,LIVE,planned
+NO_REGEN,Rotting,2,ROT,#56a36a,*2* of your broken {LAYERS} are being held down. They stay broken until this wears off.,2,0,0,0,1,1,1,0,0,0,REFRESH,1,1,Holds this many broken layers down: they stay broken while it lasts.
+SAD,Sad,2,DROP,#3d66c1,At the end of every round one of your own attacks is turned *on yourself*.,0,0,1,0,1,1,1,0,0,0,REFRESH,1,1,Each round end the victim turns one of its OWN attacks on itself.
+OVERLOAD,Overload,0,WARN,#e53859,Your {EC} is over your {MS}. Your line is being invaded until you burn it down.,0,0,0,0,1,1,1,0,0,0,REFRESH,1,1,"DERIVED, not timed: it lasts while ec > ms, so it is never stored in unit.statuses."
+BLINDED,Blinded,2,EYE,#e53859,{ANGER} has blotted out your aim. *Half* of your attacks miss outright.,0,0.5,0,0,1,1,1,0,0,0,REFRESH,1,1,The victim fluffs this fraction of its attacks.

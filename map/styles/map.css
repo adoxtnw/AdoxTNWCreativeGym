@@ -1,0 +1,552 @@
+/* =====================================================================
+   NEURO-METRO: AVUI — MAP stylesheet
+
+   There is almost nothing here on purpose. The map is RASTERISED, not
+   styled: lines, stations, labels and badges are pixels written by
+   src/mapview.js, so CSS only has to supply the frame, the integral
+   upscale, and the HUD chrome that floats over it.
+
+   Tokens are the battle system's, copied rather than imported — the two
+   apps are siblings and must not reach into each other's files. See
+   src/util.js for the same reasoning applied to code.
+   ===================================================================== */
+@property --rampPos{ syntax:"<length>"; inherits:true; initial-value:0px; }
+:root{
+  --void:#0f0d0b; --panel:#2b2620; --panelHi:#3d362e; --line:#5c5348;
+  --ink:#f4efe4;  --muted:#9a8f80;
+  --mint:#b0ffe1; --rose:#ffc2cd;
+  --chipPad:5px 15px; --chipFont:20px; --chipDrop:3px 3px 0 rgba(6,4,14,.85);
+  --chipInk:#0c0a16;
+  --bevel: inset 1px 1px 0 rgba(255,255,255,.13), inset -1px -1px 0 rgba(0,0,0,.45);
+  --drop: drop-shadow(2px 3px 0 rgba(8,6,4,.75));
+  /* pixel-rounded corners: two steps, so a corner is CUT rather than curved */
+  --r1:3px; --r2:6px;
+  /* the six emotions, for the shared ramp. One palette, from the same hexes the
+     canvas reads out of the emotions sheet. */
+  --anger:#e53859; --surprise:#724082; --disgust:#56a36a;
+  --joy:#fcc336;   --sadness:#3d66c1;  --fear:#929fa5;
+  --ramp:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+         var(--joy),var(--sadness),var(--fear),var(--anger));
+  --rampW:33.334vw;        /* one full loop, three times across the screen */
+}
+
+/* ============ PIXEL-ROUNDED CORNERS ============
+   A corner is cut in two steps rather than curved, so it is made of the same
+   square pixels as everything else. Lifted from the battle system, where the
+   whole interface is built on it. */
+.pxr{clip-path:polygon(
+  var(--r2) 0, calc(100% - var(--r2)) 0,
+  calc(100% - var(--r2)) var(--r1), calc(100% - var(--r1)) var(--r1),
+  calc(100% - var(--r1)) var(--r2), 100% var(--r2),
+  100% calc(100% - var(--r2)), calc(100% - var(--r1)) calc(100% - var(--r2)),
+  calc(100% - var(--r1)) calc(100% - var(--r1)), calc(100% - var(--r2)) calc(100% - var(--r1)),
+  calc(100% - var(--r2)) 100%, var(--r2) 100%,
+  var(--r2) calc(100% - var(--r1)), var(--r1) calc(100% - var(--r1)),
+  var(--r1) calc(100% - var(--r2)), 0 calc(100% - var(--r2)),
+  0 var(--r2), var(--r1) var(--r2), var(--r1) var(--r1), var(--r2) var(--r1))}
+
+/* ============ THE RAMP ============
+   One scrolling emotion gradient, anchored to the VIEWPORT rather than to each
+   element, so a tag and a border show the same slice of the same moving sheet —
+   as if they were masks cut out of one thing underneath. Driven from the 12 fps
+   clock in mapview.js, not by a CSS animation, so it steps with everything else. */
+.ramp{background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px}
+
+/* EVERY SYMBOL BREATHES. A still glyph in a moving interface reads as a
+   missing asset; the offset is per-element so they never march in step. */
+@keyframes floaty{from{transform:translateY(2px)} to{transform:translateY(-3px)}}
+@keyframes gfloat{from{transform:translateY(-3px)} to{transform:translateY(3px)}}
+.sym{display:inline-block; width:1em; height:1em; vertical-align:-.12em;
+  animation:gfloat 2.2s steps(26) infinite alternate;
+  animation-delay:var(--fd,0s)}
+.sym svg{width:100%; height:100%; display:block}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{background:#000; color:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
+  /* WEIGHT ALONE IS NOT ENOUGH — most mobile monospace fallbacks ship no bold
+     face, so the stroke is what actually thickens the glyphs on every device. */
+  font-weight:900; -webkit-text-stroke:0.6px currentColor; paint-order:stroke fill;
+  letter-spacing:.05em; text-transform:uppercase; -webkit-font-smoothing:none;
+  overscroll-behavior:none}
+
+.phone{width:100vw; height:100dvh; max-width:420px; max-height:920px;
+  position:relative; overflow:hidden; background:var(--void)}
+
+/* `touch-action:none` is load-bearing: without it the browser claims the drag
+   as a scroll/pinch gesture and the pointer events never arrive. */
+.screen{position:absolute; inset:0; overflow:hidden; touch-action:none;
+  cursor:grab; user-select:none; -webkit-user-select:none}
+.screen.drag{cursor:grabbing}
+
+/* The buffer is sized to an exact integer multiple in JS; centring it here
+   means the rounding-up overflow is clipped evenly on both sides rather than
+   shunted to one edge. */
+/* The turbulence filter is defined in index.html. It takes the ALREADY
+   upscaled, already-blocky canvas as its input, so the blocks survive and it
+   is their edges that swim — the city breathing rather than the image
+   blurring. Kept on its own layer so the displacement does not force the
+   whole frame to re-composite. */
+#map{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  image-rendering:pixelated; display:block;
+  filter:url(#mapWave); will-change:filter}
+
+/* ---- HUD: ordinary CSS text, the way the battle HUD does it ---- */
+.hud{position:absolute; inset:0; pointer-events:none}
+
+/* END — the one control that exists while the train is running. */
+.endbtn{position:absolute; left:50%; bottom:calc(22px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%);
+  padding:9px 30px; font:inherit; font-size:15px; letter-spacing:.22em;
+  color:var(--chipInk, #0c0a16); background:var(--ink); border:0; border-radius:2px;
+  box-shadow:var(--bevel), var(--chipDrop); cursor:pointer;
+  opacity:0; pointer-events:none; transition:opacity .18s steps(2)}
+.endbtn.show{opacity:1; pointer-events:auto}
+.endbtn:active{transform:translateX(-50%) translateY(1px); box-shadow:var(--bevel)}
+
+/* THE ONE BUTTON ON THE MAP, on the bottom edge where a thumb already rests.
+   Two strokes: a hard black one so it reads against any part of the network,
+   and outside that the shared emotion ramp, scrolling on the game clock. The
+   ramp is a RING rather than a glow, so the button is an object cut out of the
+   same moving sheet as the battle system's charge tag. */
+.menubtn{position:absolute; left:50%; bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%); z-index:3;
+  padding:16px 40px; font:inherit; font-size:19px; letter-spacing:.24em;
+  color:var(--chipInk);
+  background:linear-gradient(180deg,#fffdf7,var(--ink) 62%,#bdb6a6);
+  border:4px solid #0b0a08; cursor:pointer;
+  box-shadow:5px 6px 0 rgba(6,4,14,.85);
+  opacity:0; pointer-events:none; transition:opacity .15s steps(2)}
+.menubtn.show{opacity:1; pointer-events:auto}
+/* the rainbow stroke sits OUTSIDE the black one, punched hollow so only the
+   ring shows rather than a filled rectangle behind the label */
+.menubtn::after{content:""; position:absolute; inset:-9px; z-index:-1;
+  background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px;
+  padding:5px;
+  -webkit-mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor}
+.menubtn:active{transform:translateX(-50%) translate(2px,2px);
+  box-shadow:2px 3px 0 rgba(6,4,14,.85)}
+
+/* =====================================================================
+   NAVIGATION PANELS
+   All DOM. The canvas draws the world; anything the player has to READ
+   is markup, the same split the battle system uses. Every panel shares
+   the chip language — same bevel, same drop, same warm-grey ground —
+   so nothing here competes with an emotion colour.
+   ===================================================================== */
+
+/* A <button> does not inherit text-transform the way ordinary text does, so
+   without this the labels arrive half lower-case next to everything else. */
+button{text-transform:inherit; letter-spacing:inherit}
+
+@keyframes warnpulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* ---- the leg header ---- */
+.routehead{position:absolute; left:0; right:0; top:0; display:none;
+  align-items:center; gap:6px; padding:5px 8px; font-size:10px;
+  background:rgba(15,13,11,.86); pointer-events:none}
+.routehead.show{display:flex}
+.routehead .rl{color:#0c0a16; padding:1px 5px; border-radius:2px}
+.routehead .seg{margin-left:auto; color:#b0ffe1}
+.routehead .legs{color:var(--muted)}
+
+/* ---- panels that take over ---- */
+.peek,.dilemma,.encounter{position:absolute; inset:auto 0 0 0; display:none;
+  padding:16px; background:var(--panel);
+  box-shadow:0 -3px 0 rgba(0,0,0,.5), var(--bevel); pointer-events:auto;
+  max-height:78%; overflow-y:auto}
+
+/* ---- the travel popup ----
+   A thick stroke made of the lines this trip actually rides, scrolling. The
+   gradient is set per-render as `--trip`; it is a BORDER-shaped mask rather
+   than a background so the panel keeps its own dark ground behind the text. */
+.peek{padding:0; background:none; box-shadow:none; overflow:visible}
+.peek.show{display:block}
+.peek::before{content:""; position:absolute; inset:0; z-index:0;
+  background-image:var(--trip,linear-gradient(90deg,#5c5348,#5c5348));
+  background-size:240% 100%;
+  animation:tripscroll 3.6s linear infinite}
+@keyframes tripscroll{from{background-position:0% 0} to{background-position:-240% 0}}
+.peek > *{position:relative; z-index:1}
+/* the inner card, inset so the stroke shows as a frame */
+.peek{--pad:6px}
+.peek::after{content:""; position:absolute; inset:var(--pad); z-index:0;
+  background:linear-gradient(180deg,#221e19,var(--panel) 45%,#1a1712)}
+.peek{padding:calc(var(--pad) + 14px) calc(var(--pad) + 14px) calc(var(--pad) + 16px)}
+
+/* from → to, with the journey drawn between */
+.trip{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+.trip b{font-size:15px; letter-spacing:.06em; line-height:1.2}
+.trip .tfrom{text-align:left; color:var(--muted); flex:1}
+.trip .tto{text-align:right; color:#fff; flex:1;
+  text-shadow:2px 2px 0 rgba(6,4,14,.85)}
+.tarrow{flex:none; display:flex; align-items:center; gap:2px; height:18px}
+/* the shaft ripples away from where you are standing */
+.tarrow i{display:block; width:3px; height:3px; background:var(--ink);
+  box-shadow:1px 1px 0 rgba(6,4,14,.8);
+  animation:tripwave .78s steps(6) infinite alternate}
+.tarrow u{display:block; width:0; height:0; margin-left:1px;
+  border-left:7px solid var(--ink); border-top:5px solid transparent;
+  border-bottom:5px solid transparent;
+  filter:drop-shadow(1px 1px 0 rgba(6,4,14,.8));
+  animation:tripwave .78s steps(6) infinite alternate; animation-delay:-.6s}
+@keyframes tripwave{from{transform:translateY(-3px)} to{transform:translateY(3px)}}
+.tlines{margin-bottom:12px}
+
+/* the button wears the same moving gradient as the stroke */
+.pbtn.trip{display:block; width:100%; padding:15px 12px; border:3px solid #0b0a08;
+  color:#0b0a08; text-shadow:none;
+  background-image:var(--trip,linear-gradient(90deg,#5c5348,#5c5348));
+  background-size:240% 100%;
+  animation:tripscroll 3.6s linear infinite;
+  box-shadow:4px 5px 0 rgba(6,4,14,.85); cursor:pointer}
+.pbtn.trip span{display:block; font-size:16px; letter-spacing:.14em}
+.pbtn.trip small{display:block; margin-top:3px; font-size:11px; letter-spacing:.18em;
+  opacity:.8}
+.pbtn.trip:active{transform:translate(2px,2px); box-shadow:2px 3px 0 rgba(6,4,14,.85)}
+
+/* the canvas leans; it must not clip against the frame while it does */
+#map{transform-origin:50% 50%}
+.peek.show,.dilemma.show{display:block}
+.peek h2,.dilemma h3{font-size:15px; letter-spacing:.12em; margin-bottom:8px}
+.peek dl{display:grid; grid-template-columns:auto 1fr; gap:3px 12px;
+  font-size:10px; margin-bottom:12px}
+.peek dt{color:var(--muted)}
+.peek dd{text-align:right}
+.lchips{display:flex; gap:4px; margin-bottom:10px}
+.lchip{color:#0c0a16; font-size:10px; padding:1px 5px; border-radius:2px}
+.peek .fogged,.peek .warn{font-size:10px; color:var(--muted); text-transform:none;
+  line-height:1.6; margin-bottom:10px}
+.peek .warn{color:#ffc2cd}
+.peek .note{font-size:10px; color:var(--muted)}
+/* the close button lives ABOVE the card, clear of the destination name it was
+   sitting on top of */
+.pclose{position:absolute; right:10px; top:-20px; width:42px; height:42px;
+  font:inherit; font-size:22px; color:var(--ink);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%);
+  border:3px solid #0b0a08; box-shadow:4px 4px 0 rgba(6,4,14,.85);
+  cursor:pointer; z-index:3}
+.pclose:active{transform:translate(2px,2px); box-shadow:2px 2px 0 rgba(6,4,14,.85)}
+/* room for it, and for the trip stroke */
+.peek{margin-top:24px}
+.pbtn{width:100%; padding:11px; font:inherit; font-size:12px; letter-spacing:.14em;
+  color:var(--chipInk,#0c0a16); background:var(--ink); border:0; border-radius:2px;
+  box-shadow:var(--bevel); cursor:pointer}
+
+/* ---- the wager ---- */
+.dilemma{background:#1d1a16}
+.dilemma .held{font-size:10px; color:var(--muted); margin-bottom:10px}
+.drow{display:flex; gap:8px}
+.dbtn{flex:1; padding:10px 8px; font:inherit; font-size:11px; letter-spacing:.1em;
+  color:var(--ink); background:var(--panel); border:0; border-radius:2px;
+  box-shadow:var(--bevel); cursor:pointer; text-align:left}
+/* CONTINUE is the risky one, so it is the one that looks eager */
+.dbtn.go{color:#0c0a16; background:#b0ffe1}
+.dbtn small{display:block; margin-top:4px; font-size:9px; opacity:.72;
+  letter-spacing:.02em; text-transform:none}
+
+/* ---- DEBUG battle stand-in ---- */
+.encounter{inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(8,6,4,.94); max-height:none}
+.encounter.show{display:flex}
+.ebox{text-align:center; max-width:86%}
+.ebox h2{font-size:19px; letter-spacing:.2em; margin-bottom:10px}
+.ekind{font-size:10px; color:#ffc2cd; margin-bottom:6px}
+.emods,.estate{font-size:9px; color:var(--muted); margin-bottom:6px;
+  text-transform:none; line-height:1.7}
+.erow{display:flex; gap:7px; justify-content:center; margin:14px 0 10px}
+.ebtn{padding:10px 16px; font:inherit; font-size:12px; letter-spacing:.14em;
+  color:var(--ink); background:var(--panel); border:0; border-radius:2px;
+  box-shadow:var(--bevel); cursor:pointer}
+.ebtn.win{color:#0c0a16; background:#b0ffe1}
+.ebtn.loss{color:#0c0a16; background:#ffc2cd}
+.edebug{font-size:9px; color:var(--line); text-transform:none}
+
+/* =====================================================================
+   THE MENU
+   Everything the player IS lives behind one button. Scaled up hard for
+   thumbs, built out of the battle system's shapes: cut corners, hard
+   offset shadows, thick strokes.
+   ===================================================================== */
+
+/* THE MAP KEEPS RENDERING BEHIND THIS. It is a live canvas, so rather than
+   covering it with a flat panel it is pushed back — dimmed and blurred heavily,
+   so the city is still there but unmistakably out of focus and out of reach. */
+.menu{position:absolute; inset:0; display:none; flex-direction:column;
+  background:rgba(12,10,8,.55);
+  -webkit-backdrop-filter:blur(16px) brightness(.6) saturate(.85);
+  backdrop-filter:blur(16px) brightness(.6) saturate(.85);
+  pointer-events:auto}
+.menu.show{display:flex}
+
+/* ---- body first, tabs last: the reachable edge belongs to the fingers ---- */
+.mbody{flex:1; overflow-y:auto; padding:20px 16px 14px;
+  -webkit-overflow-scrolling:touch}
+.mhead{order:2; display:flex; align-items:stretch; gap:6px;
+  padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg,rgba(12,10,8,0),rgba(12,10,8,.9) 40%)}
+.mtabs{display:flex; gap:6px; flex:1}
+.mtab{flex:1; padding:15px 4px; font:inherit; font-size:15px; letter-spacing:.1em;
+  color:var(--muted); background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark,#1d1a16));
+  border:2px solid var(--line); box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8);
+  cursor:pointer}
+.mtab.on{color:var(--chipInk); border-color:var(--ink);
+  background:linear-gradient(180deg,#fffdf7,var(--ink) 62%,#bdb6a6)}
+.mclose{width:52px; font:inherit; font-size:26px; color:var(--ink);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%);
+  border:2px solid var(--line); box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8);
+  cursor:pointer}
+.mtab:active,.mclose:active{transform:translate(2px,2px); box-shadow:var(--bevel)}
+
+/* ---- titles: big, white, and each one carries a symbol ---- */
+.mbody h3{font-size:30px; letter-spacing:.12em; margin-bottom:16px; color:#fff;
+  text-shadow:3px 3px 0 rgba(6,4,14,.85)}
+.mbody section{margin-bottom:26px}
+.mbody h4{display:flex; align-items:center; gap:9px; font-size:17px; color:#fff;
+  letter-spacing:.14em; margin-bottom:11px;
+  text-shadow:2px 2px 0 rgba(6,4,14,.85)}
+.mbody h4 .sym{width:20px; height:20px; color:var(--mint)}
+.hint{font-size:14px; color:var(--line); text-transform:none; line-height:1.65;
+  margin-top:9px}
+.pending{list-style:none; margin-top:9px}
+.pending li{font-size:14px; color:var(--line); text-transform:none; line-height:1.65}
+
+.pills{display:flex; gap:8px; flex-wrap:wrap}
+.pill{font-size:15px; padding:5px 13px; color:var(--chipInk);
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8)}
+.pill.off,.pill.key.off{color:var(--line); background:var(--panel)}
+
+/* ---- MS and EC wear the battle system's own tags ----
+   Mint with black text for stamina, and the scrolling rainbow with white text
+   for charge — the same two objects, so a number means the same thing in both
+   halves of the game. */
+.stats2{display:grid; grid-template-columns:auto 1fr; gap:9px 16px;
+  font-size:16px; margin-bottom:24px; padding-bottom:18px;
+  border-bottom:2px solid var(--panel)}
+.stats2 dt{color:var(--muted); align-self:center}
+.stats2 dd{text-align:right; display:flex; gap:7px; justify-content:flex-end;
+  align-items:center; flex-wrap:wrap}
+.tag{display:inline-block; padding:var(--chipPad); font-size:var(--chipFont);
+  color:var(--chipInk); box-shadow:var(--bevel), 2px 2px 0 rgba(6,4,14,.7);
+  animation:floaty 3.4s steps(41) infinite alternate}
+.tag.ms{background:linear-gradient(180deg,#eafff6,var(--mint) 62%,#6fbfa2)}
+.tag.ec{color:#fff; animation-delay:-1.7s;
+  box-shadow:var(--bevel), 2px 2px 0 rgba(6,4,14,.7), 0 0 14px rgba(255,255,255,.45)}
+
+/* ---- cards and slots ----
+   Armor and Move Sets read as SOCKETS: a dotted outline you drop something
+   into, so an empty one is obviously a hole rather than a missing row. */
+.slotwrap{border:3px dashed var(--line); padding:9px; margin-bottom:11px;
+  background:rgba(0,0,0,.25)}
+.slotwrap.filled{border-style:solid; border-color:var(--panelHi)}
+.card,.slot{display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  padding:14px 15px; font:inherit; font-size:17px; color:var(--ink);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
+  border:2px solid var(--emo,var(--line));
+  box-shadow:var(--bevel), 4px 4px 0 rgba(6,4,14,.8); cursor:pointer}
+.card.on{border-color:var(--ink)}
+.card .sym,.slot .sym{width:34px; height:34px; flex:none; color:var(--emo,var(--mint))}
+.cardtxt{flex:1; min-width:0}
+.card small,.slot small{display:block; margin-top:4px; font-size:13px;
+  color:var(--muted); text-transform:none; letter-spacing:.02em}
+.card small.pas{color:var(--line)}
+.card:active,.slot:active{transform:translate(2px,2px);
+  box-shadow:var(--bevel), 2px 2px 0 rgba(6,4,14,.8)}
+.slot.empty{color:var(--line); border-style:dashed}
+.slotrow{display:flex; gap:8px; align-items:stretch; margin-top:9px}
+.chgbtn{flex:none; padding:12px 22px; font:inherit; font-size:14px; letter-spacing:.1em;
+  color:var(--chipInk); background:linear-gradient(180deg,#fffdf7,var(--ink) 62%,#bdb6a6);
+  border:2px solid var(--ink); box-shadow:var(--bevel), 4px 4px 0 rgba(6,4,14,.8);
+  cursor:pointer}
+.chgbtn:active{transform:translate(2px,2px); box-shadow:var(--bevel)}
+
+/* ---- the six layer slots an armor may fill ---- */
+.layers6{display:flex; gap:5px; margin-top:8px}
+.lay{width:20px; height:20px; background:#15130f;
+  box-shadow:inset 0 0 0 2px var(--line), 2px 2px 0 rgba(6,4,14,.7)}
+.lay.on{box-shadow:inset 0 0 0 2px rgba(255,255,255,.35), 2px 2px 0 rgba(6,4,14,.7)}
+
+.cline{display:flex; align-items:center; gap:9px; padding:11px 0; font-size:17px;
+  border-bottom:2px solid rgba(92,83,72,.28)}
+.cline b{margin-left:auto; color:var(--ink); font-size:20px}
+/* the purse's pips breathe too — "all symbols", and a static dot beside a
+   floating heading reads as the one that failed to load */
+.cline .dot{display:inline-block; width:14px; height:14px; flex:none;
+  box-shadow:2px 2px 0 rgba(6,4,14,.7);
+  animation:gfloat 2.6s steps(31) infinite alternate;
+  animation-delay:var(--fd,0s)}
+.lnk{font:inherit; font-size:14px; color:var(--ink); background:none; border:0;
+  text-decoration:underline; cursor:pointer; padding:4px 2px}
+.code2{font-size:24px; letter-spacing:.2em; color:var(--mint); padding:4px 0;
+  text-shadow:2px 2px 0 rgba(6,4,14,.85)}
+
+/* =====================================================================
+   CREATION AND SAVES
+   Creation covers the map rather than replacing it, so the world is
+   already drawn and warm behind the first screen.
+   ===================================================================== */
+.create{position:absolute; inset:0; display:none; align-items:center;
+  justify-content:center; padding:18px; background:rgba(10,8,7,.97);
+  pointer-events:auto; overflow-y:auto}
+.create.show{display:flex}
+.cbox{width:100%; max-width:330px}
+.cbox h1{font-size:26px; letter-spacing:.2em; margin-bottom:10px}
+.cbox h2{font-size:17px; letter-spacing:.14em; margin-bottom:14px}
+.lead{font-size:10px; color:var(--muted); text-transform:none; line-height:1.8;
+  margin-bottom:20px}
+.clab{display:block; font-size:9px; color:var(--muted); letter-spacing:.16em;
+  margin:14px 0 5px}
+.cin{width:100%; padding:10px; font:inherit; font-size:14px; letter-spacing:.14em;
+  color:var(--ink); background:var(--panel); border:0; border-radius:2px;
+  box-shadow:var(--bevel)}
+.cin.tall{min-height:64px; font-size:9px; letter-spacing:0; text-transform:none;
+  resize:vertical}
+.chint{font-size:9px; color:var(--line); text-transform:none; line-height:1.7;
+  margin-top:5px}
+.affs{display:grid; grid-template-columns:1fr 1fr; gap:5px}
+.aff{padding:9px 4px; font:inherit; font-size:10px; color:var(--muted);
+  background:var(--panel); border:0; border-radius:2px; box-shadow:var(--bevel);
+  cursor:pointer}
+.aff.on{box-shadow:var(--bevel), inset 0 0 0 2px var(--ink)}
+.cbtn{display:block; width:100%; margin-top:9px; padding:12px;
+  font:inherit; font-size:12px; letter-spacing:.16em; color:var(--ink);
+  background:var(--panel); border:0; border-radius:2px; box-shadow:var(--bevel);
+  cursor:pointer}
+.cbtn.go{color:var(--chipInk,#0c0a16); background:var(--ink)}
+.cbtn.thin{background:none; box-shadow:none; color:var(--line); font-size:9px;
+  text-transform:none; letter-spacing:.02em; padding:8px}
+.cbtn:active{transform:translateY(1px)}
+.cnote{margin-top:12px; padding:8px; font-size:9px; text-transform:none;
+  line-height:1.6; color:#0c0a16; background:#ffc2cd; border-radius:2px}
+.code,.code2{font-size:19px; letter-spacing:.24em; color:#b0ffe1; padding:9px 0}
+.code2{font-size:13px; padding:2px 0}
+/* The one thing a player on a static host has to understand. */
+.warn2{margin:14px 0; padding:10px; font-size:9px; text-transform:none;
+  line-height:1.75; color:var(--ink); background:#2b1a1e; border-radius:2px;
+  box-shadow:inset 0 0 0 1px #5c3a42}
+.warn2 b{color:#ffc2cd}
+.srow{display:flex; gap:5px; align-items:stretch}
+.srow .cin{flex:1}
+.srow .cbtn{width:auto; margin-top:0; padding:10px 14px; font-size:10px}
+.snap{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:10px;
+  border-bottom:1px solid rgba(92,83,72,.25)}
+.snap b{flex:1}
+
+/* =====================================================================
+   ABILITIES, AS THE BATTLE PANEL DRAWS THEM
+   Same classes, same shapes. Showing a Move Set's contents is only
+   worth doing if what you see is recognisably the same object you will
+   be tapping in a fight.
+   ===================================================================== */
+.abpage{display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px; padding:10px 2px 2px; align-content:start}
+.abrow{position:relative; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:6px 6px 6px 26px; overflow:hidden;
+  border:2px solid var(--emo,var(--line));
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8);
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16)}
+/* the depiction floats, so the box has something alive in it */
+.abline{display:flex; align-items:center; justify-content:center; flex:none;
+  animation:abFloat 2.2s steps(26) infinite alternate; animation-delay:var(--fd,0s)}
+@keyframes abFloat{from{transform:translateY(-4px)} to{transform:translateY(4px)}}
+.abline .station{position:relative; flex:none; width:46px; height:46px}
+.abline .station.chg{width:24px; height:24px}
+.abline .station svg{width:100%; height:100%; display:block}
+.abline .link{flex:none; width:6px; height:6px; background:currentColor;
+  box-shadow:1px 1px 0 rgba(6,4,14,.75)}
+.abinfo{display:flex; flex-direction:column; align-items:center; min-width:0}
+.abname{font-size:15px; letter-spacing:.06em; text-align:center; margin-top:2px}
+.abcost{font-size:12px; color:var(--muted); text-transform:none}
+/* shots run down the left edge, in the ability's own colour */
+.shots{position:absolute; left:6px; top:50%; transform:translateY(-50%);
+  display:flex; flex-direction:column; gap:5px}
+.shot{width:10px; height:10px; background:var(--emo,var(--ink));
+  box-shadow:1px 1px 0 rgba(6,4,14,.75)}
+
+/* =====================================================================
+   THE PICKER
+   A window over the menu holding what is NOT worn.
+   ===================================================================== */
+.picker{position:absolute; inset:0; z-index:4; display:flex; flex-direction:column;
+  background:rgba(10,8,7,.96)}
+.phead{display:flex; align-items:center; gap:9px; padding:14px 12px;
+  border-bottom:2px solid var(--panel)}
+.phead b{flex:1; font-size:19px; letter-spacing:.12em; color:#fff;
+  text-shadow:2px 2px 0 rgba(6,4,14,.85)}
+.sorts{display:flex; gap:5px}
+.sortbtn{padding:9px 13px; font:inherit; font-size:13px; letter-spacing:.08em;
+  color:var(--muted); background:var(--panel); border:2px solid var(--line);
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8); cursor:pointer}
+.sortbtn.on{color:var(--chipInk);
+  background:linear-gradient(180deg,#fffdf7,var(--ink) 62%,#bdb6a6);
+  border-color:var(--ink)}
+.pbody{flex:1; overflow-y:auto; padding:14px 12px calc(20px + env(safe-area-inset-bottom,0px))}
+.chgbtn.wide{width:100%; padding:15px; margin-top:10px}
+
+/* the pencil beside the player's name */
+.mbody h3{display:flex; align-items:center; gap:12px}
+.editbtn{flex:none; width:44px; height:44px; padding:0; color:var(--ink);
+  background:var(--panel); border:2px solid var(--line);
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8); cursor:pointer}
+.editbtn .sym{width:22px; height:22px}
+.editbtn:active{transform:translate(2px,2px); box-shadow:var(--bevel)}
+.big{font-size:22px; color:var(--ink)}
+
+/* =====================================================================
+   BAGGAGE — what this ride has got you, so far
+   ===================================================================== */
+.bagbtn{position:absolute; right:12px; bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  padding:13px 20px; font:inherit; font-size:14px; letter-spacing:.16em;
+  color:var(--ink); background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
+  border:3px solid #0b0a08; box-shadow:var(--bevel), 4px 5px 0 rgba(6,4,14,.85);
+  cursor:pointer; opacity:0; pointer-events:none; transition:opacity .15s steps(2)}
+.bagbtn.show{opacity:1; pointer-events:auto}
+.bagbtn:active{transform:translate(2px,2px); box-shadow:var(--bevel)}
+
+.baggage{position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
+  background:rgba(10,8,7,.93);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px)}
+.baggage.show{display:flex}
+.bhead{display:flex; align-items:center; gap:10px; padding:14px 12px;
+  border-bottom:3px solid var(--panel)}
+.bhead b{font-size:22px; letter-spacing:.16em; color:#fff;
+  text-shadow:2px 2px 0 rgba(6,4,14,.85)}
+.bhint{flex:1; font-size:11px; color:var(--rose); text-transform:none}
+.bwrap{flex:1; display:flex; gap:10px; padding:12px; min-height:0}
+/* the grid is the point: one cell per thing, so a full bag LOOKS full */
+.bgrid{flex:1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-auto-rows:88px; gap:8px; align-content:start; overflow-y:auto; min-height:0}
+.bcell{position:relative; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:5px; padding:6px;
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
+  border:2px solid var(--emo,var(--line));
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8)}
+.bcell.empty{border-style:dashed; border-color:#2f2a24; background:rgba(0,0,0,.3);
+  box-shadow:none}
+.bcell .sym{width:30px; height:30px}
+.bname{font-size:10px; text-align:center; line-height:1.25; color:var(--ink)}
+.bx{position:absolute; right:4px; top:3px; font-size:13px; color:var(--mint)}
+/* the trip bar and the purse, down the side */
+.bside{flex:none; width:104px; display:flex; flex-direction:column; gap:10px}
+.bseg{display:flex; flex-direction:column; align-items:center; gap:6px; padding:9px 6px;
+  background:var(--panel); border:2px solid var(--line);
+  box-shadow:var(--bevel), 3px 3px 0 rgba(6,4,14,.8)}
+.bseg small{font-size:9px; color:var(--muted); letter-spacing:.08em; text-align:center}
+.bseg b{font-size:17px; color:var(--mint)}
+.bbar{position:relative; width:26px; height:96px; background:#100e0c;
+  box-shadow:inset 0 0 0 2px var(--line)}
+.bbar i{position:absolute; left:0; right:0; bottom:0; display:block;
+  background:linear-gradient(180deg,#eafff6,var(--mint) 62%,#6fbfa2)}
+.bcrys{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+.bcry{display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px;
+  background:var(--panel); box-shadow:var(--bevel), 2px 2px 0 rgba(6,4,14,.75)}
+.bcry .dot{width:12px; height:12px; box-shadow:2px 2px 0 rgba(6,4,14,.7);
+  animation:gfloat 2.6s steps(31) infinite alternate; animation-delay:var(--fd,0s)}
+.bcry b{font-size:15px; color:var(--ink)}
+.bcry small{font-size:8px; color:var(--muted)}

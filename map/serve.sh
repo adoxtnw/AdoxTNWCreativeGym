@@ -5,8 +5,8 @@
 # serve.py stamps every asset URL with its modification time, and without that your
 # phone will happily keep running a cached copy of a file you just edited — the code
 # is right, it simply never runs, and nothing tells you.
-PORT=8177
-APP="BATTLE SYSTEM"
+PORT=8178
+APP="MAP"
 
 PID=$(lsof -ti :$PORT 2>/dev/null)
 if [ -n "$PID" ]; then

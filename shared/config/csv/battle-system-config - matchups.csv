@@ -1,0 +1,11 @@
+"THE SYNERGY TABLE — the main lever for designing interactions. One row per attack-emotion x layer-emotion pair. '*' is a wildcard; 'NONE' in layer_emotion means the target has no layers. When several rows match, the HIGHEST priority wins, so specific rows beat wildcards. Add a row like  JOY | SADNESS | 20 | 2.0 | 0 | CATHARSIS  and that pairing immediately behaves differently — no code change.",,,,,,,,,,,,
+attack_emotion,layer_emotion,priority,dmg_mult,ec_mult,label,tag_class,sound,rotates_layer,self_ec,status_apply,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,planned,planned,planned,planned,planned
+*,*,0,1,0,OFF TYPE,off,hit,,0,,1,Fallback. Every pair you do not name lands here.
+*,NONE,5,2,0,EXPOSED!,dmg,hit,,0,,1,"No layers left: double damage, no charge."
+ANGER,ANGER,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+SURPRISE,SURPRISE,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+DISGUST,DISGUST,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+JOY,JOY,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+SADNESS,SADNESS,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.
+FEAR,FEAR,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks it.

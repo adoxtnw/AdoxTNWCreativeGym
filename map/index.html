@@ -1,0 +1,119 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Neuro Metro: AVUI — Map</title>
+<link rel="stylesheet" href="styles/map.css">
+
+<!-- The same turbulence the battle system's title art swims in (#logoWave):
+     fractal noise whose frequency drifts over 19s, displacing the image
+     through it. Copied rather than shared — the two apps are siblings and do
+     not reach into each other's files. Applied to the whole map, not one
+     element, so the city itself is what is faintly breathing. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="mapWave" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="7" result="n">
+      <animate attributeName="baseFrequency" dur="19s" repeatCount="indefinite"
+               values="0.008 0.014; 0.013 0.008; 0.008 0.014"/>
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="7"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</defs></svg>
+
+<div class="phone">
+ <div class="screen" id="screen">
+   <canvas id="map"></canvas>
+
+   <div class="hud">
+     <!-- THE ONLY NON-MAP-ANCHORED ELEMENT ON THE MAP. Zoom lives on wheel,
+          pinch and double-tap; the player's name and state are drawn on the
+          canvas beside their marker, where they belong. -->
+     <button class="menubtn hudbtn" id="menuBtn">MENU</button>
+     <div class="menu" id="menu"></div>
+
+     <!-- the only controls that exist while the train is running -->
+     <button class="endbtn hudbtn" id="endRide">END</button>
+     <button class="bagbtn hudbtn" id="bagBtn">BAGGAGE</button>
+     <div class="baggage" id="baggage"></div>
+
+     <!-- GDD 4: where this leg is going and how much of it is bridged -->
+     <div class="routehead" id="routeHead"></div>
+
+     <!-- GDD 5: the Traveler's Dilemma, at every intermediate platform -->
+     <div class="dilemma" id="dilemma"></div>
+
+     <!-- station inspection, and where a destination is chosen -->
+     <div class="peek" id="peek"></div>
+
+     <!-- DEBUG ONLY. The battle system is not connected. -->
+     <div class="encounter" id="encounter"></div>
+
+     <!-- first boot: name, affinities, and the save file that is the only
+          copy of a run that survives a phone clearing its storage -->
+     <div class="create" id="create"></div>
+   </div>
+
+   <!-- ONE file input for the whole app. Hidden; creation and the SAVE tab
+        both click it. A drop target would be useless on a phone. -->
+   <input type="file" id="saveFile" accept="application/json,.json"
+          style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+ </div>
+</div>
+
+<!-- ================= LOAD ORDER =================
+     Every file shares one global scope, so order is the dependency graph — the same
+     convention as BATTLE SYSTEM. GENERATED (rebuild from the shared spreadsheet):
+       data.js  <- ../shared/tools/build_data.py --app MAP
+
+     util    -> bare helpers, no dependencies
+     font    -> the 3x5 map font, no dependencies
+     glyphs  -> the 8x8 ability icons and the station ring, as SVG
+     data    -> EMOTIONS, STATIONS, LINES, SOUNDS, RULES: the network and its palette
+     net     -> everything DERIVED from those two tables (routing, interchanges,
+                label sides). Must follow data.
+     states  -> the station-state registry. Defines only; reads STATIONS at run time
+     gear    -> armor/set passives, and the arithmetic that turns kit into stats
+     world   -> the hour, the day, the weather, and what they do to a station
+     player  -> who is riding, what they carry, and the save
+     route   -> paths across the network, gated by Line Keys
+     audio   -> the synth and the music slot. Reads RULES/SOUNDS at run time
+     travel  -> the travel screen: parallax, track, train
+     elements-> what spawns around the train, and the Emotional Trip bar
+     run     -> the multi-leg trip and the vault it is wagering
+     bridge  -> the 13 contract with combat
+     encounter-> the DEBUG stand-in for a battle. The only file that mentions one
+     vault   -> saves: the file, the code, snapshots, and the seam for cloud
+     peek    -> the station panel
+     menu    -> the pause menu: profile, loadout, inventory, save
+     create  -> first boot: name, affinities, and the save file
+     hud     -> the DOM panels: stats, route header, dilemma, encounter
+     journey -> the ride's state machine, the player marker, the wipes
+     mapview -> camera, rasteriser, input; boots on DOMContentLoaded
+
+     travel and journey call into mapview's rasteriser and mapview calls back into
+     theirs. That is fine here and only here: they are all function DECLARATIONS,
+     which hoist, and none of them runs until the first frame.
+     ============================================== -->
+<script src="src/util.js"></script>
+<script src="src/font.js"></script>
+<script src="src/glyphs.js"></script>
+<script src="data.js"></script>
+<script src="src/net.js"></script>
+<script src="src/states.js"></script>
+<script src="src/gear.js"></script>
+<script src="src/world.js"></script>
+<script src="src/player.js"></script>
+<script src="src/vault.js"></script>
+<script src="src/route.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/travel.js"></script>
+<script src="src/elements.js"></script>
+<script src="src/run.js"></script>
+<script src="src/battle-bridge.js"></script>
+<script src="src/encounter.js"></script>
+<script src="src/peek.js"></script>
+<script src="src/menu.js"></script>
+<script src="src/create.js"></script>
+<script src="src/hud.js"></script>
+<script src="src/journey.js"></script>
+<script src="src/mapview.js"></script>

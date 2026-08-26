@@ -7,7 +7,8 @@
 
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
-  list: ["layers", "pool", "loadouts", "emotions"]
+  list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
+        "day", "weather", "keys"]
 };
 
 const DATA = {
@@ -298,7 +299,24 @@ playerRingBreathe,2.2,Player ring breathing amplitude.,,,
 playerCanvasW,120,Player ring canvas width in logical pixels (wide and short).,,,
 playerCanvasH,32,Player ring canvas height in logical pixels.,,,
 playerRingCy,300,"Player: circle centre Y, pushed far below the strip so only the flat top of the arc shows.",,,
-crusherSteps,12,"Audio bit-crusher quantisation. Low = Atari harsh, high = SNES-clean.",,,`,
+crusherSteps,12,"Audio bit-crusher quantisation. Low = Atari harsh, high = SNES-clean.",,,
+travelRollSecs,3,Legacy fixed roll interval. rollMinSecs/rollMaxSecs supersede it.,,,
+travelTarget,10,Legacy fixed segment target. segBase x diltransience supersedes it.,,,
+travelTapR,15,"FLOOR for how near a tap must land on a travel element, in art pixels. The real reach is the element's own size scaled up; this is the minimum.",,,
+segBase,5,"Track Segments to bridge a link, before diltransience and world state.",,,
+rollMinSecs,1,Fastest the track event roll can come round (navigation GDD 4: every 1-3s).,,,
+rollMaxSecs,3,Slowest the track event roll can come round. Enemy density moves it.,,,
+aggroLockSecs,5,Default countdown before an aggro enemy forces the encounter.,,,
+exitKeepPct,0.6,Crystals kept when EXITING at an intermediate platform.,,,
+defeatKeepPct,0.1,Crystals kept on defeat.,,,
+itemLossOnExit,0.4,Chance each unbanked item is lost when exiting early.,,,
+itemLossOnDefeat,0.9,Chance each unbanked item is lost on defeat.,,,
+fogPeekHide,1.6,Fog at or above this hides a station's details from the map.,,,
+startLineKeys,L1|L2,Line Keys the player begins with.,,,
+affinitySlots,2,How many Emotional Affinities a player picks at creation.,,,
+armorSlots,1,Emotional Armor pieces worn at once.,,,
+startArmor,ARM_SCARS,The armor a new profile begins in.,,,
+startSets,LO_ANGER|LO_SADNESS|LO_JOY,The Move Sets a new profile begins with.,,,`,
 
 /* --- sounds ---
    synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.  */
@@ -330,7 +348,25 @@ regrow,triangle,120,520,300,0.16,0.4,The broken layer regrows at the back.
 clash,noise,240,240,1500,0.4,0.65,Death: the chevrons meet.
 speak,square,620,540,42,0.09,0.12,One letter of dialogue appearing.
 win,square,440,1320,620,0.24,0.55,Victory.
-lose,sawtooth,320,50,950,0.28,0.6,Defeat.`,
+lose,sawtooth,320,50,950,0.28,0.6,Defeat.
+map_select,square,760,1180,70,0.3,0.25,MAP: an adjacent station is chosen.
+map_depart,sawtooth,180,900,620,0.3,0.5,MAP: the wipe opens and the train pulls away.
+map_clack,square,210,150,34,0.13,0.18,MAP: one rail joint passing under the train.
+map_announce,triangle,520,1040,300,0.26,0.4,MAP: 'Propera parada' over the carriage speaker.
+map_flash,noise,300,2600,700,0.34,0.55,"MAP: the white flood, the train leaving the frame."
+map_arrive,square,660,1980,540,0.26,0.45,MAP: the station banner lands.
+map_return,sawtooth,1300,260,560,0.24,0.42,MAP: the wipe closes back onto the map.
+map_step,triangle,900,1350,90,0.2,0.22,MAP: the player marker moving one station.
+map_pick,square,1180,1760,70,0.26,0.2,MAP: a Track Segment is grabbed.
+map_collect,square,880,2200,150,0.28,0.35,MAP: it lands in the Emotional Trip bar.
+map_entity,noise,520,240,180,0.28,0.45,MAP: an Emotional Entity is prodded.
+ui_tap,square,900,1240,52,0.22,0.14,MAP: a button.
+ui_open,square,520,1180,120,0.24,0.28,MAP: a panel comes up.
+ui_close,square,1180,520,110,0.2,0.22,MAP: a panel goes away.
+ui_page,square,760,1010,60,0.18,0.16,MAP: moving between tabs.
+ui_equip,square,640,1560,170,0.26,0.32,MAP: something is put on.
+ui_deny,sawtooth,340,180,150,0.24,0.2,"MAP: refused - not owned, no route, no key."
+ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
 
 /* --- status_effects ---
    one row per status. Abilities apply these by id via status_apply.
@@ -379,13 +415,13 @@ sun_dusk,SUN,19,24,"sunday dusk, and monday already breathing on it",2,1,`,
    one Loadout per emotion. Slots are positional and a blank slot is a real
    empty slot in the panel. A Loadout may hold any ability whose emotion set
    includes its own emotion (see abilities.emotions).  */
-loadouts: `id,emotion,name,slot1,slot2,slot3,slot4,enabled,notes
-LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,
-LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,
-LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,,,1,
-LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,
-LO_SURPRISE,SURPRISE,Surprise,,,,,1,No Surprise abilities exist yet.
-LO_FEAR,FEAR,Fear,,,,,1,No Fear abilities exist yet.`,
+loadouts: `id,emotion,name,slot1,slot2,slot3,slot4,tier,ec_mod,passive,cost,trade_in,enabled,notes
+LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,0,,,,1,
+LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
+LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,,,1,0,,,,1,
+LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
+LO_SURPRISE,SURPRISE,Surprise,,,,,1,0,,,,1,No Surprise abilities exist yet.
+LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.`,
 
 /* --- prompts ---
    the cue above the attack line; one is drawn at random each turn.  */
