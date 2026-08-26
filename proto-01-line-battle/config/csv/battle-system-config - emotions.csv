@@ -1,0 +1,9 @@
+One row per emotional type. 'token' is the CSS palette variable name; 'hex' drives every colour in the UI for this emotion; 'bg_hex' tints the battle backdrop when an enemy of this type is fought.,,,,,,,,,,
+id,name,token,hex,bg_hex,short,icon,sfx,description,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,planned,LIVE,LIVE,planned,planned,planned
+ANGER,Anger,anger,#e53859,#2a0810,ANG,BOLT,hit_anger,"Hot, direct, aggressive.",1,
+SURPRISE,Surprise,surprise,#724082,#170a1b,SUR,BURST,hit_surprise,"Sudden, disruptive, disorienting.",1,
+DISGUST,Disgust,disgust,#56a36a,#0c1f13,DIS,ROT,hit_disgust,"Rejecting, corrosive, contemptuous.",1,
+JOY,Joy,joy,#fcc336,#2a1f06,JOY,SPARK,hit_joy,"Bright, volatile, energising.",1,
+SADNESS,Sadness,sadness,#3d66c1,#0a1229,SAD,DROP,hit_sadness,"Heavy, draining, persistent.",1,
+FEAR,Fear,fear,#929fa5,#1a1e20,FEA,EYE,hit_fear,"Cold, freezing, evasive.",1,

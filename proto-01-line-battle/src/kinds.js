@@ -65,8 +65,14 @@ Kinds.define("DAMAGE", {
     }
 
     const lay = target.layers[0] || null;
+    const resisted = !!(lay && ab.emotion && lay.e === ab.emotion);
     const m = matchup(lay ? lay.e : null, ab.emotion);
-    const dealt = Math.min(Math.round(ab.power * m.dmg), target.ms);
+    /* Rolled HERE and never in project(): the build-phase preview has to stay
+       deterministic, or it would promise a number the game then contradicts. */
+    const odds = (ab.crit_chance === "" || ab.crit_chance == null ? RULES.critChance : ab.crit_chance)
+                 + critBonus(actor);
+    const crit = Math.random() < odds;
+    const dealt = Math.min(Math.round(ab.power * m.dmg * (crit ? RULES.critMult : 1)), target.ms);
     const gain = ecFrom(ab, dealt, m);
     target.ms -= dealt; target.ec += gain;
     queueDelta(target, "MS", -dealt);          // the bar moves at settlement,
@@ -75,13 +81,23 @@ Kinds.define("DAMAGE", {
     /* No damage number and no matchup label: the accumulating MS/EC tags carry
        that information now, and the pair of them was too much to read at once.
        The matchup still speaks through its sound. */
-    sfx(m.sound);
+    if(resisted) resistTag(lay.e);
+    else {
+      AbilityFx.play("hit", {ab, actor, target, matchup:m, crit});
+      /* A critical earns whoever landed it one extra slot on their next line, and
+         the whole beat is AWAITED — the tag holds, the screen flashes, the slot
+         flies into the line, and only then does the next station fire. */
+      if(crit) await criticalSequence(actor, target, ab.emotion);
+    }
     checkDialogue();
     await Hooks.emit("damage:dealt", {attacker:actor, defender:target, ability:ab, amount:dealt, matchup:m});
     await impact(onEnemy);
 
     if(target.ms <= 0){ await settleAll(); await clashSequence(target === S.player); return; }
-    if(ab.hits_layer) await breakLayer(target);
+    /* A layer of the SAME emotion shrugs the hit off: it still costs stamina, but
+       the layer survives. Tested on the emotions directly rather than through the
+       matchup label, because that is the rule as stated — like does not break like. */
+    if(ab.hits_layer && !resisted) await breakLayer(target);
   }
 });
 
@@ -90,6 +106,7 @@ Kinds.define("SHIELD", {
   project({A, ab}){ A.shield += ab.power; },
   async run({actor, ab}){
     actor.shield += ab.power;
+    AbilityFx.play("hit", {ab, actor, target:actor});
     bigTag("SHIELD UP", "block"); sfx("block");
     renderStats(); await sleep(380);          // shields are not a bar value
   }
@@ -106,6 +123,7 @@ Kinds.define("CHARGE", {
     actor.ms -= burn; actor.ec += ab.power;
     queueDelta(actor, "EC", ab.power);
     if(burn > 0) queueDelta(actor, "MS", -burn);
+    AbilityFx.play("hit", {ab, actor, target:actor});
     sfx("absorb");
     checkDialogue();
     await sleep(420);
@@ -115,11 +133,16 @@ Kinds.define("CHARGE", {
 /* ---------- SELFHARM: forced into the line by Overload ---------- */
 Kinds.define("SELFHARM", {
   project({A, ab}){ A.ms -= Math.min(ab.power, A.ms); },
-  async run({actor, ab, onEnemy}){
+  async run({actor, ab, onEnemy, stationEl}){
+    /* It starts as an attack — the symbol goes for the opponent and turns back. */
+    const away = onEnemy ? $("pstrip") : document.querySelector(".sprwrap");
+    const home = onEnemy ? document.querySelector(".sprwrap") : $("pstrip");
+    if(stationEl) await boomerangStrike(stationEl, away, home, emoHex(ab.emotion));
     const dealt = Math.min(ab.power, actor.ms);
     actor.ms -= dealt;
     queueDelta(actor, "MS", -dealt);
-    bigTag("SELF HARM", "off"); sfx("hit");
+    AbilityFx.play("hit", {ab, actor, target:actor});
+    unitTag(actor, "SELF HARM", emoHex(ab.emotion)); sfx("hit");
     await impact(!onEnemy);
     if(actor.ms <= 0){ await settleAll(); await clashSequence(actor === S.player); }
   }
@@ -132,7 +155,8 @@ Kinds.define("FEED", {
     const healed = Math.min(ab.power, target.maxMs - target.ms);
     target.ms += healed;
     queueDelta(target, "MS", healed);
-    bigTag("FED THE ENEMY", "off"); sfx("regrow");
+    AbilityFx.play("hit", {ab, actor:target, target});
+    unitTag(target, "HEALED", "#b0ffe1"); sfx("regrow");
     await sleep(520);
   }
 });
@@ -147,6 +171,7 @@ Kinds.define("ADDLAYER", {
     for(let i = 0; i < n; i++)
       actor.layers.push({e: ab.emotion, pos: actor.layers.length, flash: 0, temp: true});
     actor.layers.forEach((l, i) => { l.pos = i; });
+    AbilityFx.play("hit", {ab, actor, target:actor});
     bigTag("+" + n + " LAYER", "block"); sfx("regrow");
     renderStats(); await sleep(460);
   }
@@ -157,10 +182,11 @@ Kinds.define("DEBUFF", {
   /* No ms/ec movement, so the AI values it at zero — deliberate for now. Give it
      a heuristic here if the enemy should ever learn to use debuffs well. */
   project(){},
-  async run({target, ab, onEnemy}){
-    const st = applyStatus(target, ab.status_apply, ab.status_duration);
+  async run({actor, target, ab, onEnemy}){
+    const st = applyStatus(target, ab.status_apply, ab.status_duration, ab.name);
     if(!st){ return; }
-    bigTag(st.name.toUpperCase(), "off"); sfx("breaklayer");
-    renderStats(); await sleep(520);
+    AbilityFx.play("apply", {ab, actor, target, st});
+    renderStats();
+    await sleep(RULES.statusFxMs);
   }
 });

@@ -10,26 +10,65 @@ async function applyAbility(actor,target,ab,onEnemy,stationEl){
   await Kinds.get(ab.kind).run({actor,target,ab,onEnemy,stationEl});
 }
 
+/* Flash a whole line white, to say "this one is about to run". */
+async function alertLine(lane){
+  for(let i=0;i<RULES.lineAlertFlashes;i++){
+    lane.classList.add("alert");  await sleep(RULES.lineAlertMs);
+    lane.classList.remove("alert"); await sleep(RULES.lineAlertMs);
+  }
+}
+/* Every station fires dead centre of the lane. The whole line is parked off to
+   one side first and then travels across, so the motion always reads the same way
+   — yours enters from the left and moves right, the enemy's mirrors it — instead
+   of the track jumping back and forth to whichever station happens to be next. */
+/* The station's centre, in LANE coordinates, is the track's own offset inside the
+   lane plus the station's offset inside the track. Leaving out the track offset was
+   why nothing landed in the middle: `.lane` centres its track, so the track starts
+   ~100px in, and every station was off by exactly that much. */
+function stationCentre(track,st){ return track.offsetLeft + st.offsetLeft + st.offsetWidth/2; }
 function centerStation(lane,track,st){
-  const tx=lane.clientWidth/2-(st.offsetLeft+st.offsetWidth/2);
+  const tx=lane.clientWidth/2 - stationCentre(track,st);
   track.style.transform=`translateX(${Math.round(tx)}px)`;
 }
-/* Charging is not free, but it no longer interrupts. Holding on a charge segment
-   used to fire the opponent's next station out of turn, which read as chaos — you
-   were punished by an event you could not see coming. Instead, every charge
-   segment a unit lays down grants the OPPONENT one temporary slot on their line
-   next turn (see grantBonusSlots). The cost is the same shape — charging gives
-   the other side more room to act — but it is visible before it matters. */
+/* Park the line clear of the centre, on the side it will travel FROM. */
+function parkLine(unit,lane,track){
+  const first=track.querySelector(".station[data-idx]");
+  const w=lane.clientWidth;
+  const base=first ? w/2 - stationCentre(track,first) : 0;
+  const off=(unit.dir>0 ? -1 : 1) * (w*0.5 + 40);
+  track.style.transition="none";
+  track.style.transform=`translateX(${Math.round(base+off)}px)`;
+  void track.offsetWidth;                       // commit before the travel begins
+  track.style.transition="";
+}
+/* Charging costs only TIME now. It used to fire the opponent's next station out of
+   turn (chaos), and then to buy the opponent a temporary slot (legible, but it made
+   every heavy attack a gift). Both are retired: a charge segment simply occupies a
+   slot and delays what follows. Extra slots still exist, but they are earned by
+   criticals or forced by Overload — see `unit.extra`. */
 async function resolveLine(actor,target,laneId,trackId,onEnemy){
   const lane=$(laneId),track=$(trackId);
+  if(actor.stunned > 0){
+    /* No tag here. Breaking the last layer already threw the big colour-coded
+       STUNNED, and this fires in the same round — two tags for one event. The
+       sound and the skipped line carry it. */
+    sfx("block");
+    await sleep(700);
+    return;                                   // it reels; the line simply does not run
+  }
   if(slotsUsed(actor)===0){
     actor.ec+=RULES.restEc; actor.shownEc=actor.ec; sfx("regrow"); renderStats(); await sleep(800); return;
   }
   const cost=lineCost(actor);
   actor.ec-=cost; actor.shownEc=actor.ec; renderStats(); sfx("depart");
   await Hooks.emit("line:depart",{unit:actor,cost});
-  await sleep(560);
-  lane.classList.add("zoom"); await sleep(260);
+  await sleep(360);
+  /* Three white flashes on the line about to run, so the eye is already there
+     when the first station fires. */
+  await alertLine(lane);
+  lane.classList.add("zoom");
+  parkLine(actor,lane,track);                   // start off-centre, on the near side
+  await sleep(180);
   let chargeRun=0;
   while(actor.cursor < actor.line.length){
     if(S.player.ms<=0||S.enemy.ms<=0) break;
@@ -39,7 +78,12 @@ async function resolveLine(actor,target,laneId,trackId,onEnemy){
     const st=track.querySelector(`.station[data-idx="${i}"]`);
     if(st && !st.classList.contains("spent")) centerStation(lane,track,st);
     else { actor.cursor++; continue; }           // already spent by an interrupt
-    await sleep(entry.charge?160:300);
+    const stepT0 = performance.now();
+    /* WAIT for the slide to finish. The station has to actually BE in the middle
+       before it lights up and throws its symbol — firing 40ms after asking the
+       track to move meant the symbol left from wherever the line happened to be
+       mid-travel, which is why it appeared to come from behind the bar. */
+    await sleep(RULES.lineTravelMs);
     st.classList.add("active");
     await Hooks.emit("station:fire",{unit:actor,entry,index:i});
 
@@ -53,15 +97,32 @@ async function resolveLine(actor,target,laneId,trackId,onEnemy){
       continue;
     }
 
-    sfx("arrive"); await sleep(150);
+    sfx("arrive"); await sleep(RULES.lineFlashMs);
     await applyAbility(actor,target,entry.ab,onEnemy,st);
-    chargeRun=0; await sleep(180);
+    chargeRun=0;
     st.classList.remove("active"); st.classList.add("spent");
     actor.cursor++;
-    await sleep(110);
+    /* One station = attackStepMs, whatever the ability spent on its own
+       animations. Padding to a deadline rather than adding fixed sleeps keeps
+       the rhythm even across abilities that do very different amounts of work. */
+    /* A station that hands out a status holds far longer, so the player can read
+       what just happened; everything else keeps the brisk attack rhythm. */
+    const budget = entry.ab.status_apply ? RULES.statusStepMs : RULES.attackStepMs;
+    const spentMs = performance.now() - stepT0;
+    if(spentMs < budget) await sleep(budget - spentMs);
   }
-  await sleep(200); lane.classList.remove("zoom");
-  track.style.transform="translateX(0)"; await sleep(250);
+  /* The line RUNS OUT the far side instead of snapping home. Cutting straight
+     back to zero was the jump between the last station and the turn changing
+     hands — the motion simply stopped mid-travel. */
+  const outW = lane.clientWidth;
+  track.style.transform = `translateX(${Math.round(actor.dir>0 ? outW : -outW)}px)`;
+  await sleep(300);
+  lane.classList.remove("zoom");
+  track.style.transition="none";                 // reset unseen, once it is off-screen
+  track.style.transform="translateX(0)";
+  void track.offsetWidth;
+  track.style.transition="";
+  await sleep(200);
 }
 
 async function clashSequence(playerDied){
@@ -167,7 +228,7 @@ async function runSelfHits(u, onEnemy){
   for(let i = 0; i < n; i++){
     if(u.ms <= 0) return;
     const ab = pool[Math.floor(Math.random() * pool.length)];
-    bigTag("SELF HARM", "off");
+    unitTag(u, "SELF HARM", emoHex("SADNESS"));     // over the sufferer, so two are two
     await applyAbility(u, u, ab, !onEnemy, null);   // actor and target are the same unit
     await settle(u);
   }
@@ -190,9 +251,8 @@ async function depart(){
   if(S.phase!=="BUILD"||S.busy)return;
   S.busy=true; S.phase="RESOLVE";
   await Hooks.emit("round:start",{round:S.round});
-  $("abilPanel").classList.remove("open");      // close the panel while the line resolves
-  $("emoBtn").classList.add("rest");
-  document.querySelector(".btnrow").classList.add("hide");
+  closePanel();                                 // no building while the line resolves
+  $("screen").classList.add("resolving");
   renderLines(); renderStats();
   await resolveLine(S.player,S.enemy,"pLane","pTrack",true);
   await settleAll();                       // the enemy's bar takes the hits now
@@ -210,23 +270,36 @@ async function depart(){
   await regrowLayers(S.player); await regrowLayers(S.enemy);
   tickCooldowns(S.player); tickCooldowns(S.enemy);
   tickStatuses(S.player);  tickStatuses(S.enemy);
+  /* After regrowLayers has already been skipped for this turn. */
+  if(S.player.stunned>0) S.player.stunned--;
+  if(S.enemy.stunned>0)  S.enemy.stunned--;
   shuffleLayers(S.player); shuffleLayers(S.enemy);
   S.round++;
-  /* Each side's charging buys the OTHER side room next turn. Recomputed from
-     scratch every round, so a grant lasts exactly one turn. */
-  const pChg=chargeCount(S.player), eChg=chargeCount(S.enemy);
-  grantBonusSlots(S.enemy,  pChg);
-  grantBonusSlots(S.player, eChg);
+  /* A slot earned by a critical is good for exactly one line. It is granted the
+     moment the crit lands (so it can be seen flying in), so the sweep keeps a
+     FRESH one — it has not been built with yet — and clears anything older. */
+  [S.player, S.enemy].forEach(u => {
+    if(u.critFresh) u.critFresh = false;      // survives into the line about to be built
+    else dropExtra(u, "CRIT");                // already had its line
+  });
   clearLine(S.player);
   const forced=applyOverload(S.player);
   if(forced){ bigTag("LINE INVADED","dmg"); sfx("breaklayer"); }
   buildEnemyLine();
   S.phase="BUILD"; S.busy=false;
-  document.querySelector(".btnrow").classList.remove("hide");
+  $("screen").classList.remove("resolving");
+  newPrompt();
   render();
   await announceBonusSlots();      // show where the temporary slots came from
 }
-$("departBtn").addEventListener("click",depart);
+/* DEPART is a button of its own again, sitting above the line and appearing only
+   once there is something to send. The terminus arrow is back to being purely a
+   direction indicator. */
+$("departBtn").addEventListener("click",()=>{
+  if(S.phase!=="BUILD"||S.busy) return;
+  $("departBtn").classList.remove("show");     // gone the moment it is used
+  depart();
+});
 /* Tapping any segment removes the whole ability, charge segments included.
    Drag-reordering is off while charge groups exist — moving one would have to
    drag its charges with it. Worth restoring once the grouping is settled.  */
@@ -244,8 +317,11 @@ $("pTrack").addEventListener("click",e=>{
   for(let i=start;i<=end;i++) S.player.line[i]=null;
   sfx("remove"); render();
 });
-$("emoBtn").addEventListener("click",()=>{
-  const open=$("abilPanel").classList.toggle("open");
-  $("emoBtn").classList.toggle("rest",!open);
-  sfx("tap");
+/* The line itself is the way in: tap any empty stretch of it to open Emotions.
+   Tapping a station still removes it, and tapping the terminus departs, so this
+   only fires when neither of those was hit. */
+$("pLane").addEventListener("click",e=>{
+  if(S.phase!=="BUILD"||S.busy) return;
+  if(e.target.closest(".station[data-idx]")) return;
+  togglePanel();
 });

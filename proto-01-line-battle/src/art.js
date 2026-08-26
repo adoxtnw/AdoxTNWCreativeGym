@@ -39,3 +39,16 @@ function chargeSVG(){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 8 8" shape-rendering="crispEdges"><g fill="#6e1219">${r}</g></svg>`;
   document.documentElement.style.setProperty("--warn",`url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
 })();
+
+
+/* A chunky, stair-stepped arrow. A CSS border triangle has a smooth diagonal,
+   which is the wrong medium here — this is drawn on the same 8x8 pixel grid the
+   station glyphs use, so its edge steps like everything else. */
+const ARROW_R=["xx......","xxxx....","xxxxxx..","xxxxxxxx",
+               "xxxxxxxx","xxxxxx..","xxxx....","xx......"];
+function arrowSVG(pointRight){
+  const g=pointRight ? ARROW_R : ARROW_R.map(r=>r.split("").reverse().join(""));
+  let out="";
+  g.forEach((row,y)=>row.split("").forEach((c,x)=>{ if(c==="x") out+=R(x,y); }));
+  return `<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${out}</svg>`;
+}

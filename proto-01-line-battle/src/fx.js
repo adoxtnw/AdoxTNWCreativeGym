@@ -15,7 +15,19 @@ function bigTag(txt,cls){
 async function flyStrike(stationEl,targetEl,col){
   if(!stationEl||!targetEl) return;
   const sr=$("screen").getBoundingClientRect();
-  const a=stationEl.getBoundingClientRect(), b=targetEl.getBoundingClientRect();
+  let a=stationEl.getBoundingClientRect();
+  /* Launch from the MIDDLE OF THE LINE, not from wherever the station's rect
+     happens to be. The station is centred by construction before it fires, but its
+     rect depends on the slide transition having visually settled — read a frame
+     early, or with transitions suppressed, and the symbol flew in from off the
+     side of the bar. The lane's centre is the same point and is always true. */
+  const lane=stationEl.closest(".lane");
+  if(lane){
+    const lr=lane.getBoundingClientRect();
+    a={left:lr.left+lr.width/2-a.width/2, top:lr.top+lr.height/2-a.height/2,
+       width:a.width, height:a.height};
+  }
+  const b=targetEl.getBoundingClientRect();
   const el=document.createElement("div");
   el.className="flyer"; el.innerHTML=stationEl.innerHTML;
   el.style.cssText=`left:${a.left-sr.left}px;top:${a.top-sr.top}px;width:${a.width}px;height:${a.height}px;color:${col}`;
@@ -73,132 +85,56 @@ function zoneBox(el){
   return { x, y, w: el.offsetWidth, h: el.offsetHeight };
 }
 
-/* ONE tag per unit per kind — not one per hit. A five-station line used to post
-   five pills and the eye had nowhere to rest; now the MS tag and the EC tag each
-   sit still and COUNT UP, growing and breathing harder as the running total
-   approaches that unit's whole stamina bar. Scale and breathing rate are driven
-   from |total| / maxMs, so the same hit reads as bigger on a frailer fighter. */
-function tagStyle(el, u, total){
-  const f = Math.min(1, Math.abs(total) / Math.max(1, u.maxMs));
-  let sc = 1 + RULES.tagGrowth * f;
-  /* A tag holding a whole stamina bar would otherwise be wider than the phone.
-     offsetWidth is the untransformed layout width, so this reads the natural
-     size and caps the scale rather than fighting it. */
-  const maxW = $("screen").offsetWidth * 0.94, natural = el.offsetWidth;
-  if(natural > 0 && natural * sc > maxW) sc = maxW / natural;
-  el.style.setProperty("--sc", sc.toFixed(3));
-  el.style.setProperty("--bd",
-    Math.round(RULES.tagBreathSlowMs + (RULES.tagBreathFastMs - RULES.tagBreathSlowMs) * f) + "ms");
-  el.style.setProperty("--gl", (0.5 + 2.2 * f).toFixed(2));
-}
+/* ================= FLOATING NUMBERS =================
+   Damage and charge are applied THE MOMENT THEY LAND — no accumulating tag, no
+   ball of light, no deferred settlement. What is left is the readout: a bare
+   number thrown up beside the fighter, beat-'em-up style.
 
-function queueDelta(u, kind, amount){
+   MS goes up the RIGHT of the layers, EC up the LEFT, so the two never queue for
+   the same space and you learn where to look. Size scales with the hit as a
+   fraction of that fighter's whole stamina bar, so a big hit simply looks big.
+   Overlap is fine and expected. */
+function floatNum(u, kind, amount){
   if(!amount) return;
-  let item = u.pending.find(i => i.kind === kind);
-
-  if(item){                                   // fold into the tag already standing
-    item.amount += amount;
-    if(!item.amount){ item.el.remove(); u.pending.splice(u.pending.indexOf(item),1); return; }
-    item.el.textContent = (item.amount>0?"+":"") + item.amount + " " + kind;
-    tagStyle(item.el, u, item.amount);
-    item.el.classList.remove("bump"); void item.el.offsetWidth; item.el.classList.add("bump");
-    return;
-  }
-
-  /* Two tags at most, so they get fixed places rather than a scatter: stamina
-     above the fighter, charge below it. */
   const zone = zoneBox(u===S.player ? $("pstrip") : document.querySelector(".sprwrap"));
   const el = document.createElement("div");
-  el.className = `ind pxr ${kind==="EC" ? "ec" : (u===S.player ? "ms-p" : "ms-e")}`;
-  el.textContent = (amount>0?"+":"") + amount + " " + kind;
-  const cx = $("screen").offsetWidth / 2;
-  const cy = zone.y + zone.h * (kind === "MS" ? 0.14 : 0.86);   // frame the fighter, not bury it
-  el.style.left = cx + "px";
-  el.style.top  = cy + "px";
+  el.className = `fnum ${kind==="EC" ? "ec" : (u===S.player ? "ms-p" : "ms-e")}`;
+  el.textContent = (amount>0 ? "+" : "\u2212") + Math.abs(amount);
+
+  const f = Math.min(1, Math.abs(amount) / Math.max(1, u.maxMs));
+  el.style.setProperty("--fs", (RULES.fnumMinPx + (RULES.fnumMaxPx - RULES.fnumMinPx) * f).toFixed(1) + "px");
+  el.style.setProperty("--rise", (RULES.fnumRisePx + Math.round(f * 26)) + "px");
+
+  /* Bands measured from the SCREEN, not from the zone. The enemy's zone is its
+     186px sprite, but the player's is the full-width layer strip — so "just outside
+     the zone" threw every player number off the edge of the phone entirely. */
+  const right = kind !== "EC";
+  const W = $("screen").offsetWidth;
+  const band = right ? [0.70, 0.95] : [0.05, 0.30];
+  el.style.left = Math.round(W * (band[0] + Math.random() * (band[1] - band[0]))) + "px";
+  el.style.top  = Math.round(zone.y + zone.h * (0.18 + Math.random() * 0.6)) + "px";
+  el.style.setProperty("--drift", Math.round(Math.random()*18 - 9) + "px");
+  el.style.setProperty("--in",   RULES.fnumInMs   + "ms");
+  el.style.setProperty("--hold", (RULES.fnumHoldMs + RULES.fnumLingerMs) + "ms");
+  el.style.setProperty("--out",  RULES.fnumOutMs  + "ms");
+
   $("screen").appendChild(el);
-  tagStyle(el, u, amount);          // after appending: offsetWidth needs layout
-  u.pending.push({kind, amount, el, x:cx, y:cy});
+  setTimeout(() => el.remove(),
+    RULES.fnumInMs + RULES.fnumHoldMs + RULES.fnumLingerMs + RULES.fnumOutMs + 120);
 }
 
-
-function crash(cx, cy, kind, u){
-  const cols = kind==="EC" ? Object.values(EMOTIONS).map(e=>e.hex) : [ACCENT(u), "#ffffff"];
-  for(let i=0;i<14;i++){
-    const p=document.createElement("div");
-    p.className="crash";
-    const sz=2+Math.floor(Math.random()*3)*2;
-    p.style.cssText=`left:${cx}px;top:${cy}px;width:${sz}px;height:${sz}px;`+
-                    `background:${cols[i%cols.length]}`;
-    $("screen").appendChild(p);
-    const a=Math.random()*Math.PI*2, sp=18+Math.random()*46;
-    p.animate([{transform:"translate(-50%,-50%) scale(1)",opacity:1},
-               {transform:`translate(calc(-50% + ${Math.cos(a)*sp}px), calc(-50% + ${Math.sin(a)*sp}px)) scale(.3)`,opacity:0}],
-              {duration:420+Math.random()*260, easing:"cubic-bezier(.1,.8,.3,1)", fill:"forwards"});
-    setTimeout(()=>p.remove(), 760);
-  }
+/* A hit lands: the ledger already moved, so this is purely the reaction. */
+function hitFeedback(u, kind, amount){
+  floatNum(u, kind, amount);
+  u.shownMs = u.ms; u.shownEc = u.ec;      // the bar keeps no secrets any more
+  sfx(amount < 0 ? "hit" : "absorb");
+  gaugeHurt(u === S.enemy);
+  renderStats();
 }
 
-/* Every indicator turns to light at the same moment — then they stream into
-   the bar one at a time so each change can be read. */
-async function morphAll(u){
-  if(!u.pending.length) return;
-  for(const item of u.pending){
-    item.el.style.animation="none";
-    item.el.animate([{transform:"translate(-50%,-50%) scale(1)", borderRadius:"0"},
-                     {transform:"translate(-50%,-50%) scale(.34)", borderRadius:"50%", opacity:.35}],
-                    {duration:190, easing:"steps(4)", fill:"forwards"});
-    const ball=document.createElement("div");
-    ball.className="ball";
-    ball.style.cssText=`left:${item.x}px;top:${item.y}px;`+
-                       `color:${item.kind==="EC"?"#fcc336":ACCENT(u)}`;
-    $("screen").appendChild(ball);
-    item.ball=ball;
-  }
-  sfx("absorb");
-  await sleep(230);
-  u.pending.forEach(i=>i.el.remove());
-}
-
-/* one ball arcs into the bar */
-async function flyDelta(u, item){
-  /* layout box again -- the gauge may be mid-shake from the previous hit, and
-     flights now overlap the tween, so a client rect could aim at a jittered target */
-  const gauge=zoneBox($(u===S.player ? "pGauge" : "eGauge"));
-  const x0=item.x, y0=item.y;
-  const x1=gauge.x+gauge.w*(0.3+Math.random()*0.4);
-  const y1=gauge.y+gauge.h/2;
-  const ball=item.ball;
-  const bow=Math.abs(y1-y0)*0.45 + 30;              // arc, rather than a straight line
-  await waitAnim(ball.animate([
-    {transform:"translate(-50%,-50%) scale(.6)"},
-    {transform:`translate(calc(-50% + ${(x1-x0)*0.5}px), calc(-50% + ${(y1-y0)*0.5-bow}px)) scale(1.25)`, offset:.5},
-    {transform:`translate(calc(-50% + ${x1-x0}px), calc(-50% + ${y1-y0}px)) scale(.85)`}
-  ],{duration:RULES.ballFlyMs, easing:"cubic-bezier(.35,0,.7,1)", fill:"forwards"}), RULES.ballFlyMs);
-  ball.remove();
-  crash(x1, y1, item.kind, u);
-}
-
-/* walk every queued hit onto the bar, one at a time */
-async function settle(u){
-  if(!u.pending.length){ u.shownMs=u.ms; u.shownEc=u.ec; renderStats(); return; }
-  await morphAll(u);
-  while(u.pending.length){
-    const item=u.pending.shift();
-    await flyDelta(u, item);
-    if(item.kind==="MS") tweenShown(u,"Ms",Math.max(0,Math.min(u.maxMs,u.shownMs+item.amount)));
-    else                 tweenShown(u,"Ec",Math.max(0,u.shownEc+item.amount));
-    sfx(item.amount<0 ? "hit" : "absorb");
-    gaugeHurt(u===S.enemy);
-    /* The bar gets its full second, but the next ball sets off during the tail
-       of it — so each bar change still reads as a second without the flights
-       stacking on top and doubling the wait. */
-    await sleep(Math.max(0, RULES.barTweenMs - RULES.ballFlyMs));
-    renderStats();
-    await checkOverload(u);
-    await sleep(RULES.settleStepMs);
-  }
-  u.shownMs=u.ms; u.shownEc=u.ec; renderStats();   // snap, in case of rounding
-}
+/* Kept so callers read the same, but nothing is deferred now. */
+function queueDelta(u, kind, amount){ hitFeedback(u, kind, amount); }
+async function settle(u){ u.shownMs=u.ms; u.shownEc=u.ec; renderStats(); await checkOverload(u); }
 async function settleAll(){ await settle(S.enemy); await settle(S.player); }
 
 /* ---- OVERLOAD: charge past the ceiling, and the container starts to fail ---- */
@@ -221,11 +157,11 @@ async function checkOverload(u){
 }
 
 async function impact(onEnemy){
-  frozen=true; $("flash").classList.add("on"); await sleep(95);
+  frozen=true; $("flash").classList.add("on"); await sleep(RULES.impactFlashMs);
   frozen=false; $("flash").classList.remove("on");
   const el=onEnemy?$("stage"):$("screen");
   el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
-  await sleep(270); el.classList.remove("shake");
+  await sleep(RULES.impactShakeMs); el.classList.remove("shake");
 }
 /* Paced layer break: flash → vanish (the rest ease outward) → beat → regrow
    from the centre at the back of the queue.                                */
@@ -236,7 +172,7 @@ async function impact(onEnemy){
    appear between turns and there is nothing to say where they came from. */
 async function announceBonusSlots(){
   for(const [u, trackId] of [[S.enemy,"eTrack"], [S.player,"pTrack"]]){
-    if(!u.bonusSlots) continue;
+    if(!u.extra.length) continue;
     const els = [...$(trackId).querySelectorAll(".station.bonus")];
     if(!els.length) continue;
     /* they come FROM the opponent: the player's arrive from above (the enemy's
@@ -252,6 +188,23 @@ async function announceBonusSlots(){
   }
 }
 
+/* A layer shrugging off its own emotion: a big tag in that layer's colour, shaking
+   sideways, over two descending notes. */
+function resistTag(emotion){
+  const el=document.createElement("div");
+  el.className="bigtag resist pxr";
+  el.textContent="RESISTED";
+  el.style.background=emoHex(emotion);
+  /* Over the fighter that shrugged it off, sat a little below its centre so the
+     rings stay readable behind it. */
+  const zone=zoneBox(document.querySelector(".sprwrap"));
+  el.style.top=Math.round(zone.y + zone.h*0.62)+"px";
+  $("screen").appendChild(el);
+  setTimeout(()=>el.remove(),760);
+  sfxAt(SOUNDS.resist, 1);
+  setTimeout(()=>sfxAt(SOUNDS.resist, 0.72), 110);   // the second, lower note
+}
+
 async function breakLayer(u){
   if(!u.layers.length) return;
   const l=u.layers[0];
@@ -261,10 +214,17 @@ async function breakLayer(u){
   u.layers.shift();
   /* Grown layers are temporary: they are simply gone, never filed for regrowth. */
   if(!l.temp) u.broken.push(l);
+  /* Stripped to nothing: the unit reels. It skips its next line entirely and
+     regrows nothing that turn, which is what makes stripping worth doing. */
+  if(!u.layers.length){
+    u.stunned = RULES.stunTurns;
+    bigTag("STUNNED", "overload"); sfx("clash");
+  }
   await Hooks.emit("layer:broken",{unit:u,layer:l});
   await sleep(RULES.layerGapMs);
 }
 async function regrowLayers(u){
+  if(u.stunned > 0){ return; }        // reeling: nothing comes back this turn
   if(!u.broken.length) return;
   /* A status may be holding some of them down — those stay in `broken` and get
      another chance next round, once it has worn off. */
@@ -277,3 +237,249 @@ async function regrowLayers(u){
   sfx("regrow");
   await sleep(RULES.layerRegrowMs);
 }
+
+/* ================= ABILITY EFFECTS =================
+   What an ability LOOKS like when it lands, kept apart from what it DOES.
+
+   Lookup is ability id -> kind -> default, so a bespoke effect for one ability is
+   a single `AbilityFx.define("HVY_JOY", {...})` and nothing else moves. Effects are
+   fire-and-forget: they never block the turn loop and never touch the ledger.
+
+   Hooks: `hit` (an attack connects) and `apply` (a status or buff takes hold). */
+const AbilityFx = (() => {
+  const byId = {}, byKind = {}, base = {};
+  const pick = (name, ctx) =>
+    (byId[ctx.ab && ctx.ab.id] || {})[name] ||
+    (byKind[ctx.ab && ctx.ab.kind] || {})[name] ||
+    base[name];
+  return {
+    define(abilityId, spec){ byId[abilityId] = Object.assign(byId[abilityId] || {}, spec); },
+    defineKind(kind, spec){ byKind[kind] = Object.assign(byKind[kind] || {}, spec); },
+    defineDefault(spec){ Object.assign(base, spec); },
+    play(name, ctx){ const f = pick(name, ctx); if(f) try{ f(ctx); }catch(_){} }
+  };
+})();
+
+/* ---- where an effect should happen: the target's own body ---- */
+function bodyBox(u){
+  return zoneBox(u === S.player ? $("pstrip") : document.querySelector(".sprwrap"));
+}
+
+/* ---- shards: a few shapes of the attack's own emotion, thrown off the impact ---- */
+function hitShards(emotion, u){
+  const z = bodyBox(u), col = emoHex(emotion);
+  const glyph = (EMOTIONS[emotion] || {}).icon || "BOLT";
+  for(let i = 0; i < RULES.hitShards; i++){
+    const el = document.createElement("div");
+    el.className = "shard";
+    el.innerHTML = `<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${iconSVG(glyph)}</svg>`;
+    const sz = 22 + Math.random() * 40;
+    el.style.cssText =
+      `left:${Math.round(z.x + z.w * (0.15 + Math.random()*0.7))}px;` +
+      `top:${Math.round(z.y + z.h * (0.15 + Math.random()*0.7))}px;` +
+      `width:${Math.round(sz)}px;height:${Math.round(sz)}px;color:${col};` +
+      `--rot:${Math.round(Math.random()*70 - 35)}deg;--dl:${i*40}ms`;
+    $("screen").appendChild(el);
+    setTimeout(() => el.remove(), RULES.hitShardMs + i*40 + 120);
+  }
+}
+
+/* ---- action lines: streaks over the target, up for a lift, down for a drag ---- */
+function actionLines(u, up){
+  const z = bodyBox(u);
+  const wrap = document.createElement("div");
+  wrap.className = "actionlines " + (up ? "up" : "down");
+  wrap.style.cssText = `left:${z.x}px;top:${z.y}px;width:${z.w}px;height:${z.h}px`;
+  let bars = "";
+  for(let i = 0; i < 7; i++)
+    bars += `<i style="left:${Math.round(6 + Math.random()*88)}%;` +
+            `--dl:${Math.round(Math.random()*180)}ms;` +
+            `--h:${Math.round(30 + Math.random()*45)}%"></i>`;
+  wrap.innerHTML = bars;
+  $("screen").appendChild(wrap);
+  sfx(up ? "buff_up" : "debuff_down");
+  setTimeout(() => wrap.remove(), RULES.actionLineMs + 260);
+}
+
+/* ---- a status taking hold: the body distorts, a bloom swells behind it, and the
+        name of the ABILITY that did it flies to where its tag will sit ---- */
+function statusFx(u, st, label){
+  const z = bodyBox(u), host = u === S.player ? $("pstrip") : document.querySelector(".sprwrap");
+  host.style.setProperty("--wt", RULES.statusFxMs + "ms");
+  host.classList.remove("warp"); void host.offsetWidth; host.classList.add("warp");
+  setTimeout(() => host.classList.remove("warp"), RULES.statusFxMs);
+
+  const bloom = document.createElement("div");
+  bloom.className = "statusbloom";
+  bloom.style.cssText = `left:${z.x + z.w/2}px;top:${z.y + z.h/2}px;color:${st.color}`;
+  $("screen").appendChild(bloom);
+  setTimeout(() => bloom.remove(), RULES.statusFxMs + 200);
+
+  const fly = document.createElement("div");
+  fly.className = "statusname pxr";
+  fly.textContent = label.toUpperCase();
+  fly.style.cssText = `left:${z.x + z.w/2}px;top:${z.y + z.h*0.5}px;background:${st.color}`;
+  $("screen").appendChild(fly);
+  /* travel to the row this status will live in, then hand over to the real tag */
+  const row = $(u === S.player ? "pStatus" : "eStatus").getBoundingClientRect();
+  const sr = $("screen").getBoundingClientRect();
+  requestAnimationFrame(() => {
+    fly.style.transition = `transform ${RULES.statusFxMs*0.55}ms steps(7)`;
+    fly.style.transform =
+      `translate(-50%,-50%) translate(${Math.round((row.left + row.width/2) - sr.left - (z.x + z.w/2))}px,` +
+      `${Math.round((row.top + row.height/2) - sr.top - (z.y + z.h*0.5))}px) scale(.72)`;
+  });
+  setTimeout(() => fly.remove(), RULES.statusFxMs);
+  sfx("status_on");
+}
+
+/* ---- the defaults every ability gets unless it says otherwise ---- */
+AbilityFx.defineDefault({
+  hit({ab, target}){
+    if(ab.emotion) sfx((EMOTIONS[ab.emotion] || {}).sfx || "hit");
+    hitShards(ab.emotion || S.enemy.emotion, target);
+  },
+  apply({target, st, ab}){ statusFx(target, st, ab.name); }
+});
+/* A buff points its streaks up; anything hostile drags them down. */
+AbilityFx.defineKind("CHARGE",  { hit({actor}){ actionLines(actor, true); } });
+AbilityFx.defineKind("SHIELD",  { hit({actor}){ actionLines(actor, true); } });
+AbilityFx.defineKind("ADDLAYER",{ hit({actor}){ actionLines(actor, true); } });
+AbilityFx.defineKind("DEBUFF",  { apply(ctx){ actionLines(ctx.target, false); statusFx(ctx.target, ctx.st, ctx.ab.name); } });
+
+/* ---- CRITICAL: thrown up somewhere around the impact, white, edged in the
+        attack's own colour so you can tell whose it was ---- */
+function criticalTag(u, emotion){
+  const z = bodyBox(u);
+  const el = document.createElement("div");
+  el.className = "crittag pxr";
+  el.textContent = "CRITICAL";
+  el.style.cssText =
+    `left:${Math.round(z.x + z.w * (0.2 + Math.random()*0.6))}px;` +
+    `top:${Math.round(z.y + z.h * (0.15 + Math.random()*0.6))}px;` +
+    `--emo:${emoHex(emotion)};--tilt:${Math.round(Math.random()*18 - 9)}deg;` +
+    `--ct:${RULES.critHoldMs}ms`;
+  $("screen").appendChild(el);
+  return el;                                   // the sequence owns its lifetime now
+}
+
+/* One wash of the whole screen in the attacking emotion's colour. */
+function flashColour(hex){
+  const el = document.createElement("div");
+  el.className = "colourflash";
+  el.style.cssText = `background:${hex};--cf:${RULES.critFlashMs}ms`;
+  $("screen").appendChild(el);
+  setTimeout(() => el.remove(), RULES.critFlashMs + 80);
+}
+
+/* The earned slot travels from the CRITICAL tag to the end of the attacker's line,
+   so the reward is visibly connected to the thing that caused it. A ghost, not the
+   real station: re-rendering the track mid-resolution would destroy the very
+   elements `resolveLine` is holding on to. The real slot arrives next build. */
+async function flySlotToLine(fromEl, attacker, col){
+  const sr = $("screen").getBoundingClientRect();
+  const lane = $(attacker === S.player ? "pLane" : "eLane");
+  if(!fromEl || !lane) return;
+  const a = fromEl.getBoundingClientRect(), lr = lane.getBoundingClientRect();
+
+  const el = document.createElement("div");
+  el.className = "critslot";
+  el.innerHTML = `<svg viewBox="0 0 8 8" shape-rendering="crispEdges">${stationSVG(null)}</svg>`;
+  el.style.cssText = `left:${a.left - sr.left + a.width/2}px;` +
+                     `top:${a.top - sr.top + a.height/2}px;color:${col}`;
+  $("screen").appendChild(el);
+
+  /* aim at the end of the line the attacker travels toward */
+  const tx = (attacker.dir > 0 ? lr.right - 22 : lr.left + 22) - sr.left;
+  const ty = lr.top + lr.height/2 - sr.top;
+  const ms = RULES.critSlotFlyMs;
+  await waitAnim(el.animate([
+    {transform:"translate(-50%,-50%) scale(.5) rotate(0deg)", opacity:0},
+    {transform:"translate(-50%,-50%) scale(1.5) rotate(120deg)", opacity:1, offset:.25},
+    {transform:`translate(calc(-50% + ${Math.round(tx - (a.left - sr.left + a.width/2))}px),`+
+               `calc(-50% + ${Math.round(ty - (a.top - sr.top + a.height/2))}px))`+
+               ` scale(1) rotate(360deg)`, opacity:1}
+  ], {duration:ms, easing:"steps(12)", fill:"forwards"}), ms);
+  sfx("place");
+  lane.classList.add("alert"); await sleep(90); lane.classList.remove("alert");
+  el.remove();
+}
+
+/* The whole critical beat, awaited by the attack that caused it — nothing else
+   happens until the slot has landed. */
+async function criticalSequence(attacker, target, emotion){
+  const col = emoHex(emotion);
+  const tag = criticalTag(target, emotion);
+  flashColour(col);
+  await sleep(RULES.critHoldMs);
+  /* granted now, and marked fresh so the end-of-round sweep keeps it for the
+     line the player actually gets to build */
+  addExtra(attacker, "CRIT", 1);
+  attacker.critFresh = true;
+  await flySlotToLine(tag, attacker, col);
+  tag.remove();
+}
+
+/* ---- a tag over ONE fighter, rather than centre screen ----
+   Centre-screen tags cannot say who they are about. When both sides suffer the same
+   thing in one round — two Sad units each turning on themselves — the two
+   announcements read as one event fired twice. Placed on the body, they are
+   obviously two. */
+function unitTag(u, text, hex){
+  const z = bodyBox(u);
+  const el = document.createElement("div");
+  el.className = "crittag pxr unittag";
+  el.textContent = text;
+  el.style.cssText =
+    `left:${Math.round(z.x + z.w * 0.5)}px;` +
+    `top:${Math.round(z.y + z.h * (0.3 + Math.random()*0.3))}px;` +
+    `--emo:${hex || "#ffffff"};--tilt:${Math.round(Math.random()*10 - 5)}deg`;
+  $("screen").appendChild(el);
+  setTimeout(() => el.remove(), RULES.critTagMs + 120);
+}
+
+/* ---- self-harm reads as an attack that turns on you: the symbol travels most of
+        the way to the opponent, thinks better of it, and comes back ---- */
+async function boomerangStrike(stationEl, awayEl, backEl, col){
+  if(!stationEl || !awayEl || !backEl) return;
+  const sr = $("screen").getBoundingClientRect();
+  let a = stationEl.getBoundingClientRect();
+  const lane = stationEl.closest(".lane");
+  if(lane){
+    const lr = lane.getBoundingClientRect();
+    a = {left:lr.left + lr.width/2 - a.width/2, top:lr.top + lr.height/2 - a.height/2,
+         width:a.width, height:a.height};
+  }
+  const away = awayEl.getBoundingClientRect(), back = backEl.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "flyer"; el.innerHTML = stationEl.innerHTML;
+  el.style.cssText = `left:${a.left - sr.left}px;top:${a.top - sr.top}px;` +
+                     `width:${a.width}px;height:${a.height}px;color:${col}`;
+  $("screen").appendChild(el);
+  const to = (r, k) => [((r.left + r.width/2) - (a.left + a.width/2)) * k,
+                        ((r.top + r.height/2) - (a.top + a.height/2)) * k];
+  /* Nearly ALL the way out, then a clean snap home. The caster's own body sits only
+     a little short of the opponent on this layout, so a timid overshoot made the two
+     ends indistinguishable — the gesture only reads if the apex is committed and the
+     return is one move, not a drift. */
+  const [ax, ay] = to(away, 0.95);
+  const [bx, by] = to(back, 1);
+  sfx("travel");
+  const ms = RULES.flyMs * 2.4;
+  await waitAnim(el.animate([
+    {transform:"translate(0,0) scale(1)", offset:0},
+    {transform:`translate(${ax}px,${ay}px) scale(1.55)`, offset:.42},
+    {transform:`translate(${ax}px,${ay}px) scale(1.15)`, offset:.58},   // hangs, refuses
+    {transform:`translate(${bx}px,${by}px) scale(1.45)`, offset:1}      // and comes home
+  ], {duration:ms, easing:"steps(16)"}), ms);
+  el.remove();
+}
+
+/* Self-harm: the boomerang, and no shards on the way out. */
+AbilityFx.define("SELF_HARM", {
+  hit({actor}){ hitShards(S.enemy.emotion, actor); }
+});
+/* Healing lifts, in stamina mint. */
+AbilityFx.defineKind("FEED", {
+  hit({target}){ actionLines(target, true); }
+});

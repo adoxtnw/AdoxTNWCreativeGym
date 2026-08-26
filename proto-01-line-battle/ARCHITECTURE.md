@@ -1,6 +1,70 @@
-# NEURO-METRO: AVUI — architecture
+# Neuro Metro: AVUI — BATTLE SYSTEM · architecture
 
-How the prototype is put together, and where a new thing goes.
+How the battle system is put together, and where a new thing goes.
+
+## This is a game, not a page
+
+The distinction decides most of the arguments in this codebase:
+
+- **There is one clock.** `tick()` in `rings.js` runs at 12 fps and is the only
+  heartbeat: canvas repaints, layer motion, bar tweens and the shared gradient all
+  advance on it. Anything that animates itself independently will drift out of step
+  and read as the wrong medium. CSS animations are allowed, but they must be
+  `steps(duration / 83ms)` so they land on the same frames.
+- **Simulation and presentation are separate, and simulation wins.** The ledger
+  (`ms`, `ec`, `layers`, `statuses`) changes the instant a rule says so. What the
+  player sees is a reaction to that, never a gate on it.
+- **Content lives in the spreadsheet.** Abilities, statuses, sounds, phrases and every
+  tunable number are rows. Adding an ability is a row; adding a *kind* of ability is
+  one `Kinds.define()`. If a designer has to open a `.js` file, that is a design flaw.
+- **Effects are fire-and-forget.** A hit throws a number and moves on. Nothing in
+  `fx.js` may block the turn loop or own state the rules need.
+- **The interface is diegetic.** There is no button bar: the line is the control
+  surface. Tap a station to remove it, tap the line to open Emotions, tap DEPART.
+
+### Loadouts
+A **Loadout** is one emotion's set of ability slots; the player carries `equippedSlots`
+of them and they *are* the panel's pagination. Slots are POSITIONAL — a blank `slot3` is
+a real, visible empty cell — which is why the sheet uses four columns rather than one
+pipe list.
+
+- `unit.pool` is **derived** for a unit that has loadouts: always-on actions
+  (`abilities.action`) plus the union of the equipped sets. A unit with no loadouts (the
+  enemy) keeps its flat `pool` column and behaves exactly as before.
+- `abilities.emotions` is the **hybrid hook**: blank means "just my own emotion", and
+  `abilityFitsLoadout()` lets a future multi-emotion ability sit in a Loadout of any of
+  its emotions. Nothing is hybrid yet; adding one is a row edit.
+- **`equipLoadout(u, slot, id)` is the single seam** a future equip screen uses. It works
+  today. What makes it safe is that `buildPanel()` and `renderLoadoutBar()` are markup
+  only and re-callable, while every gesture listener lives in `wirePanelGestures()`,
+  which runs once. Rebuilding the panel therefore cannot stack handlers — there is a
+  regression test for exactly this.
+
+### Ability effects
+What an ability *looks* like when it lands is kept apart from what it *does*.
+`AbilityFx` in `src/fx.js` resolves **ability id -> kind -> default**, so a bespoke
+effect for one ability is a single call and nothing else moves:
+
+```js
+AbilityFx.define("HVY_JOY", { hit(ctx){ /* only Mania does this */ } });
+AbilityFx.defineKind("DEBUFF", { apply(ctx){ /* every debuff does this */ } });
+```
+
+Two hooks today: **`hit`** (an attack connects) and **`apply`** (a status takes hold).
+`ctx` is `{ab, actor, target, st?, matchup?}`. Effects are fire-and-forget — they never
+block the turn loop and never touch the ledger.
+
+### Where to add things
+| You want to add | You touch |
+|---|---|
+| an ability | a row in `abilities` |
+| a new *behaviour* for abilities | `Kinds.define()` in `kinds.js` |
+| a status effect | a row in `status_effects` + one reader |
+| a visual reaction to a hit | `AbilityFx.define()` / `defineKind()` in `fx.js` |
+| a line of flavour text | a row in `prompts` |
+| a rule that spans turns | `hooks.js` |
+| a tunable number | a row in `rules` — never a literal |
+| an ability set | a row in `loadouts`; equip it via `units.loadouts` |
 
 ## Ground rules
 
@@ -117,8 +181,15 @@ Events: `battle:start`, `round:start`, `round:end`, `line:depart`,
   cooldown (`commitUses`), and finishing that cooldown is what refills it
   (`tickCooldowns`). Because `usesLeft` counts what is currently ON the line, pulling
   an ability back off returns its shot with no extra bookkeeping.
-- **`unit.bonusSlots`** are TEMPORARY line slots, granted one per charge segment
-  the *opponent* laid down last turn and capped by `unit.maxBonus`. They are always
+- **`unit.extra`** is one entry per slot past `lineCap`, naming what KIND it is.
+  Two kinds exist and they behave differently, which is why a bare count no longer
+  suffices: **OVERLOAD** slots are forced on you, `locked`, drawn in the OPPONENT's
+  stamina colour, and rebuilt from scratch every turn; **CRIT** slots are earned by a
+  critical and last exactly one line. `slotKind(u,i)` reads it; `addExtra`/`dropExtra`
+  maintain it. Charging no longer grants anything — that rule is retired.
+- **Overload is DERIVED, never stored.** It lasts while `ec > ms`, so it must not live
+  in `unit.statuses`: `tickStatuses()` decrements every entry it finds and would tick it
+  away. `isOverloaded()` is the test, and `renderStatuses()` merges it in at draw time. They are always
   the tail of `unit.line`, so `isBonusSlot(u,i)` is just `i >= u.lineCap`, and
   they last exactly one turn because `grantBonusSlots` recomputes from scratch
   each round rather than decrementing a timer. This replaced the charge *interrupt*,
@@ -132,7 +203,12 @@ Events: `battle:start`, `round:start`, `round:end`, `line:depart`,
   `settle()` in `src/fx.js` walks them onto the bar afterwards. Only the display is
   deferred — never the simulation. Anything that reads a unit's health for *rules*
   must use `ms`/`ec`; anything drawing it must use the `shown` pair.
-- **`unit.pending`** holds AT MOST TWO entries — one `MS`, one `EC` — because
+- **`unit.pending` is gone.** Damage and charge are applied the moment they land;
+  `hitFeedback()` throws a floating number beside the fighter and snaps the bar.
+  There is no deferred settlement, no accumulating tag, no ball of light. `settle()`
+  survives only as a no-op that reconciles `shown*` and checks Overload, so callers
+  did not all have to change at once.
+- ~~**`unit.pending`** held AT MOST TWO entries — one `MS`, one `EC` — because
   `queueDelta()` folds each new hit into the tag already standing rather than
   posting another. The tag grows and breathes faster as its running total
   approaches that unit's `maxMs`. `morphAll()` turns them into balls at once,
@@ -206,6 +282,70 @@ The long press has to cooperate with the page swipe: movement past the drag thre
 cancels the timer, and once a tooltip has opened the click that follows is swallowed so
 the press does not also place the ability.
 
+## The build interface has no buttons
+
+The EMOTIONS and DEPART buttons are gone; the line itself carries both jobs.
+
+- Tapping a **station** removes that ability.
+- Tapping the **terminus arrow** departs — it already points where the line will
+  travel, so tapping it means "send it". `.lane.ready` pulses it once there is
+  something to send.
+- Tapping **anywhere else on the line** opens Emotions. The three are ordered by
+  specificity inside one listener, so they cannot fight.
+
+`abilities.action` marks the abilities that live outside the pagination (Defend,
+Recharge). Which ones those are is content, in the sheet — `buildActions()` and
+`buildPanel()` split the pool on that flag, and both wire their rows through the
+same `wireAbilityRow()`.
+
+## Layers: like does not break like
+
+- A hit whose emotion **matches the outermost layer** does not break it. The layer
+  still absorbs (half damage), the stamina still goes, but the queue does not move.
+  Tested on `layer.e === ab.emotion` directly rather than through the matchup label,
+  because that is the rule as stated.
+- Breaking the **last** layer sets `unit.stunned = RULES.stunTurns`. A stunned unit
+  skips `resolveLine` entirely and `regrowLayers` returns early, so nothing comes back
+  that turn either. The counter ticks down at `round:end`, *after* regrowth was
+  already skipped — order matters.
+
+## The line always travels one way
+
+`parkLine()` puts the whole track off-centre on the side it will travel FROM — left
+for you, right for the enemy — and each station is then centred in turn, so the motion
+reads as one continuous sweep instead of the track jumping back and forth to whichever
+station is next. At the end the line **runs out the far side** and is reset with the
+transition suppressed; cutting straight back to zero was a visible jump between the
+last station and the turn changing hands.
+
+## Criticals
+`crit_chance` on the ability (falling back to `RULES.critChance`) plus `critBonus(u)`,
+which sums `crit_mult` across active statuses — the same "readers sum across whatever is
+active" shape as `regenBlocked()` and `missChance()`, so a future buff only fills in a
+column. Rolled in `DAMAGE.run()` and **never in `project()`**: the build-phase preview
+has to stay deterministic or it would promise a number the game then contradicts.
+Whoever lands one earns a CRIT slot for their next line, and the whole beat is
+**awaited** by the attack that caused it — the tag holds for `critHoldMs`, the screen
+washes once in the attacking emotion, the earned slot flies from the tag into that
+fighter's line, and only then does the next station fire.
+
+The slot is granted **at the moment of the crit** so it can be seen arriving, which is
+why `critFresh` exists: the end-of-round sweep keeps a slot that has not yet had a line
+built with it, and drops anything older. The thing that flies is a **ghost** — the real
+slot appears at the next build — because re-rendering the track mid-resolution would
+destroy the station elements `resolveLine` is still holding.
+
+## Pacing
+
+A station's budget depends on what it does: anything with `status_apply` gets
+`statusStepMs` (2000) so the player can read it, everything else `attackStepMs` (600).
+The step is padded to a deadline rather than
+built from fixed sleeps: whatever the ability spent on its own animations, the step
+is topped up to the same total. That keeps the rhythm even across abilities that do
+very different amounts of work. It can only pad a short step — an ability whose
+internals exceed the budget will overrun, so `flyMs`, `impactFlashMs`,
+`impactShakeMs`, `layerFlashMs` and `layerGapMs` all have to fit inside it.
+
 ## Conventions
 
 - **Never `setPointerCapture` on pointerdown if a click has to land underneath.**
@@ -259,6 +399,56 @@ the press does not also place the ability.
 - **Anything sequenced during the opening must not depend on rAF.** It is suspended
   outright on a hidden tab, so `wipeReveal` runs on a timer with a safety timeout;
   otherwise the opening hangs for ever on a backgrounded tab.
+- **An idle animation can push an element into the thing it was cleared from.** The
+  shields sat outside their lanes at rest and *still* ended up inside them, because
+  the wave animation lifted them 8px and scaled them 1.14 — and for the enemy, whose
+  shields hang below the lane, "up" means "into it". Measuring one frame at rest said
+  it was fine; sampling across the whole cycle found it. Mirror the motion per side
+  and size the clearance for travel + scale.
+- **For a gradient BORDER, use `border-image`.** Two other approaches failed here:
+  `mask-composite` did not render at all, and a `z-index:-1` pseudo-element painted
+  *above* the parent's background rather than behind it, flooding the whole lane
+  with colour instead of ringing it.
+- **Never delete CSS by slicing between two markers.** A Pass 33 cleanup removed
+  everything between `.ind` and a later comment to drop some dead rules, and took the
+  tooltip and status-tag styles with it. An element with no rule is not obviously
+  broken — it silently becomes `position:static` and flows to the bottom of the page.
+  Delete rules by name, and assert the survivors afterwards.
+- **A centred flex track does not start at its container's edge.** Any maths that
+  positions a station must include `track.offsetLeft`; leaving it out puts every
+  station off by a constant, which reads as a line that slides but never arrives.
+- **Never put a quoted `url()` in a style ATTRIBUTE.** The double quote ends the
+  attribute, the whole declaration becomes invalid, and the element silently renders
+  with no background at all. Percent-encoded data URIs need no quotes.
+- **Position effects from the SCREEN, not from the target's box, when the box may be
+  full-width.** The enemy's zone is its 186px sprite, so "just outside it" reads well;
+  the player's zone is the full-width layer strip, so the same maths threw every player
+  number off both edges of the phone and they were never seen at all.
+- **`font-weight` alone does not make text bold on mobile.** Most mobile monospace
+  fallbacks ship no bold face, so raising the weight changes nothing and every label
+  renders hairline-thin. `-webkit-text-stroke` in `currentColor` is what actually
+  thickens the glyphs, on every device.
+- **`tools/stamp.py` writes `build.js` — run it LAST, before packaging.** It reports
+  the newest mtime across `src/`, `styles/` and the generated tables, so the title
+  screen says when the GAME changed rather than when the script ran. Version comes
+  from the highest `## Pass NN` in the README, so nobody has to remember to bump it.
+- **`window.innerWidth` is NOT the game's width.** The phone frame is capped at
+  `frameMaxW`; on desktop the window is several times that. Anything sized from the
+  window will be drawn outside the frame — and a box wider than its container cannot be
+  centred by `margin:auto`, so it left-aligns and its contents land off-screen. Take the
+  first of screen -> frame -> window that reports anything, and clamp to `frameMaxW`.
+- **A width of zero silently becomes a tall stack of text.** Anything that rasterises
+  wrapped text at a fixed width must take the WIDEST width available — a hidden tab
+  reports nothing, and an un-laid-out wrapper reports nothing — and must redraw on
+  resize, or it bakes in whatever was true at boot.
+- **A centred column that overflows loses its TOP, silently.** `.title` centres its
+  content, so on a short phone the mood line rendered perfectly and sat above the
+  viewport. Anything full-screen must have one element designated to give way — here
+  the logo — or the first thing off the edge is whatever is at the top.
+- **A tag about a FIGHTER belongs on that fighter.** Centre-screen tags cannot say who
+  they are about, so when both sides suffer the same thing in one round the two
+  announcements read as one firing twice. `unitTag()` places it on the body; `bigTag()`
+  is for things that happen to the whole battle.
 - **Serve with `tools/serve.py`, never `python3 -m http.server`.** It stamps each
   local asset URL with its modification time. Without that, browsers happily run
   a cached copy of a module you just edited — the code is right, it simply never

@@ -1,0 +1,5 @@
+"RESERVED. Line-level combos: things that depend on what else is in the line, or on what fired just before. trigger/subject/operator/value form the condition; effect/effect_value form the result. Tell me the ones you want and I will wire the vocabulary you use here.",,,,,,,,,,,,
+id,name,trigger,subject,operator,value,window,effect,effect_value,applies_to,priority,enabled,notes
+planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned,planned
+EXAMPLE_TRIPLE,Monochrome Line,LINE_CONTAINS,EMOTION_COUNT,>=,3,LINE,DMG_MULT,1.5,ALL_STATIONS,10,0,EXAMPLE ROW — three stations of one emotion in a line hit 50% harder. enabled=0.
+EXAMPLE_CHAIN,Grief After Rage,PREV_STATION,EMOTION,,ANGER,STATION,EC_MULT,2,THIS_STATION,20,0,EXAMPLE ROW — a station firing straight after an Anger station gives double charge. enabled=0.

@@ -105,18 +105,26 @@ function wipeReveal(ms){
    The enemy's arrive first and from above, pitched lower; yours follow from
    below, pitched higher. They overlap — the next starts before the last lands. */
 async function unsheath(el, fromTop, sound){
+  /* Drawn into place like a blade leaving its sheath: scaled out from the edge it
+     enters from, with a bright flash that fades.
+
+     This used to animate `clip-path`, which was wrong twice over. It is one of the
+     most expensive properties to animate, and with `fill` it stays on the element
+     for ever — and a clip-path on a container also clips children positioned
+     OUTSIDE its box, which is what made the DEPART button invisible. `transform`
+     and `opacity` composite on the GPU and leave nothing behind. */
   const dir = fromTop ? -1 : 1;
-  el.style.willChange="clip-path,transform,filter";
-  el.classList.remove("drawin");        // hidden until exactly this moment
+  el.classList.remove("drawin");
   sfx(sound);
   const anim = el.animate([
-    { clipPath: fromTop ? "inset(0 0 100% 0)" : "inset(100% 0 0 0)",
-      transform:`translateY(${dir*-16}px)`, filter:"brightness(3.4)", opacity:1 },
-    { clipPath: fromTop ? "inset(0 0 38% 0)"  : "inset(38% 0 0 0)",
-      transform:`translateY(${dir*-6}px)`,  filter:"brightness(2.1)", offset:.45 },
-    { clipPath:"inset(0 0 0 0)", transform:"translateY(0)", filter:"brightness(1)" }
-  ], { duration: RULES.unsheathMs, easing:"cubic-bezier(.1,.85,.25,1)", fill:"both" });
+    { transform:`translateY(${dir*-14}px) scaleY(.05)`, opacity:0, filter:"brightness(3.6)" },
+    { transform:`translateY(${dir*-4}px) scaleY(1.06)`, opacity:1, filter:"brightness(1.9)", offset:.6 },
+    { transform:"translateY(0) scaleY(1)", opacity:1, filter:"brightness(1)" }
+  ], { duration: RULES.unsheathMs, easing:"steps(6,end)",
+       fill:"backwards", composite:"replace" });
+  anim.onfinish = () => { try{ anim.cancel(); }catch(_){} };   // never let it hold state
   await waitAnim(anim, RULES.unsheathMs);
+  try{ anim.cancel(); }catch(_){}
   el.style.willChange="";
 }
 
@@ -125,7 +133,7 @@ async function revealInterface(){
   /* Top-down for the enemy, then bottom-up for the player — the order the eye
      travels, not DOM order. */
   const enemy  = [q("#ePanel"), q("#eStatus"), q("#eLane") && q("#eLane").closest(".lane-wrap")];
-  const player = [q("#pPanel"), q(".btnrow"), q("#pStatus"),
+  const player = [q("#pPanel"), q("#actionRow"), q("#pStatus"), q("#emoCue"),
                   q("#pLane") && q("#pLane").closest(".lane-wrap"), q("#pstrip")];
   /* Hide them all BEFORE the blackout lifts. Removing `preintro` reveals every
      element at once, so without this the later ones sat fully visible for
@@ -270,9 +278,63 @@ function pickMoment(now){
   return best[Math.floor(Math.random() * best.length)];
 }
 
+/* Drawn small onto a canvas and upscaled with nearest-neighbour, the same way the
+   rings, the gauges and the intro line are — so this line is genuinely pixelated
+   rather than just un-antialiased text pretending to be. */
+function pixelText(cv, text, opts){
+  const PX = opts.px, W = Math.floor(opts.cssW / PX);
+  const ctx = cv.getContext("2d");
+  const font = `900 ${opts.size}px ui-monospace, Menlo, monospace`;
+
+  ctx.font = font;                                   // measure before sizing
+  const words = text.split(" "), lines = [];
+  let line = "";
+  for(const w of words){
+    const t = line ? line + " " + w : w;
+    if(ctx.measureText(t).width > W - 2 && line){ lines.push(line); line = w; }
+    else line = t;
+  }
+  if(line) lines.push(line);
+
+  const lh = Math.round(opts.size * 1.25);
+  cv.width = W; cv.height = lines.length * lh + 2;
+  cv.style.width  = (W * PX) + "px";
+  cv.style.height = (cv.height * PX) + "px";
+
+  const c = cv.getContext("2d");
+  c.imageSmoothingEnabled = false;
+  c.font = font; c.textAlign = "center"; c.textBaseline = "top";
+  c.fillStyle = opts.color;
+  lines.forEach((l, i) => c.fillText(l, W/2, i * lh + 1));
+}
+
 function renderMoment(){
   const el = $("momentLine"); if(!el) return;
   const now = barcelonaNow(), m = pickMoment(now);
-  el.textContent = m ? `Barcelona, ${now.weekday}, ${m.phrase}.`
-                     : `Barcelona, ${now.weekday}.`;
+  const text = (m ? `Barcelona, ${now.weekday}, ${m.phrase}.`
+                  : `Barcelona, ${now.weekday}.`).toUpperCase();
+  /* The FIRST source that reports anything, in order of how much it can be trusted:
+     the screen, then the phone frame, then the window. Never the widest — on desktop
+     the window is ~1500px while the phone frame is 420, and a canvas wider than its
+     container cannot be centred by `margin:auto`, so it left-aligns and the centred
+     text lands outside the frame and is clipped away. Falling back through zeros is
+     what a hidden tab or an un-laid-out wrapper needs. `momentSize` is the LOGICAL
+     size; what you see is that times `momentPx`. */
+  const w = el => (el ? el.getBoundingClientRect().width : 0);
+  const wrap = w($("screen")) || w(document.querySelector(".phone")) || window.innerWidth || 360;
+  /* and never wider than the frame can actually show */
+  const cssW = Math.max(260, Math.min(wrap - 16, RULES.frameMaxW - 16));
+  pixelText(el, text, {px:RULES.momentPx, size:RULES.momentSize,
+                       cssW, color:"#ffffff"});
 }
+
+/* The build stamp: version, and when the game itself last changed. */
+function renderBuildStamp(){
+  const el = $("buildStamp"); if(!el || typeof BUILD === "undefined") return;
+  el.textContent = `${BUILD.version} · ${BUILD.modified}`;
+}
+
+
+/* The mood line is rasterised at a fixed width, so it has to be redrawn when that
+   width changes — a rotation, or a tab that was hidden when it first drew. */
+addEventListener("resize", () => { if($("momentLine")) renderMoment(); });

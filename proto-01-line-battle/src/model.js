@@ -5,20 +5,65 @@
    every file shares one global scope. */
 
 /* ================= STATE ================= */
+/* ---------- loadouts ----------
+   A Loadout is one emotion's set of ability slots. The player carries
+   `equippedSlots` of them; a unit with none (the enemy) keeps its flat `pool`
+   column and nothing about its behaviour changes.
+
+   Slots are POSITIONAL: `slot3` empty is a real, visible gap in the panel, not a
+   missing entry, so this always returns exactly `loadoutSlots` cells. */
+function loadoutSlotList(loadoutId){
+  const lo = LOADOUTS[loadoutId];
+  const out = [];
+  for(let i=1; i<=RULES.loadoutSlots; i++){
+    const abId = lo ? lo["slot"+i] : "";
+    out.push(abId ? (ABILITIES[abId] || null) : null);
+  }
+  return out;
+}
+/* An ability may belong to SEVERAL emotions. `emotions` is blank for every ability
+   today, meaning "just my own emotion" — the column exists so a hybrid can be added
+   as a row edit, and it may then sit in a Loadout of any of its emotions. */
+const emotionsOf = a => (a && a.emotions && a.emotions.length) ? a.emotions
+                      : (a && a.emotion ? [a.emotion] : []);
+const abilityFitsLoadout = (a, emotion) => emotionsOf(a).includes(emotion);
+
+const isActionAb = a => !!(a && a.action);
+const allActions = () => Object.values(ABILITIES).filter(a => a.enabled && isActionAb(a));
+
+/* Actions are always available whatever is equipped, because they are always on
+   screen. Everything else comes from the equipped Loadouts. */
+function poolFrom(loadoutIds){
+  const seen = new Set(), out = [];
+  for(const a of allActions()){ if(!seen.has(a.id)){ seen.add(a.id); out.push(a); } }
+  for(const id of loadoutIds)
+    for(const a of loadoutSlotList(id))
+      if(a && !seen.has(a.id)){ seen.add(a.id); out.push(a); }
+  return out;
+}
+
 function makeUnit(id){
   const r=UNITS[id];
   return {id, name:r.name, emotion:r.emotion, maxMs:r.max_ms, ms:r.max_ms,
     ec:Math.round(r.max_ms*r.start_ec_pct), shield:0,
     layers:r.layers.slice(0,RULES.maxLayers).map((e,i)=>({e,pos:i,flash:0})),
-    pool:r.pool.map(a=>ABILITIES[a]).filter(Boolean),
-    line:Array(r.line_cap || RULES.lineCap).fill(null), broken:[], overloaded:false, bonusSlots:0,
+    loadouts:(r.loadouts||[]).slice(0, RULES.equippedSlots),
+    /* With Loadouts the pool is DERIVED from them; without, the flat column stands. */
+    pool:(r.loadouts && r.loadouts.length)
+         ? poolFrom(r.loadouts.slice(0, RULES.equippedSlots))
+         : r.pool.map(a=>ABILITIES[a]).filter(Boolean),
+    line:Array(r.line_cap || RULES.lineCap).fill(null), broken:[], overloaded:false,
+    /* One entry per slot past `lineCap`, naming what KIND it is. Two kinds exist:
+       OVERLOAD (forced on you, locked, drawn in the opponent's colour) and CRIT
+       (earned by a critical, free to fill, gone after one turn). */
+    extra:[],
     /* Per-unit line sizing: how many permanent slots, and the ceiling on the
        temporary ones the opponent's charging can buy. */
-    lineCap:(r.line_cap || RULES.lineCap), maxBonus:(r.max_bonus_slots || RULES.maxBonusSlots),
+    lineCap:(r.line_cap || RULES.lineCap),
     /* `used[abilityId]` is how many of an ability's shots are already spent.
        Shots CARRY OVER between turns — the pool only refills once the ability
        has been emptied and served its cooldown. */
-    used:{}, statuses:{},
+    used:{}, statuses:{}, statusSource:{}, stunned:0, critFresh:false,
     cooldowns:{}, cursor:0, hurtFlash:0, dir:r.line_dir||1,
     /* The bar renders shownMs/shownEc, not ms/ec. Hits land in `pending` during
        a line and are walked onto the bar afterwards, so the player can watch
@@ -60,18 +105,19 @@ function placeEntries(u, ab){
    opponent's charging bought this unit.  The bonus slots are always the tail of
    the array, so `i >= RULES.lineCap` is the whole test for "this slot is
    temporary" — rendering and expiry both lean on that. */
-const isBonusSlot = (u, i) => i >= u.lineCap;
-function lineLen(u){ return u.lineCap + (u.bonusSlots||0); }
+const slotKind = (u, i) => i < u.lineCap ? "NORMAL" : (u.extra[i - u.lineCap] || "NORMAL");
+function lineLen(u){ return u.lineCap + u.extra.length; }
+/* Add slots of a kind, never past the hard cap. */
+function addExtra(u, kind, n){
+  for(let i=0; i<n && u.extra.length < RULES.maxExtraSlots; i++) u.extra.push(kind);
+}
+const dropExtra = (u, kind) => { u.extra = u.extra.filter(k => k !== kind); };
 function clearLine(u){ u.line=Array(lineLen(u)).fill(null); u.cursor=0; }
 
 /* Charging is no longer an interrupt — holding on a charge segment instead hands
    the OPPONENT room to act. Every charge segment in a line grants one temporary
    slot, which lasts exactly one turn: this is recomputed from scratch each round,
    so last round's grant simply stops being renewed. */
-function grantBonusSlots(u, n){
-  u.bonusSlots = RULES.chargeGrantsSlots ? Math.max(0, Math.min(u.maxBonus, n)) : 0;
-}
-
 /* ---------- shots ----------
    An ability can only be added to the line while it has shots left. Shots are NOT
    refilled each turn: whatever you do not spend is still there next turn. Emptying
@@ -95,7 +141,20 @@ function commitUses(u){
       u.cooldowns[id] = (ab.cooldown || 0) + 1;   // emptied: NOW it goes on cooldown
   }
 }
-const chargeCount = u => u.line.filter(e => e && e.charge).length;
+
+/* ---------- the future equip hook ----------
+   Nothing calls this yet. It is the single seam an equip screen will use: swap one
+   carried Loadout, rebuild the derived pool, redraw. `buildPanel()` and
+   `renderLoadoutBar()` are deliberately safe to call again (their gesture wiring
+   lives in `wirePanelGestures()`, which runs once), so this cannot stack listeners. */
+function equipLoadout(u, slotIndex, loadoutId){
+  if(slotIndex < 0 || slotIndex >= RULES.equippedSlots) return false;
+  if(!LOADOUTS[loadoutId]) return false;
+  u.loadouts[slotIndex] = loadoutId;
+  u.pool = poolFrom(u.loadouts);
+  if(u === S.player && typeof buildPanel === "function"){ buildPanel(); render(); }
+  return true;
+}
 
 /* ---------- statuses ----------
    `unit.statuses` is {statusId: roundsLeft}. The row in the status_effects sheet
@@ -103,10 +162,13 @@ const chargeCount = u => u.line.filter(e => e && e.charge).length;
    a status is adding a row plus whatever reads its column. */
 const hasStatus = (u, id) => (u.statuses[id] || 0) > 0;
 const statusRow = id => STATUSES[id];
-function applyStatus(u, id, turns){
+function applyStatus(u, id, turns, sourceName){
   if(!id || !STATUSES[id]) return null;
   const n = turns || STATUSES[id].duration || 1;
   u.statuses[id] = Math.max(u.statuses[id] || 0, n);    // REFRESH, never stack
+  /* The tag shows the ABILITY that did this, not the emotion — "SELF-HARM" tells
+     you what hit you; "SAD" only tells you what colour it was. */
+  if(sourceName) u.statusSource[id] = sourceName;
   return STATUSES[id];
 }
 function tickStatuses(u){
@@ -117,6 +179,13 @@ function regenBlocked(u){
   let n = 0;
   for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) n += (STATUSES[k].block_regen || 0);
   return n;
+}
+/* How much active statuses shift this unit's crit odds, summed like every other
+   status reader — so a future buff or debuff only has to fill in `crit_mult`. */
+function critBonus(u){
+  let m = 0;
+  for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) m += (STATUSES[k].crit_mult || 0);
+  return m;
 }
 /* Fraction of this unit's attacks that miss outright. */
 function missChance(u){
@@ -154,24 +223,36 @@ function shuffleLayers(u){
 }
 /* OVERLOAD: charge past the ceiling and the line is invaded by things you did
    not choose and cannot remove. */
+/* OVERLOAD: charge past the ceiling and the line is invaded.
+   The forced stations are APPENDED so you can see them arrive at the end of your
+   own line, and they are all of ONE kind — turning on yourself, or feeding the
+   opponent, never a mix of the two. Rebuilt from scratch each turn: its previous
+   slots are dropped first, or they would pile up every round. */
 function applyOverload(u){
+  dropExtra(u, "OVERLOAD");                       // clear last turn's before measuring
+  u.line = u.line.slice(0, lineLen(u));
   u.overloaded = u.ec > u.ms;
   if(!u.overloaded) return 0;
-  const over=u.ec-u.ms;
-  const n=Math.max(1, Math.min(u.line.length-1,
-        Math.ceil(over/(RULES.overloadSlotPer*u.maxMs))));
-  const idx=[...u.line.keys()];
-  for(let i=idx.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idx[i],idx[j]]=[idx[j],idx[i]]; }
-  const pool=[ABILITIES.SELF_HARM, ABILITIES.FEED].filter(Boolean);
-  let placed=0;
-  for(const at of idx){
-    if(placed>=n) break;
-    if(u.line[at]) continue;
-    u.line[at]={ab:pool[Math.floor(Math.random()*pool.length)], charge:false, locked:true};
-    placed++;
-  }
-  return placed;
+
+  const over = u.ec - u.ms;
+  const want = Math.max(1, Math.ceil(over / (RULES.overloadSlotPer * u.maxMs)));
+  const before = u.extra.length;
+  addExtra(u, "OVERLOAD", want);
+  const n = u.extra.length - before;
+  if(!n) return 0;
+
+  /* one ability for the whole event, never a mix */
+  const pool = [ABILITIES.SELF_HARM, ABILITIES.FEED].filter(Boolean);
+  const ab = pool[Math.floor(Math.random() * pool.length)];
+  while(u.line.length < lineLen(u)) u.line.push(null);
+  for(let i = u.lineCap; i < lineLen(u); i++)
+    if(u.extra[i - u.lineCap] === "OVERLOAD")
+      u.line[i] = {ab, charge:false, locked:true};
+  return n;
 }
+/* Overload is DERIVED, never stored in `unit.statuses` — tickStatuses() decrements
+   every entry it finds, so a status kept there would tick itself away. */
+const isOverloaded = u => u.ec > u.ms;
 
 /* Interactions come entirely from the matchups table. '*' is a wildcard and
    'NONE' means the target has no layers; highest priority wins, so a specific

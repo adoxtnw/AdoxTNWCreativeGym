@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Rebuild config/avui-config.xlsx from scratch.
+Rebuild config/battle-system-config.xlsx from scratch.
 
     python3 tools/build_workbook.py
 
@@ -119,18 +119,20 @@ rd.column_dimensions["A"].width = 100
 EMO = [
  # OFFICIAL palette, straight from Bars_Reference_001.svg. This list's ORDER is
  # also the gradient order (the reference puts them at even 20% stops).
- ("ANGER",   "Anger",   "anger",   "#e53859","#2a0810","Hot, direct, aggressive."),
- ("SURPRISE","Surprise","surprise","#724082","#170a1b","Sudden, disruptive, disorienting."),
- ("DISGUST", "Disgust", "disgust", "#56a36a","#0c1f13","Rejecting, corrosive, contemptuous."),
- ("JOY",     "Joy",     "joy",     "#fcc336","#2a1f06","Bright, volatile, energising."),
- ("SADNESS", "Sadness", "sadness", "#3d66c1","#0a1229","Heavy, draining, persistent."),
- ("FEAR",    "Fear",    "fear",    "#929fa5","#1a1e20","Cold, freezing, evasive."),
+ # the last field is the glyph tiled behind this emotion's Loadout button
+ ("ANGER",   "Anger",   "anger",   "#e53859","#2a0810","Hot, direct, aggressive.","BOLT"),
+ ("SURPRISE","Surprise","surprise","#724082","#170a1b","Sudden, disruptive, disorienting.","BURST"),
+ ("DISGUST", "Disgust", "disgust", "#56a36a","#0c1f13","Rejecting, corrosive, contemptuous.","ROT"),
+ ("JOY",     "Joy",     "joy",     "#fcc336","#2a1f06","Bright, volatile, energising.","SPARK"),
+ ("SADNESS", "Sadness", "sadness", "#3d66c1","#0a1229","Heavy, draining, persistent.","DROP"),
+ ("FEAR",    "Fear",    "fear",    "#929fa5","#1a1e20","Cold, freezing, evasive.","EYE"),
 ]
 sheet("emotions",
-  ["id","name","token","hex","bg_hex","short","description","enabled","notes"],
-  {"id","name","token","hex","bg_hex"},
-  [dict(id=i,name=n,token=t,hex=h,bg_hex=b,short=i[:3],description=d,enabled=1,notes="")
-   for i,n,t,h,b,d in EMO],
+  ["id","name","token","hex","bg_hex","short","icon","sfx","description","enabled","notes"],
+  {"id","name","token","hex","bg_hex","icon","sfx"},
+  [dict(id=i,name=n,token=t,hex=h,bg_hex=b,short=i[:3],icon=ic,sfx="hit_"+i.lower(),
+        description=d,enabled=1,notes="")
+   for i,n,t,h,b,d,ic in EMO],
   widths={"description":40,"notes":30},
   notes=("One row per emotional type. 'token' is the CSS palette variable name; 'hex' drives every colour "
          "in the UI for this emotion; 'bg_hex' tints the battle backdrop when an enemy of this type is fought."))
@@ -139,50 +141,50 @@ sheet("emotions",
 ABIL_COLS = ["id","name","emotion","cost","kind","power","charge","hits_layer","icon",
              "target","reach","self_ms","self_ec","ec_push_target","ec_drain_target",
              "heal","shield_gain","pierce_shield","ignore_layer","repeat","cooldown",
-             "uses","blurb","status_apply","status_chance","status_duration",
+             "uses","blurb","action","emotions","crit_chance","status_apply","status_chance","status_duration",
              "combo_tag","requires_prev_tag","synergy_group","wild_target",
              "rarity","unlock","enabled","suggested_cost","cost_delta","notes"]
-ABIL_LIVE = {"id","name","emotion","cost","kind","power","charge","hits_layer","icon","self_ms","cooldown","uses","blurb","status_apply","status_duration"}
+ABIL_LIVE = {"id","name","emotion","cost","kind","power","charge","hits_layer","icon","self_ms","cooldown","uses","blurb","action","emotions","crit_chance","status_apply","status_duration"}
 def ab(**k):
     row = {c:"" for c in ABIL_COLS}
     row.update(dict(target="ENEMY", reach="SINGLE", charge=0, repeat=1, cooldown=1,
-                    uses=3, status_chance=0, status_duration=0,
+                    uses=3, action=0, emotions="", crit_chance="", status_chance=0, status_duration=0,
                     pierce_shield=0, ignore_layer=0, enabled=1,
                     self_ms=0, self_ec=0, ec_push_target=0, ec_drain_target=0,
                     heal=0, shield_gain=0, wild_target="LOWEST_MS", rarity="COMMON"))
     row.update(k); return row
 ABILS = [
- ab(id="ATK_ANGER", blurb='A straight {ANGER} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',  name="Anger",  emotion="ANGER",   cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BOLT"),
- ab(id="ATK_SADNESS", blurb='A straight {SADNESS} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',name="Sadness",emotion="SADNESS", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="DROP"),
- ab(id="ATK_JOY", blurb='A straight {JOY} strike. Costs {EC}, takes {MS} off the target and cracks its outermost {LAYER}.',    name="Joy",    emotion="JOY",     cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="SPARK"),
- ab(id="DEFEND", blurb='Raises a guard. The next hit against you is *blocked* outright instead of costing {MS}.',     name="Defend", emotion="",        cost=10, kind="SHIELD", power=1,  hits_layer=0, icon="SHIELD",
+ ab(id="ATK_ANGER", blurb='Attack. Cracks the outermost {LAYER}.',  name="Heated Punch",  emotion="ANGER",   cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BOLT"),
+ ab(id="ATK_SADNESS", blurb='Attack. Cracks the outermost {LAYER}.',name="Cold Shoulder",emotion="SADNESS", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="DROP"),
+ ab(id="ATK_JOY", blurb='Attack. Cracks the outermost {LAYER}.',    name="Manic Grin",    emotion="JOY",     cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="SPARK"),
+ ab(action=1, id="DEFEND", blurb='Defence. Blocks the next hit outright.',     name="Block", emotion="",        cost=10, kind="SHIELD", power=1,  hits_layer=0, icon="SHIELD",
     target="SELF", wild_target="SELF", shield_gain=1),
- ab(uses=2, id="HVY_ANGER", blurb='Heavy {ANGER}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.',  name="Rage",   emotion="ANGER",   cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BOLT"),
- ab(uses=2, id="HVY_SADNESS", blurb='Heavy {SADNESS}. Holds two *charge* segments first, so it lands late and hands the opponent room, but it hits for almost triple.',name="Grief",  emotion="SADNESS", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="DROP"),
- ab(uses=2, id="HVY_JOY", blurb='Heavy {JOY}. Three *charge* segments and the hardest hit in the pool. Slow, loud, and expensive in every sense.',    name="Mania",  emotion="JOY",     cost=60, kind="DAMAGE", power=130,charge=3, hits_layer=1, icon="SPARK"),
- ab(id="RECHARGE", blurb='Buys {EC} with your own {MS}. Gains charge and lowers your ceiling at the same time — watch the {OVERLOAD} line.',   name="Recharge",emotion="",       cost=0,  kind="CHARGE", power=20, hits_layer=0, icon="CHARGE",
+ ab(uses=2, id="HVY_ANGER", blurb='Attack. *Charges* first, then hits for triple.',  name="Rage",   emotion="ANGER",   cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BOLT"),
+ ab(uses=2, id="HVY_SADNESS", blurb='Attack. *Charges* first, then hits for triple.',name="Grief",  emotion="SADNESS", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="DROP"),
+ ab(uses=2, id="HVY_JOY", blurb='Attack. The hardest hit there is, after a long *charge*.',    name="Mania",  emotion="JOY",     cost=60, kind="DAMAGE", power=130,charge=3, hits_layer=1, icon="SPARK"),
+ ab(action=1, id="RECHARGE", blurb='Buff. Trades your own {MS} for {EC}.',   name="Recharge",emotion="",       cost=0,  kind="CHARGE", power=20, hits_layer=0, icon="CHARGE",
     target="SELF", wild_target="SELF", self_ms=5,
     notes="Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling."),
- ab(id="GEN_DISGUST", blurb='Grows one extra {DISGUST} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.', name="Bile",   emotion="DISGUST", cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
+ ab(id="GEN_DISGUST", blurb='Defence. Grows a {LAYER} that *never regrows* once broken.', name="Bile",   emotion="DISGUST", cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
     target="SELF", wild_target="SELF", uses=2,
     notes="Grows one extra Disgust layer. Grown layers are TEMPORARY: once broken they never regrow."),
- ab(id="GEN_ANGER", blurb='Grows one extra {ANGER} {LAYER} on yourself. *Grown layers never regrow* — once it breaks, it is gone.',   name="Bristle",emotion="ANGER",   cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
+ ab(id="GEN_ANGER", blurb='Defence. Grows a {LAYER} that *never regrows* once broken.',   name="Bristle",emotion="ANGER",   cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
     target="SELF", wild_target="SELF", uses=2,
     notes="Grows one extra Anger layer. Grown layers are TEMPORARY: once broken they never regrow."),
- ab(id="ROT", blurb='{DISGUST} rot. For *2 turns* the target cannot regrow *2* of its broken {LAYERS}.',         name="Rot",    emotion="DISGUST", cost=25, kind="DEBUFF",   power=0, hits_layer=0, icon="ROT",
+ ab(id="ROT", blurb='Debuff. Target cannot regrow *2* {LAYERS} for *2 turns*.',         name="Fester",    emotion="DISGUST", cost=25, kind="DEBUFF",   power=0, hits_layer=0, icon="ROT",
     uses=2, status_apply="NO_REGEN", status_duration=2,
     notes="For 2 turns the target cannot regrow 2 of its broken layers."),
- ab(id="INFLICT_SAD", blurb='{SADNESS} turned inward. For *2 turns* the target uses one of its own attacks *on itself* at the end of every round.', name="Self-Harm", emotion="SADNESS", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="DROP",
+ ab(id="INFLICT_SAD", blurb='Status. Target attacks *itself* each round for *2 turns*.', name="Self-Harm", emotion="SADNESS", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="DROP",
     uses=2, status_apply="SAD", status_duration=2,
     notes="Each round end the target turns one of its own attacks on itself. NOTE: distinct from "
           "SELF_HARM, which is the Overload-forced station."),
- ab(id="BLIND", blurb='{ANGER} blots out aim. For *2 turns* the target *misses half* of its attacks.',       name="Blinded by Hate", emotion="ANGER", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="EYE",
+ ab(id="BLIND", blurb='Debuff. Target *misses half* its attacks for *2 turns*.',       name="Blinded by Hate", emotion="ANGER", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="EYE",
     uses=2, status_apply="BLINDED", status_duration=2,
     notes="ENEMY ability. The target misses half its attacks for 2 turns."),
- ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Forced onto your line by {OVERLOAD}. Costs you {MS} and cannot be removed.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
+ ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Status. Forced by {OVERLOAD}; costs you {MS}.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
     target="SELF", wild_target="SELF", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed."),
- ab(cooldown=0, uses=0, id="FEED", blurb='Forced onto your line by {OVERLOAD}. *Heals your opponent* and cannot be removed.',       name="Feed",    emotion="",       cost=0,  kind="FEED",     power=30, hits_layer=0, icon="DROP",
+ ab(cooldown=0, uses=0, id="FEED", blurb='Status. Forced by {OVERLOAD}; *heals* your opponent.',       name="Feed",    emotion="",       cost=0,  kind="FEED",     power=30, hits_layer=0, icon="DROP",
     target="ENEMY", wild_target="AS_WRITTEN", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed."),
 ]
@@ -212,7 +214,7 @@ MUS = [
  mu("*","*",0,1,0,"OFF TYPE","off","hit","Fallback. Every pair you do not name lands here."),
  mu("*","NONE",5,2,0,"EXPOSED!","dmg","hit","No layers left: double damage, no charge."),
 ]
-for e,_,_,_,_,_ in EMO:
+for e,*_ in EMO:
     MUS.append(mu(e,e,10,0.5,1,"ABSORBED!","absorb","absorb","Same emotion: the layer drinks it."))
 sheet("matchups", MU_COLS, MU_LIVE, MUS,
   widths={"notes":52,"label":16},
@@ -224,17 +226,17 @@ sheet("matchups", MU_COLS, MU_LIVE, MUS,
 
 # ───────────────────────────── units ─────────────────────────────
 U_COLS = ["id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir",
-          "line_cap","max_bonus_slots",
+          "line_cap","max_bonus_slots","loadouts",
           "ai_profile","init","start_shield","max_layers_override","tags","enabled","notes"]
-U_LIVE = {"id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir","line_cap","max_bonus_slots"}
+U_LIVE = {"id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir","line_cap","max_bonus_slots","loadouts"}
 UNITS_ROWS = [
  dict(id="player", name="You", emotion="", max_ms=400, start_ec_pct=0.40,
       layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD", line_dir=1,
-      line_cap=3, max_bonus_slots=6,
+      line_cap=3, max_bonus_slots=6, loadouts="LO_ANGER|LO_SADNESS|LO_JOY",
       ai_profile="", init=10, start_shield=0, max_layers_override="", tags="PLAYER", enabled=1, notes=""),
  dict(id="enemy", name="The Commuter", emotion="ANGER", max_ms=250, start_ec_pct=0.40,
       layers="ANGER|ANGER|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND", line_dir=-1,
-      line_cap=3, max_bonus_slots=6,
+      line_cap=3, max_bonus_slots=6, loadouts="",
       ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0, max_layers_override="",
       tags="ENEMY", enabled=1, notes="AI reads the matchups sheet, so retuning it retunes the AI."),
 ]
@@ -257,13 +259,13 @@ sheet("layer_types", LT_COLS, set(),
          "when it breaks, or granting a passive while it is outermost)."))
 
 # ───────────────────────────── status_effects (reserved) ─────────────────────────────
-SE_COLS = ["id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits",
+SE_COLS = ["id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits","crit_mult",
            "dmg_taken_mult","dmg_dealt_mult","ec_gain_mult","ms_per_turn","ec_per_turn",
            "blocks_actions","stacking","max_stacks","enabled","notes"]
-SE_LIVE = {"id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits","enabled"}
+SE_LIVE = {"id","name","duration","icon","color","blurb","block_regen","miss_chance","self_hits","crit_mult","enabled"}
 def se(**k):
     row = {c:"" for c in SE_COLS}
-    row.update(dict(duration=2, block_regen=0, miss_chance=0, self_hits=0,
+    row.update(dict(duration=2, block_regen=0, miss_chance=0, self_hits=0, crit_mult=0,
                     dmg_taken_mult=1, dmg_dealt_mult=1, ec_gain_mult=1,
                     ms_per_turn=0, ec_per_turn=0, blocks_actions=0,
                     stacking="REFRESH", max_stacks=1, enabled=1))
@@ -275,6 +277,9 @@ SE_ROWS = [
  se(id="SAD",      name="Sad",     duration=2, icon="DROP", color="#3d66c1", self_hits=1,
     blurb="At the end of every round one of your own attacks is turned *on yourself*.",
     notes="Each round end the victim turns one of its OWN attacks on itself."),
+ se(id="OVERLOAD", name="Overload", duration=0, icon="WARN", color="#e53859",
+    blurb="Your {EC} is over your {MS}. Your line is being invaded until you burn it down.",
+    notes="DERIVED, not timed: it lasts while ec > ms, so it is never stored in unit.statuses."),
  se(id="BLINDED",  name="Blinded", duration=2, icon="EYE", color="#e53859", miss_chance=0.5,
     blurb="{ANGER} has blotted out your aim. *Half* of your attacks miss outright.",
     notes="The victim fluffs this fraction of its attacks."),
@@ -315,7 +320,7 @@ RULES = [
  ("clashSeconds",4,"Length of the death sequence."),
  ("layerRegenAtTurnEnd",1,"Broken layers stay gone until the round ends, then regrow at the back of the queue."),
  ("chargeStepMs",260,"How long each charge segment holds before the next."),
- ("flyMs",420,"How long a station takes to fly across and strike the target."),
+ ("flyMs",120,"How long a station takes to fly across and strike the target."),
  ("typeMs",32,"Delay between letters of dialogue."),
  ("dialogueHoldMs",3000,"How long a finished line stays on screen before it fades."),
  ("lowHpTalkPct",0.2,"Fraction of max MS below which the winning / losing lines fire."),
@@ -324,10 +329,30 @@ RULES = [
  ("aiDebuffChance",0.5,"Chance the AI spends a slot on a debuff the target is not already suffering."),
  ("aiChargeBias",0.55,"Chance the AI prefers an ability with charge segments when it can afford one."),
  ("shuffleLayersEachRound",1,"Re-order every unit's layer queue at the start of each round."),
- ("chargeGrantsSlots",1,"Each charge segment in a line grants the OPPONENT one temporary slot next turn."),
- ("maxBonusSlots",6,"FALLBACK cap on temporary slots, used only if a unit row leaves max_bonus_slots blank."),
- ("abilPageSize",4,"Abilities shown per page in the Emotions panel."),
+ ("maxExtraSlots",6,"Hard cap on extra slots of any kind a line may carry."),
+ ("loadoutPatternAlpha",0.13,"How faint the emotion glyph tiled behind a Loadout button is."),
+ ("loadoutSlots",4,"Ability slots in one Loadout, and so cells per page."),
+ ("equippedSlots",3,"Loadouts the player carries into a battle."),
 ("slotArriveMs",260,"Gap between one temporary slot flying in and the next."),
+ ("impactFlashMs",45,"White frame on a hit."),
+ ("impactShakeMs",85,"Shake after that white frame."),
+ ("stunTurns",1,"Turns a unit is stunned for once its last layer breaks. It skips its line and regrows nothing."),
+ ("lineTravelMs",200,"How long the line takes to slide the next station to the centre."),
+ ("lineFlashMs",90,"How long a centred station flashes before it strikes."),
+ ("chargeShownMax",2,"Most charge stations drawn in an ability box; beyond this it just repeats."),
+ ("critChance",0.05,"Default chance an attack crits, when the ability does not say otherwise."),
+ ("frameMaxW",420,"The phone frame's widest; nothing drawn for it may exceed this."),
+ ("momentPx",2,"Upscale of the title screen's mood line: bigger = chunkier pixels."),
+ ("momentSize",10,"LOGICAL type size; what you see is this times momentPx."),
+ ("critTagMs",700,"How long a plain positioned tag stays up."),
+ ("critHoldMs",1000,"How long CRITICAL is held before the earned slot flies in."),
+ ("critFlashMs",260,"One wash of the screen in the attacking emotion's colour."),
+ ("critSlotFlyMs",520,"The earned slot travelling from the tag to the line."),
+ ("critMult",2,"Damage multiplier on a critical."),
+ ("statusStepMs",2000,"A station that applies a status holds this long, so it can be read."),
+ ("attackStepMs",600,"Total time one executed station takes, start to finish."),
+ ("lineAlertFlashes",3,"How many times a line flashes white before it starts executing."),
+ ("lineAlertMs",110,"Length of one of those flashes."),
  ("unsheathMs",340,"How long one interface element takes to draw itself into place."),
  ("unsheathGapMs",110,"Gap before the next element starts — smaller than unsheathMs, so they overlap."),
  ("longPressMs",420,"How long an ability must be held before its tooltip opens."),
@@ -354,9 +379,21 @@ RULES = [
  ("capR",2,"End-cap corner rounding in logical pixels."),
  ("ballFlyMs",330,"How long a ball of light takes to arc from its indicator into the bar."),
  ("settleStepMs",70,"Pause between one hit landing on a bar and the next setting off."),
+ ("fnumMinPx",20,"Smallest a floating damage number gets."),
+ ("fnumMaxPx",62,"Largest — reached when one hit costs a whole stamina bar."),
+ ("fnumRisePx",34,"How far a floating number travels up before it settles."),
+ ("fnumInMs",600,"Fade in while rising."),
+ ("fnumHoldMs",600,"Easing to a stop."),
+ ("fnumOutMs",400,"Fade out."),
+ ("fnumLingerMs",300,"Extra time a floating number holds before it goes."),
+ ("hitShards",3,"Shapes thrown off where an attack lands."),
+ ("hitShardMs",260,"How long one of those shapes flashes."),
+ ("actionLineMs",620,"Buff / debuff streaks over the target."),
+ ("statusFxMs",1000,"Distortion and bloom when a status takes hold."),
+ ("backdropGlow",0.55,"How strongly the enemy's emotion tints the battle backdrop."),
  ("barTweenMs",1000,"How long a bar takes to travel to its new value once a hit lands."),
  ("overloadHoldMs",2000,"How long the OVERLOAD tag and its slow motion last."),
- ("ecScrollSpeed",0.0022,"How fast the charge gradient drifts along the bar."),
+ ("ecScrollSpeed",0.0044,"How fast the charge gradient drifts along the bar."),
  ("themeOpening","audio/theme-opening.wav","Theme part 1: plays once."),
  ("themeLoop","audio/theme-loop.wav","Theme part 2: loops for ever, scheduled to start the instant part 1 ends."),
  ("musicFadeMs",900,"How quickly the theme fades out when the battle ends."),
@@ -368,8 +405,8 @@ RULES = [
  ("layerFill",0.42,"Ring thickness as a fraction of the gap to the next slot."),
  ("layerOuterThick",2,"Thickness multiplier for the outermost (active) layer."),
  ("layerInnerThick",0.9,"Thickness multiplier for every layer behind it."),
- ("layerFlashMs",240,"How long a struck layer flashes white before vanishing."),
- ("layerGapMs",260,"Beat between the layer vanishing and it regrowing at the back."),
+ ("layerFlashMs",50,"How long a struck layer flashes white before vanishing."),
+ ("layerGapMs",18,"Beat between the layer vanishing and it regrowing at the back."),
  ("layerRegrowMs",380,"How long the regrow beat holds before resolution continues."),
  ("enemyRingBaseR",28,"Enemy: radius of the outermost ring, in logical canvas pixels."),
  ("enemyRingSpacing",4.7,"Enemy: radius step between one layer and the next in. baseR/spacing sets how many fit."),
@@ -391,6 +428,16 @@ sheet("rules", ["key","value","description"], {"key","value"},
 SND = [
  ("tap","square",980,1460,80,0.46,0.30,"Adding an ability to the line."),
  ("place","square",620,1760,130,0.40,0.35,"The station lands on your line and flashes white."),
+ ("resist","square",880,760,120,0.34,0.30,"A layer shrugs off its own emotion. Played twice, descending."),
+ ("hit_anger","square",300,90,150,0.36,0.28,"Anger lands: hard and low."),
+ ("hit_surprise","sawtooth",1200,300,130,0.30,0.34,"Surprise lands: a sharp drop."),
+ ("hit_disgust","noise",420,200,180,0.30,0.30,"Disgust lands: wet and dull."),
+ ("hit_joy","square",900,1800,120,0.30,0.32,"Joy lands: bright and rising."),
+ ("hit_sadness","triangle",520,180,220,0.30,0.38,"Sadness lands: a long fall."),
+ ("hit_fear","noise",900,1400,120,0.26,0.40,"Fear lands: a cold hiss."),
+ ("buff_up","square",420,1500,260,0.28,0.35,"Something is lifted."),
+ ("debuff_down","sawtooth",1500,260,300,0.30,0.38,"Something is dragged down."),
+ ("status_on","noise",200,1100,520,0.32,0.5,"A status takes hold."),
  ("sheatheE","sawtooth",1500,220,150,0.30,0.22,"Enemy UI element drawn into place. Lower."),
  ("sheatheP","sawtooth",2100,340,140,0.28,0.22,"Player UI element drawn into place. Higher."),
  ("slot","triangle",300,1500,150,0.30,0.45,"A temporary slot flies in from the opponent."),
@@ -428,6 +475,45 @@ if os.path.exists(_dlg_src):
                          state=r["State"].strip().upper(),
                          line=r["Dialogue Line"].strip(),
                          enabled=1, notes=""))
+# ───────────────────────────── loadouts ─────────────────────────────
+# One Loadout per emotion. Slots are POSITIONAL — an empty cell is a real, visible
+# empty slot in the panel, not a missing entry — so they are four columns rather
+# than one pipe list. A future equip screen maps one-to-one onto them.
+LO_COLS = ["id","emotion","name","slot1","slot2","slot3","slot4","enabled","notes"]
+LO_LIVE = {"id","emotion","name","slot1","slot2","slot3","slot4","enabled"}
+def lo(i, emo, name, *slots, notes=""):
+    row = dict(id=i, emotion=emo, name=name, enabled=1, notes=notes)
+    for n in range(4):
+        row["slot%d" % (n+1)] = slots[n] if n < len(slots) else ""
+    return row
+LOADOUTS_ROWS = [
+ lo("LO_ANGER",   "ANGER",   "Anger",   "ATK_ANGER","HVY_ANGER","GEN_ANGER"),
+ lo("LO_SADNESS", "SADNESS", "Sadness", "ATK_SADNESS","HVY_SADNESS","INFLICT_SAD"),
+ lo("LO_JOY",     "JOY",     "Joy",     "ATK_JOY","HVY_JOY"),
+ lo("LO_DISGUST", "DISGUST", "Disgust", "GEN_DISGUST","ROT"),
+ lo("LO_SURPRISE","SURPRISE","Surprise", notes="No Surprise abilities exist yet."),
+ lo("LO_FEAR",    "FEAR",    "Fear",     notes="No Fear abilities exist yet."),
+]
+sheet("loadouts", LO_COLS, LO_LIVE, LOADOUTS_ROWS,
+  widths={"notes":40},
+  notes=("One Loadout per emotion; the player carries `equippedSlots` of them into a battle "
+         "(units.loadouts). A Loadout may hold any ability whose emotion set includes its own "
+         "emotion — see abilities.emotions for hybrids. Blank slots render as empty."))
+
+# ───────────────────────────── prompts ─────────────────────────────
+# The line's cue. One is drawn at random each turn, so the game keeps asking the
+# question in a slightly different voice.
+PROMPTS = [
+ "Whatcha gonna do?", "How did that make you feel?", "Act!", "R U OK?",
+ "Show them.", "Say something.", "Your move.", "Don't just stand there.",
+ "Feel it.", "What now?", "Answer that.", "Let it out.",
+ "Breathe. Then act.", "You alright?", "Do something.",
+]
+sheet("prompts", ["id","text","enabled","notes"], {"id","text","enabled"},
+  [dict(id="p%02d" % (i+1), text=t, enabled=1, notes="") for i,t in enumerate(PROMPTS)],
+  widths={"text":40},
+  notes="The cue above the attack line. One is picked at random each turn.")
+
 # ───────────────────────────── moments ─────────────────────────────
 # The title screen names Barcelona's current moment. `day` is a weekday or "*",
 # and from_hour/to_hour are BARCELONA local hours, to_hour exclusive; a band that
@@ -518,7 +604,7 @@ for r,(label,exp,formula) in enumerate(CHECKS, 4):
 ck.column_dimensions["A"].width = 56
 for col,w in (("B",12),("C",12),("D",12)): ck.column_dimensions[col].width = w
 
-WB._sheets.sort(key=lambda s: ["README","emotions","abilities","matchups","units","dialogue","moments",
+WB._sheets.sort(key=lambda s: ["README","emotions","abilities","loadouts","matchups","units","dialogue","prompts","moments",
   "layer_types","status_effects","synergies","rules","sounds","checks"].index(s.title))
-WB.save(os.path.join(HERE, "..", "config", "avui-config.xlsx"))
+WB.save(os.path.join(HERE, "..", "config", "battle-system-config.xlsx"))
 print("saved")

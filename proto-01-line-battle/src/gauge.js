@@ -128,6 +128,14 @@ function drawGauge(ctx, dctx, u, o){
                     GAUGE.deadMid[2]+(GAUGE.deadRim[2]-GAUGE.deadMid[2])*k]);
         continue;
       }
+      /* The living bar lives strictly BETWEEN the two brackets. It used to be drawn
+         underneath them as well, and because a cap has rounded corners the wave's
+         peaks showed through exactly where those corner pixels are cut away — the
+         silhouette appeared to poke out past the bracket. The one exception is
+         charge that has spilled past the ceiling, which must still draw. */
+      const underCap = x < capW || (x >= msX && x <= msX + capW);
+      if(underCap && !(overcharged && x > msX && x <= ecX)) continue;
+
       if(y < top - 1 || y > bot + 1) continue;
 
       /* ---- the mint silhouette stroke ---- */

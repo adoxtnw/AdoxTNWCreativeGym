@@ -7,16 +7,16 @@ Export every sheet of the config workbook to CSV.
 The spreadsheet is the source of truth, but build_data.py reads CSV (the format
 Google Sheets exports). This closes the loop locally, so the whole chain is:
 
-    build_workbook.py  ->  avui-config.xlsx  ->  export_csv.py  ->  build_data.py
+    build_workbook.py  ->  battle-system-config.xlsx  ->  export_csv.py  ->  build_data.py
 
-Files are named the way Google names them ("avui-config - rules.csv") so
+Files are named the way Google names them ("battle-system-config - rules.csv") so
 build_data.py matches them without special-casing.
 """
 import sys, os, csv
 import openpyxl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BOOK = os.path.join(HERE, "..", "config", "avui-config.xlsx")
+BOOK = os.path.join(HERE, "..", "config", "battle-system-config.xlsx")
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "config", "csv")
@@ -25,7 +25,7 @@ def main():
     n = 0
     for name in wb.sheetnames:
         ws = wb[name]
-        path = os.path.join(out, f"avui-config - {name}.csv")
+        path = os.path.join(out, f"battle-system-config - {name}.csv")
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             for row in ws.iter_rows(values_only=True):

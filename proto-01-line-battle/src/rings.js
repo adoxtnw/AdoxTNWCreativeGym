@@ -95,6 +95,10 @@ const E_CFG={baseR:RULES.enemyRingBaseR,  spacing:RULES.enemyRingSpacing,  breat
 const P_CFG={baseR:RULES.playerRingBaseR, spacing:RULES.playerRingSpacing, breathe:RULES.playerRingBreathe};
 let t=0, frozen=false, timer=null, glowCache={};
 let stepMs=1000/12, acc=0, lastTs=0, rafId=0, lastTickAt=0, watchdog=null;
+let rampX=0;
+const RAMP_STEP=2;                       // px per frame
+/* the loop is a third of the viewport, matching --rampW */
+const rampLoopPx=()=>Math.max(1, window.innerWidth/3);
 function applyGlow(el,u,px){
   const e=u.layers.length?u.layers[0].e:null;
   const key=el.id+":"+e;
@@ -108,6 +112,12 @@ function tick(){
   if(frozen)return;
   t++; stepLayers(S.enemy); stepLayers(S.player);
   gaugePhase = t;                       // the bar's waves ride the same clock
+  /* ONE ramp position for the whole document. Every `.ramp` element reads this,
+     so a tag, a border and a number are always showing the same slice of the same
+     sheet. Per-element CSS animations drifted out of phase with each other and
+     cost one animation per element; this is a single custom-property write. */
+  rampX = (rampX - RAMP_STEP) % rampLoopPx();
+  document.documentElement.style.setProperty("--rampPos", rampX.toFixed(1) + "px");
   if(S.enemy.hurtFlash>0)  S.enemy.hurtFlash--;
   if(S.player.hurtFlash>0) S.player.hurtFlash--;
   redrawGauges();                       // canvas bars repaint every frame

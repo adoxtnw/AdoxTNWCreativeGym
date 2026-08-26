@@ -1,10 +1,10 @@
-<!-- NEURO-METRO: AVUI — combat prototype
+<!-- Neuro Metro: AVUI — BATTLE SYSTEM
      Markup only. Styles live in styles/, behaviour in src/.
      Classic scripts, not modules, so this still opens from file://. -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#191534">
-<title>NEURO-METRO: AVUI — proto 01</title>
+<title>Neuro Metro: AVUI — Battle System</title>
 <link rel="stylesheet" href="styles/game.css">
 
 <div class="phone">
@@ -23,12 +23,12 @@
   </filter>
 </defs></svg>
 <div class="title" id="title"><div class="titlewrap">
-    <div class="moment" id="momentLine"></div>
+    <canvas class="moment" id="momentLine"></canvas>
     <!-- screen-wide square frame: the logo, a colour-dodged glow that drifts
          through the emotions, and a turbulence filter that keeps the image
          faintly swimming. -->
     <div class="logoframe">
-      <img class="logoimg" id="logoImg" src="art/logo.png" alt="NEURO-METRO: AVUI">
+      <img class="logoimg" id="logoImg" src="art/logo.png" alt="Neuro Metro: AVUI">
       <div class="logoglow"></div>
     </div>
     <div class="blurb">Who laughed, who cried, who was riding with a heartbreak
@@ -37,6 +37,7 @@
     <button class="confront pxr pxr-sh" id="confrontBtn">CONFRONT EMOTION</button>
     <button class="confront rest pxr pxr-sh" id="howtoBtn"
       style="margin-top:9px;background:linear-gradient(180deg,#b3a7d0,var(--apathy) 55%,#5d5378);color:var(--ink);animation:none">HOW TO PLAY</button>
+    <div class="buildstamp" id="buildStamp"></div>
   </div></div>
   <div class="howto" id="howto">
     <h2>HOW TO PLAY</h2>
@@ -68,10 +69,10 @@
   </div>
 
   <div class="panel unit pxr pxr-sh" id="ePanel">
+    <div class="tagrow" id="eTagsA">
+      <div class="tag ms pxr" id="eTagMs"></div><div class="tag ec pxr" id="eTagEc"></div></div>
     <div class="gwrap" id="eWrap">
-      <div class="tanchor ms" id="eTagMsA"><div class="tag ms pxr" id="eTagMs"></div></div>
       <canvas class="gaugecv dead" id="eGaugeDead"></canvas><canvas class="gaugecv" id="eGauge"></canvas>
-      <div class="tanchor ec" id="eTagEcA"><div class="tag ec pxr" id="eTagEc"></div></div>
       <div class="gflash"></div>
     </div>
 
@@ -90,26 +91,25 @@
 
   <div class="pstrip" id="pstrip"><canvas id="pRingsIn"></canvas><canvas id="pRingsOut"></canvas></div>
   <div class="statusrow" id="pStatus"></div>
-  <div class="lane-wrap"><div class="shieldrow above" id="pShields"></div>
-    <div class="lane pxr" id="pLane"><div class="track" id="pTrack"></div></div></div>
+  <div class="emocue" id="emoCue">EMOTIONS<span class="cuetri"></span></div>
+  <div class="departslot"><button class="departbtn pxr" id="departBtn">DEPART</button></div>
+  <div class="lane-wrap ring"><div class="shieldrow above" id="pShields"></div>
+    <div class="lane pxr live" id="pLane"><div class="track" id="pTrack"></div></div></div>
   <div class="abilpanel pxr" id="abilPanel">
     <div class="abilscroll" id="abilScroll"><div class="abpages" id="abPages"></div></div>
-    <div class="abarrow l" id="abPrev"></div>
-    <div class="abarrow r" id="abNext"></div>
-    <div class="abdots" id="abDots"></div>
+    <!-- Actions live inside the panel now, in the strip the page dots used to occupy -->
+    <div class="actionrow" id="actionRow"></div>
   </div>
-  <div class="btnrow">
-    <button class="depart rest pxr pxr-sh" id="emoBtn">EMOTIONS</button>
-    <button class="depart pxr pxr-sh" id="departBtn">DEPART &#9654;</button>
-  </div>
+  <!-- the three carried Loadouts: this IS the pagination -->
+  <div class="loadoutbar" id="loadoutBar"></div>
 
   <div class="panel unit pxr pxr-sh" id="pPanel">
     <div class="gwrap" id="pWrap">
-      <div class="tanchor ms" id="pTagMsA"><div class="tag ms pxr" id="pTagMs"></div></div>
       <canvas class="gaugecv dead" id="pGaugeDead"></canvas><canvas class="gaugecv" id="pGauge"></canvas>
-      <div class="tanchor ec" id="pTagEcA"><div class="tag ec pxr" id="pTagEc"></div></div>
       <div class="gflash"></div>
     </div>
+    <div class="tagrow" id="pTagsA">
+      <div class="tag ms pxr" id="pTagMs"></div><div class="tag ec pxr" id="pTagEc"></div></div>
 
   </div>
  </div>
@@ -126,6 +126,7 @@
      audio/theme-loop.wav is scheduled to start the sample it ends.
      ============================================== -->
 <script src="data.js"></script>
+<script src="build.js"></script>   <!-- tools/stamp.py -->
 
 <!-- foundations: no dependencies beyond the data tables -->
 <script src="src/util.js"></script>

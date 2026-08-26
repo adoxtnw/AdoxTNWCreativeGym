@@ -1,0 +1,12 @@
+LIVE VALIDATION — every row should read OK. Anything else means a broken reference.,,,
+check,expected,actual,status
+Abilities with an emotion not in 'emotions',0,,
+Abilities missing an id,0,,
+Units with a blank pool,0,,
+Matchup rows with no label,0,,
+Matchup attack emotions unknown (blank/*/NONE allowed),0,,
+Matchup layer emotions unknown (blank/*/NONE allowed),0,,
+Duplicate ability ids,0,,
+Duplicate emotion ids,0,,
+Enabled emotions,6,,
+Enabled abilities,10,,

@@ -1,0 +1,31 @@
+"Every sound is synthesised at runtime — there are no audio files. wave: square | sawtooth | triangle | sine | noise. f0/f1 sweep in Hz over 'dur' ms. 'echo' is how much of the sound feeds the shared delay line. Everything runs through a bit-crusher, which is where the crunch comes from.",,,,,,,
+id,wave,f0,f1,dur,gain,echo,description
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
+tap,square,980,1460,80,0.46,0.3,Adding an ability to the line.
+place,square,620,1760,130,0.4,0.35,The station lands on your line and flashes white.
+resist,square,880,760,120,0.34,0.3,"A layer shrugs off its own emotion. Played twice, descending."
+hit_anger,square,300,90,150,0.36,0.28,Anger lands: hard and low.
+hit_surprise,sawtooth,1200,300,130,0.3,0.34,Surprise lands: a sharp drop.
+hit_disgust,noise,420,200,180,0.3,0.3,Disgust lands: wet and dull.
+hit_joy,square,900,1800,120,0.3,0.32,Joy lands: bright and rising.
+hit_sadness,triangle,520,180,220,0.3,0.38,Sadness lands: a long fall.
+hit_fear,noise,900,1400,120,0.26,0.4,Fear lands: a cold hiss.
+buff_up,square,420,1500,260,0.28,0.35,Something is lifted.
+debuff_down,sawtooth,1500,260,300,0.3,0.38,Something is dragged down.
+status_on,noise,200,1100,520,0.32,0.5,A status takes hold.
+sheatheE,sawtooth,1500,220,150,0.3,0.22,Enemy UI element drawn into place. Lower.
+sheatheP,sawtooth,2100,340,140,0.28,0.22,Player UI element drawn into place. Higher.
+slot,triangle,300,1500,150,0.3,0.45,A temporary slot flies in from the opponent.
+remove,square,520,220,90,0.34,0.24,Removing a station.
+depart,sawtooth,240,70,420,0.26,0.45,The line departs and charge is spent.
+travel,square,150,150,38,0.1,0.15,Line scrolling to the next station.
+arrive,square,880,880,45,0.14,0.3,Station reaches the head and lights up.
+hit,noise,700,700,190,0.34,0.4,Off-type hit.
+absorb,square,300,1200,260,0.24,0.5,Same-type hit: the layer absorbs it.
+block,noise,1600,1600,90,0.3,0.35,"Shield blocks, or shield goes up."
+breaklayer,sawtooth,760,80,340,0.28,0.55,A layer flashes and breaks.
+regrow,triangle,120,520,300,0.16,0.4,The broken layer regrows at the back.
+clash,noise,240,240,1500,0.4,0.65,Death: the chevrons meet.
+speak,square,620,540,42,0.09,0.12,One letter of dialogue appearing.
+win,square,440,1320,620,0.24,0.55,Victory.
+lose,sawtooth,320,50,950,0.28,0.6,Defeat.

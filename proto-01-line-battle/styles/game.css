@@ -6,7 +6,35 @@
    screens. When adding a rule, put it in its section rather than at the
    end, so the cascade stays something you can reason about.
    ===================================================================== */
+@property --rampPos{ syntax:"<length>"; inherits:true; initial-value:0px; }
+/* ============================================================================
+   NEURO-METRO: AVUI — one stylesheet.
+
+   HOUSE RULES, in order of how often they are broken:
+
+   1. TWELVE FRAMES A SECOND. Everything ticks at 12 fps — the canvas clock, and
+      every CSS animation via `steps(duration / 83ms)`. A smooth `ease-in-out`
+      loop next to a stepped one is instantly visible as the wrong medium.
+   2. ONE SHAPE PER ROLE. Every chip (--chipPad/--chipFont/--chipDrop/--chipInk)
+      is the same shape. To make one stand out, change its BACKGROUND, never its
+      geometry.
+   3. ONE RAMP. The emotion gradient is `.ramp`, anchored to the VIEWPORT, so
+      every element shows the same slice of the same moving sheet.
+   4. ANIMATE `transform`, `opacity` and `filter`. Never `clip-path`, never
+      layout properties — and never leave an animation `fill`ing, because a
+      filled clip-path outlives its animation and clips children forever.
+   ============================================================================ */
 :root{
+  /* ---- the shared ramp ---- */
+  --ramp:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+         var(--joy),var(--sadness),var(--fear),var(--anger));
+  --rampW:33.334vw;        /* one full loop, three times across the screen */
+  --rampStepPx:2;          /* pixels the sheet slides per 12 fps frame */
+  /* ---- one shape language for every chip, tag and pill ---- */
+  --chipPad:3px 9px;
+  --chipFont:12px;
+  --chipDrop:2px 2px 0 rgba(6,4,14,.85);
+  --chipInk:#0c0a16;
   /* the six emotions — the ONLY saturated colour in the interface */
   --anger:#e53859; --surprise:#724082; --disgust:#56a36a;
   --joy:#fcc336;   --sadness:#3d66c1;  --fear:#929fa5;
@@ -26,7 +54,11 @@
 html,body{height:100%}
 body{background:var(--void); color:var(--ink);
   font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
-  font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  /* WEIGHT ALONE IS NOT ENOUGH. Most mobile monospace fallbacks ship no bold face,
+     so `font-weight` changes nothing there and every label renders hairline-thin.
+     The stroke is what actually thickens the glyphs, on every device. */
+  font-weight:900; letter-spacing:.05em; text-transform:uppercase;
+  -webkit-text-stroke:0.6px currentColor; paint-order:stroke fill;
   display:flex; align-items:center; justify-content:center; overflow:hidden;
   -webkit-font-smoothing:none; -webkit-tap-highlight-color:transparent;
   user-select:none; -webkit-user-select:none}
@@ -61,10 +93,10 @@ body{background:var(--void); color:var(--ink);
 
 /* ============ GAUGE ============ */
 .unit{padding:4px 11px}
-.gwrap{position:relative; height:106px}
+.gwrap{position:relative; height:62px}
 /* The bar is a pixel canvas, not a stack of divs — see src/gauge.js. Upscaled
    with nearest-neighbour so the wave edges stay chunky rather than smoothed. */
-.gaugecv{position:absolute; left:0; right:0; top:24px; width:100%; height:58px;
+.gaugecv{position:absolute; left:0; right:0; top:2px; width:100%; height:58px;
   image-rendering:pixelated}
 /* Only the living bar glows. Spent capacity sits on its own canvas underneath
    with no filter at all, so the mint / rose bloom stops where the bar does. */
@@ -77,16 +109,36 @@ body{background:var(--void); color:var(--ink);
 @keyframes wavedrift{from{background-position:0 0} to{background-position:16px 0}}
 /* a hot filament at the leading edge of the charge */
 /* value tags stay large — they are the only numbers on screen */
-.tag{position:absolute; transform:translateX(-50%); padding:2px 7px; font-size:17px;
-  color:#0c0a16; letter-spacing:.02em; white-space:nowrap; z-index:12; line-height:1.2;
-  transition:left .22s steps(6); box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7)}
-.tag.ms{top:0; background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0)}
-@keyframes rainbow{from{background-position:0 0} to{background-position:-50vw 0}}
-.tag.ec{bottom:0; color:#0c0a16;
-  background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
-    var(--joy),var(--sadness),var(--fear),var(--anger));
-  background-size:50vw 100%; background-repeat:repeat-x;
-  animation:floaty 3.4s ease-in-out infinite alternate, rainbow 7s linear infinite;
+/* Every chip in the game — value tags, cost pills, status tags, tooltip stats,
+   the INFO button — shares one shape: same padding, same dark ink, one hard
+   pixel drop, no blur. Anything that needs to stand out changes its BACKGROUND,
+   never its geometry. */
+.chip,.tag,.pill,.tstat,.stag,.infotag{
+  color:var(--chipInk); letter-spacing:.02em; white-space:nowrap; line-height:1.2;
+  box-shadow:var(--bevel), var(--chipDrop)}
+.tag{position:static; padding:var(--chipPad); font-size:17px; z-index:12}
+/* each side's stamina tag wears that side's own bar colour */
+#eTagMs{background:linear-gradient(180deg,#fff5f7,var(--rose) 62%,#c98b96)}
+#pTagMs{background:linear-gradient(180deg,#eafff6,var(--mint) 62%,#6fbfa2)}
+/* ============ THE RAMP ============
+   One scrolling emotion gradient, revealed by every element that uses it.
+   `background-attachment:fixed` anchors it to the VIEWPORT, not to each element,
+   so a tag, a border and a number all show the same slice of the same moving
+   gradient — as if they were masks cut out of one sheet underneath. The loop is
+   a third of the screen, so it repeats three times across. */
+.ramp{
+  background-image:var(--ramp);
+  background-size:var(--rampW) 100%;
+  background-repeat:repeat-x;
+  background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px}
+/* text cut out of the sheet */
+.ramp.astext{-webkit-background-clip:text; background-clip:text; color:transparent}
+.tag.ec{bottom:0; color:#fff;
+  background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px;
+  animation:floaty 3.4s steps(41) infinite alternate;
   box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 12px rgba(255,255,255,.5)}
 .tag.ec.overcharged{box-shadow:var(--bevel), 1px 1px 0 rgba(6,4,14,.7), 0 0 18px var(--anger);
   outline:var(--px) solid var(--anger); outline-offset:1px}
@@ -96,12 +148,13 @@ body{background:var(--void); color:var(--ink);
 /* ============ STAGE ============ */
 .stage{flex:1; min-height:78px; display:flex; align-items:center; justify-content:center}
 .sprwrap{position:relative; width:min(52vw,186px); height:min(52vw,186px);
-  animation:hover 3.6s ease-in-out infinite alternate}
+  animation:hover 3.6s steps(43) infinite alternate}
 .sprwrap canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated}
 #sprOut{z-index:2}
 #sprIn{z-index:1}
 /* the player's layers: a very large circle, so only a gentle arc crosses the strip */
-.pstrip{position:relative; width:100%; aspect-ratio:120/32; flex:none}
+.pstrip{position:relative; width:100%; aspect-ratio:120/32; flex:none;
+  margin-bottom:-54px}   /* what follows overlays the arc rather than sitting under it */
 .pstrip canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated}
 #pRingsOut{z-index:2}
 #pRingsIn{z-index:1}
@@ -139,31 +192,63 @@ body{background:var(--void); color:var(--ink);
    the enemy's below theirs — rolling through a wave one after the next */
 .shieldrow{position:absolute; left:0; right:0; display:flex; justify-content:center;
   gap:10px; z-index:8; pointer-events:none}
-.shieldrow.above{bottom:100%; margin-bottom:-10px}
-.shieldrow.below{top:100%; margin-top:-10px}
+.shieldrow.above{bottom:100%; margin-bottom:7px}
+.shieldrow.below{top:100%; margin-top:7px}
 .shieldrow .sh{width:32px; height:32px; color:var(--ok);
   filter:drop-shadow(0 0 7px var(--ok)) drop-shadow(0 0 20px rgba(244,239,228,.6));
-  animation:shwave 1.9s ease-in-out infinite; animation-delay:var(--d,0s)}
+  animation:shwave 1.9s steps(23) infinite; animation-delay:var(--d,0s)}
 .shieldrow .sh svg{width:100%; height:100%; display:block}
+/* The wave has to travel AWAY from the lane, and the clearance has to cover both
+   the travel and the 1.14 scale. A single upward wave was why the enemy's shields
+   kept ending up inside their own line: below the lane, "up" means "into it". */
 @keyframes shwave{
   0%,100%{transform:translateY(0) scale(1)}
   50%{transform:translateY(-8px) scale(1.14)}}
+@keyframes shwaveDown{
+  0%,100%{transform:translateY(0) scale(1)}
+  50%{transform:translateY(8px) scale(1.14)}}
+.shieldrow.below .sh{animation-name:shwaveDown}
 
 .lane{position:relative; overflow:hidden; height:38px; display:flex; align-items:center;
+  justify-content:center;                    /* the line sits centred in the bar */
   background:var(--void); border:var(--px) solid var(--line); box-shadow:var(--bevel)}
+.lane{transition:height .26s cubic-bezier(.16,1,.3,1)}
 .lane.zoom{height:60px}
+/* the player's line is the way into Emotions, so it advertises itself */
+/* `border-image` paints the gradient on the BORDER ONLY. Two earlier attempts
+   failed here: mask-compositing did not render at all, and a z-index:-1 pseudo
+   painted above the lane's own background instead of behind it, flooding the
+   whole bar with rainbow. This cannot do either. */
+/* Thick, scrolling, breathing — it has to read as the thing you tap.
+   `border-image` cannot scroll, so the ring is a padded wrapper whose background
+   is the moving gradient and whose centre is covered by the lane itself. */
+.lane.live{border-color:var(--ink)}
+/* Above .pstrip (also z-index 3): DEPART hangs up out of this wrapper into the
+   layer arc's space, and at equal z it was painting behind the canvases. */
+/* The player's line reads as tappable through its GLOW, not through weight: the
+   same thin rule the enemy has, in white, breathing. The rainbow wrapper is gone. */
+.lane-wrap.ring{position:relative; z-index:8;
+  animation:ringGlow 1.6s steps(19) infinite alternate}
+@keyframes ringGlow{
+  from{filter:drop-shadow(0 0 3px rgba(255,255,255,.32))}
+  to  {filter:drop-shadow(0 0 13px rgba(255,255,255,.9))}}
+/* three white frames, to pull the eye to the line that is about to run */
+.lane.alert{background:var(--ink)}
 .track{display:flex; align-items:center; gap:0; padding:0 6px; position:relative;
-  transition:transform .3s steps(6); will-change:transform}
+  transition:transform .2s steps(3); will-change:transform}   /* == RULES.lineTravelMs */
 .link{flex:none; width:9px; height:5px; background:currentColor; box-shadow:0 1px 0 rgba(6,4,14,.7)}
 .lane.zoom .link{width:14px; height:7px}
 .link.dead{color:var(--line); box-shadow:none; opacity:.7;
   background:repeating-linear-gradient(90deg,var(--line) 0 3px,transparent 3px 6px)}
-.term{flex:none; width:0; height:0; border-right:6px solid currentColor;
-  border-top:5px solid transparent; border-bottom:5px solid transparent; filter:var(--drop)}
+.term{flex:none; width:20px; height:20px; filter:var(--drop); margin:0 2px}
+.term svg{width:100%; height:100%; display:block; fill:currentColor}
 .term.dead{color:var(--line); filter:none; opacity:.55}
-#pLane .term{border-right:0; border-left:6px solid currentColor}
-#pLane.zoom .term{border-left-width:9px}
-.lane.zoom .term{border-right-width:9px; border-top-width:7px; border-bottom-width:7px}
+.lane.zoom .term{width:30px; height:30px}
+/* it is also DEPART, so it pulses once the line has something to send */
+.lane.ready .term{cursor:pointer; animation:termReady .8s steps(10) infinite alternate}
+@keyframes termReady{
+  from{transform:translateX(0) scale(1);      filter:drop-shadow(0 0 3px currentColor)}
+  to  {transform:translateX(3px) scale(1.12); filter:drop-shadow(0 0 11px currentColor)}}
 .station{position:relative; flex:none; width:28px; height:28px;
   transition:width .3s steps(4),height .3s steps(4),transform .18s steps(3),filter .18s linear}
 .lane.zoom .station{width:46px; height:46px; animation:none}
@@ -180,7 +265,7 @@ body{background:var(--void); color:var(--ink);
   100%{transform:translateY(0)     scale(1);   filter:brightness(1) saturate(1)}}
 /* idle: a wave of swell-and-glow travelling along the line, plus a bobbing
    float on the same phase. Player waves left to right, enemy right to left. */
-.lane .station{animation:stationIdle 2.4s ease-in-out infinite; animation-delay:var(--d,0s)}
+.lane .station{animation:stationIdle 2.4s steps(29) infinite; animation-delay:var(--d,0s)}
 @keyframes stationIdle{
   0%,100%{transform:translateY(0) scale(1); filter:none}
   45%{transform:translateY(-4px) scale(1.10);
@@ -216,7 +301,20 @@ body{background:var(--void); color:var(--ink);
 /* ---- rainbow charge: gradient is screen-wide, only visible where charge reaches ---- */
 /* one tile is half the screen and starts and ends on the same hue, and the
    animation shifts by exactly one tile — so the loop is seamless */
-@keyframes rainbow{from{background-position:0 0} to{background-position:-50vw 0}}
+/* ============ THE RAMP ============
+   One scrolling emotion gradient, revealed by every element that uses it.
+   `background-attachment:fixed` anchors it to the VIEWPORT, not to each element,
+   so a tag, a border and a number all show the same slice of the same moving
+   gradient — as if they were masks cut out of one sheet underneath. The loop is
+   a third of the screen, so it repeats three times across. */
+.ramp{
+  background-image:var(--ramp);
+  background-size:var(--rampW) 100%;
+  background-repeat:repeat-x;
+  background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px}
+/* text cut out of the sheet */
+.ramp.astext{-webkit-background-clip:text; background-clip:text; color:transparent}
 /* ---- destroyed capacity: bigger warning glyph, drifting diagonally ---- */
 @keyframes warndrift{from{background-position:0 0} to{background-position:16px 16px}}
 /* ---- markers ---- */
@@ -227,11 +325,12 @@ body{background:var(--void); color:var(--ink);
 .gwrap.hurt .gflash{animation:magenta .1s steps(2) 5}
 @keyframes magenta{0%{opacity:.9} 100%{opacity:0}}
 @keyframes gshake{0%{transform:translate(-6px,2px)}50%{transform:translate(6px,-2px)}100%{transform:translate(0,0)}}
-/* ---- value tags: anchor holds the position, the tag itself idles ---- */
-.tanchor{position:absolute; z-index:12; transition:left .22s steps(6)}
-.tanchor.ms{top:0} .tanchor.ec{bottom:0}
-.tag{position:static; transform:none; animation:floaty 3.4s ease-in-out infinite alternate}
-.tanchor.ec .tag{animation-delay:-1.7s}
+/* ---- value tags: side by side, out of the bar's way ----
+   They used to ride along the bar on absolute anchors, which forced the container
+   to be tall enough for them AND left the bar hidden behind the open panel. */
+.tagrow{display:flex; justify-content:center; gap:7px; padding:1px 0 0}
+.tag{animation:floaty 3.4s steps(41) infinite alternate}
+.tagrow .tag.ec{animation-delay:-1.7s}
 @keyframes floaty{from{transform:translateY(2px)} to{transform:translateY(-3px)}}
 /* ---- flying ability ---- */
 .flyer{position:absolute; z-index:30; pointer-events:none;
@@ -246,11 +345,19 @@ body{background:var(--void); color:var(--ink);
 /* ---- temporary slot, bought by the OPPONENT's charging: dashed, and turning ---- */
 .station.bonus::after{content:""; position:absolute; inset:-5px; border-radius:50%;
   border:2px dashed currentColor; opacity:.95; pointer-events:none;
-  animation:bonusSpin 3.4s linear infinite}
+  animation:bonusSpin 3.4s steps(41) infinite}
 .station.bonus.ghost{opacity:1}
-/* the dashed ring is off-palette on purpose: a temporary slot belongs to no
-   emotion, so it must not borrow one's colour */
-.station.bonus::after{border-color:var(--ink)}
+/* A CRIT slot is yours: off-palette white, it belongs to no emotion. */
+.station.bonus.crit::after{border-color:var(--ink)}
+/* An OVERLOAD slot is NOT yours — it wears the opponent's stamina colour, thick
+   and glowing, symbol included, so a corrupted station reads as something done to
+   you rather than something you chose. */
+#pTrack .station.bonus.overload{color:var(--rose) !important}
+#eTrack .station.bonus.overload{color:var(--mint) !important}
+.station.bonus.overload::after{
+  border-width:4px; border-style:dotted; border-color:currentColor;
+  filter:drop-shadow(0 0 6px currentColor) drop-shadow(0 0 14px currentColor)}
+.station.bonus.overload{filter:drop-shadow(0 0 7px currentColor)}
 /* flying in from the opponent's side, one at a time, so the grant is legible */
 .station.bonus.arriving{animation:slotArrive .42s cubic-bezier(.2,1.2,.4,1) both}
 @keyframes slotArrive{
@@ -258,44 +365,119 @@ body{background:var(--void); color:var(--ink);
   60% {opacity:1}
   to  {transform:translate(0,0) scale(1); opacity:1}}
 @keyframes bonusSpin{from{transform:rotate(0deg)} to{transform:rotate(360deg)}}
+/* ---- DEPART ----
+   Lives in a ZERO-HEIGHT slot of its own. Absolute inside the lane wrapper meant
+   any clip-path on that wrapper erased it, and in normal flow it shoved the whole
+   interface down when it appeared. A zero-height slot does neither. */
+.departslot{position:relative; height:0; z-index:9}
+.departbtn{display:none; position:absolute; left:50%; bottom:4px;
+  transform:translateX(-50%); z-index:9;
+  padding:4px 26px; font:inherit; font-size:18px; font-weight:900;
+  letter-spacing:.2em; cursor:pointer; white-space:nowrap;
+  color:var(--void); background:#fff; border:3px solid transparent;
+  border-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
+    var(--joy),var(--sadness),var(--fear),var(--anger)) 1;
+  box-shadow:0 0 14px rgba(255,255,255,.75)}
+.departbtn.show{display:block; animation:departFloat 1.1s steps(13) infinite alternate}
+.departbtn:active{transform:translateX(-50%) translateY(1px)}
+@keyframes departFloat{
+  from{transform:translateX(-50%) translateY(-4px); box-shadow:0 0 10px rgba(255,255,255,.55)}
+  to  {transform:translateX(-50%) translateY(3px);  box-shadow:0 0 28px rgba(255,255,255,1)}}
+
+/* ---- the cue that the line opens Emotions ---- */
+.emocue{display:flex; align-items:center; justify-content:center; gap:5px;
+  font-size:11px; font-weight:900; letter-spacing:.16em; color:var(--ink);
+  padding:1px 0; pointer-events:none; position:relative; z-index:4;
+  text-shadow:2px 2px 0 rgba(6,4,14,.9);
+  animation:cueFloat 1.5s steps(18) infinite alternate;
+  transition:opacity .22s ease}
+.emocue.hide{opacity:0}
+.cuetri{width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent;
+  border-top:10px solid var(--ink);
+  animation:cueWobble .34s steps(4) infinite alternate}
+@keyframes cueWobble{from{transform:translateY(-3px)} to{transform:translateY(4px)}}
+@keyframes cueFloat{from{transform:translateY(-2px)} to{transform:translateY(1px)}}
+
+/* ---- Actions: always present, never paginated, and COMPACT — they live in the
+   strip the two buttons used to occupy, so they must not cost more height ---- */
+/* Actions sit INSIDE the panel now, in the strip the page dots used to occupy. */
+.actionrow{display:none; grid-template-columns:1fr 1fr; gap:5px;
+  position:relative; z-index:3; padding:0 5px 5px}
+.abilpanel.open .actionrow{display:grid}
+.actionrow .abrow{flex-direction:row; align-items:center; justify-content:flex-start;
+  gap:8px; padding:4px 6px 4px 18px}
+.actionrow .abline{animation:none; flex:none}
+.actionrow .abline .station{width:26px; height:26px}
+.actionrow .abline .station.chg{width:18px; height:18px}
+.actionrow .abline .link{width:6px; height:4px}
+.actionrow .abinfo{align-items:flex-start; gap:2px}
+.actionrow .abname{font-size:10px; letter-spacing:.06em; text-align:left}
+.actionrow .infotag{font-size:9px; padding:1px 6px}
+.actionrow .shots{left:4px; gap:3px}
+.actionrow .shot{width:7px; height:7px}
+.actionrow .cdnum{font-size:30px}
+
+/* ---- the carried Loadouts: this is the pagination ----
+   Fully coloured, gradient into a darker version of the same emotion, with that
+   emotion's glyph tiled large and faint behind, panning diagonally. The three
+   undulate as a group: same float, staggered by --i. */
+.loadoutbar{display:grid; grid-template-columns:repeat(3,1fr); gap:5px;
+  position:relative; z-index:3}
+.lobtn{position:relative; overflow:hidden; cursor:pointer; font:inherit;
+  padding:9px 4px; font-size:12px; font-weight:900; letter-spacing:.1em;
+  color:#fff; text-shadow:2px 2px 0 rgba(6,4,14,.85);
+  border:var(--px) solid var(--emo); box-shadow:var(--bevel), var(--chipDrop);
+  background-image:var(--pat), linear-gradient(160deg,var(--emo),var(--emoDark));
+  background-size:46px 46px, 100% 100%;
+  background-repeat:repeat, no-repeat;
+  animation:loPan 6s steps(72) infinite,
+            loFloat 1.6s steps(19) infinite alternate;
+  animation-delay:0s, calc(var(--i,0) * -0.42s)}
+/* the pattern is the FIRST layer, so only its position moves */
+@keyframes loPan{ to{ background-position:46px 46px, 0 0 } }
+@keyframes loFloat{ from{transform:translateY(-3px)} to{transform:translateY(3px)} }
+.lobtn span{position:relative; z-index:1}   /* the label rides above the pattern */
+.lobtn{filter:brightness(.72) saturate(.9)}          /* unequipped page: sits back */
+.lobtn.on{filter:brightness(1.12) saturate(1.05);
+  box-shadow:var(--bevel), var(--chipDrop), 0 0 14px var(--emo)}
+.lobtn:active{transform:translateY(1px)}
+
 /* ---- the EMOTIONS panel ---- */
 .btnrow{display:grid; grid-template-columns:1fr 1fr; gap:5px}
-.abilpanel{height:0; opacity:0; overflow:hidden; position:relative; z-index:3;
+/* Sized by its CONTENT, not by a magic dvh. `max-height` collapses and expands
+   exactly like `height` did, but the open panel is whatever its rows need — so
+   adding a row or resizing one can never clip the Actions off the bottom again. */
+.abilpanel{max-height:0; height:auto; opacity:0; overflow:hidden;
+  position:relative; z-index:3;
   border:0 solid var(--line); box-shadow:var(--bevel); flex:none;
   background:linear-gradient(180deg,var(--panelHi),var(--panel) 40%,var(--dark));
-  transition:height .46s cubic-bezier(.16,1,.3,1), opacity .28s ease,
+  transition:max-height .46s cubic-bezier(.16,1,.3,1), opacity .28s ease,
              border-width .46s cubic-bezier(.16,1,.3,1)}
-.abilpanel.open{height:33dvh; opacity:1; border-width:var(--px)}
+.abilpanel.open{max-height:52dvh; opacity:1; border-width:var(--px)}
 /* A closed panel still ran 8 floating depictions and 7 rainbow pills every frame,
    stealing time from the 12 fps clock for something nobody could see. */
 .abilpanel:not(.open) *{animation-play-state:paused !important}
 /* Paged, not scrolled: four to a page, swiped with a pointer. `touch-action:pan-y`
    keeps the horizontal axis ours while leaving vertical scrolling to the page. */
-.abilscroll{height:calc(100% - 18px); overflow:hidden; position:relative; touch-action:pan-y}
-.abpages{display:flex; height:100%; will-change:transform;
+/* auto height: the panel is content-sized now, so `100% - 18px` (room for the
+   old page dots) no longer means anything and left the Actions hanging out. */
+.abilscroll{height:auto; overflow:hidden; position:relative; touch-action:pan-y}
+.abpages{display:flex; align-items:stretch; will-change:transform;
   transition:transform .34s cubic-bezier(.16,1,.3,1)}
 .abpage{flex:0 0 100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-  grid-auto-rows:1fr; gap:6px; padding:6px; align-content:start}
-/* position dots: the one you are on simply grows */
-.abdots{position:absolute; left:0; right:0; bottom:3px; height:14px;
-  display:flex; align-items:center; justify-content:center; gap:7px; z-index:4}
-.abdot{width:5px; height:5px; background:var(--line); cursor:pointer;
-  box-shadow:1px 1px 0 rgba(6,4,14,.7); transition:all .22s ease}
-.abdot.on{width:10px; height:10px; background:var(--ink)}
+  grid-auto-rows:min-content;   /* content-sized: a shorter box is actually shorter */
+  gap:5px; padding:5px; align-content:start}
 /* triangles are indicators that a page exists that way, nothing more */
-.abarrow{position:absolute; top:50%; width:0; height:0; opacity:0; z-index:4;
-  pointer-events:none; transition:opacity .22s ease;
-  animation:abBob 1.5s ease-in-out infinite alternate}
-.abarrow.show{opacity:.75; pointer-events:auto; cursor:pointer}
-.abarrow.l{left:3px;  border:7px solid transparent; border-right-color:var(--ink)}
-.abarrow.r{right:3px; border:7px solid transparent; border-left-color:var(--ink)}
 @keyframes abBob{from{transform:translateY(-11px)} to{transform:translateY(3px)}}
 .abrow{position:relative; display:flex; flex-direction:column; align-items:center;
-  justify-content:space-evenly; gap:2px; padding:5px 5px 5px 22px; overflow:hidden;
+  justify-content:center; gap:0; padding:2px 4px 2px 20px; overflow:hidden;
   cursor:pointer; border:var(--px) solid var(--emo,var(--line)); box-shadow:var(--bevel);
   background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,var(--dark))}
 /* the veil does the obscuring, so the row itself must NOT also be dimmed */
 .abrow.cool{pointer-events:none}
+/* an unfilled Loadout slot: keeps the grid's shape, says nothing */
+.abrow.empty{pointer-events:none; border-color:var(--line); opacity:.38;
+  background:linear-gradient(180deg,#151310,var(--void) 70%); box-shadow:none}
 /* ---- shots: how many more times this can be added to the line ----
    They do not refill each turn; emptying them is what starts the cooldown. */
 .shots{position:absolute; left:5px; top:50%; transform:translateY(-50%); z-index:2;
@@ -313,19 +495,35 @@ body{background:var(--void); color:var(--ink);
 .abrow.dis{opacity:.34; pointer-events:none}
 /* the depiction floats, so the box has something alive in it */
 .abline{display:flex; align-items:center; justify-content:center; gap:0; flex:none;
-  animation:abFloat 2.2s ease-in-out infinite alternate; animation-delay:var(--fd,0s)}
+  animation:abFloat 2.2s steps(26) infinite alternate; animation-delay:var(--fd,0s)}
 @keyframes abFloat{from{transform:translateY(-4px)} to{transform:translateY(4px)}}
 .abrow.cool .abline{animation:none}
-.abline .station{width:52px; height:52px}
-.abline .station.chg{width:30px; height:30px}
-.abline .link{width:11px; height:6px}
-.abinfo{display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0}
-.abname{font-size:14px; letter-spacing:.09em; text-align:center}
+.abline .station{width:42px; height:42px}
+.abline .station.chg{width:24px; height:24px}
+/* the charge tail is tight: short links so it does not out-width a plain ability */
+.abline .link{width:5px; height:5px}
+.actionrow .abline .link{width:4px; height:4px}
+.abinfo{display:flex; flex-direction:column; align-items:center; gap:0; min-width:0}
+.abname{font-size:14px; letter-spacing:.09em; text-align:center; margin-top:-2px}
+/* the numbers moved into the tooltip; this chip is how you get at them */
+.infotag{position:absolute; top:3px; right:3px; z-index:4;
+  width:30px; height:30px; padding:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; font-weight:900; font-style:italic; line-height:1;
+  text-transform:none;        /* the global rule would render the "i" as "I" */
+  background:var(--emo,var(--ink));
+  box-shadow:var(--bevel),2px 2px 0 rgba(6,4,14,.75);
+  animation:infoBreathe 1.7s steps(20) infinite alternate}
+.infotag:active{transform:translate(1px,1px)}
+@keyframes infoBreathe{
+  from{filter:brightness(.72)}
+  to  {filter:brightness(1.5) drop-shadow(0 0 6px var(--emo,var(--ink)))}}
+.actionrow .infotag{width:24px; height:24px; font-size:15px}
 .pills{display:flex; gap:4px; justify-content:center}
-.pill{font-size:12px; padding:2px 7px; color:#0c0a16; box-shadow:var(--bevel),1px 1px 0 rgba(6,4,14,.7)}
-.pill.rain{background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
-    var(--joy),var(--sadness),var(--fear),var(--anger));
-  background-size:50vw 100%; background-repeat:repeat-x; animation:rainbow 7s linear infinite}
+.pill{font-size:var(--chipFont); padding:var(--chipPad)}
+.pill.rain{background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px;}
 .pill.wht{background:linear-gradient(180deg,#fff,var(--ink) 60%,#c9c3b0)}
 
 /* ---------- background: darkens toward the top ---------- */
@@ -337,7 +535,7 @@ body{background:var(--void); color:var(--ink);
 .floorwrap.lit{opacity:1}
 .floorlight{position:absolute; left:50%; bottom:-30px; width:78%; height:26px; pointer-events:none;
   background:radial-gradient(ellipse at center, currentColor 0%, transparent 68%);
-  animation:floorpulse 3.6s ease-in-out infinite alternate; z-index:-1}
+  animation:floorpulse 3.6s steps(43) infinite alternate; z-index:-1}
 /* down = tight and bright, up = wide and faint, exactly counter to the hover */
 @keyframes floorpulse{
   from{transform:translateX(-50%) scale(.68); opacity:.9;  filter:blur(2px)}
@@ -345,76 +543,37 @@ body{background:var(--void); color:var(--ink);
 /* ---------- deferred hits: indicators, the ball, the crash ----------
    Hits accumulate as pills during a line, then each morphs into a ball of
    light that arcs into the bar. The bar only moves when a ball lands. */
-.ind{position:absolute; z-index:24; padding:4px 11px; font-size:18px; font-weight:900;
-  letter-spacing:.01em; color:#0c0a16;
-  white-space:nowrap; pointer-events:none;
-  transform:translate(-50%,-50%) scale(var(--sc,1));
-  box-shadow:var(--bevel),3px 3px 0 rgba(6,4,14,.85);
-  --anims:indIn .22s steps(3) both,
-          indFloat 1.05s ease-in-out infinite alternate,
-          indBreathe var(--bd,1700ms) ease-in-out infinite alternate;
-  animation:var(--anims)}
-@keyframes indIn{from{opacity:0} to{opacity:1}}
-/* the tag holds its place and counts up; --sc rides in the keyframes because a
-   transform animation would otherwise wipe the inline scale */
-@keyframes indFloat{
-  from{transform:translate(-50%,calc(-50% + 15px)) scale(var(--sc,1))}
-  to  {transform:translate(-50%,calc(-50% - 16px)) scale(var(--sc,1))}}
-/* breathes harder AND faster the more it is holding (--gl, --bd from fx.js) */
-@keyframes indBreathe{
-  from{filter:drop-shadow(0 0 calc(2px * var(--gl,1)) rgba(255,255,255,.45)) brightness(1)}
-  to  {filter:drop-shadow(0 0 calc(9px * var(--gl,1)) rgba(255,255,255,.95)) brightness(1.4)}}
-/* a kick each time another hit folds into the total */
-.ind.bump{--anims:indBump .2s steps(3),
-           indFloat 1.05s ease-in-out infinite alternate,
-           indBreathe var(--bd,1700ms) ease-in-out infinite alternate}
-@keyframes indBump{
-  from{transform:translate(-50%,-50%) scale(calc(var(--sc,1) * 1.4))}
-  to  {transform:translate(-50%,-50%) scale(var(--sc,1))}}
-/* the same flat mint / rose as the bars' wavy stroke, and the same bloom */
-.ind.ms-p{background:var(--mint);
-  filter:drop-shadow(0 0 5px rgba(176,255,225,.55)) drop-shadow(0 0 16px rgba(176,255,225,.28))}
-.ind.ms-e{background:var(--rose);
-  filter:drop-shadow(0 0 5px rgba(255,194,205,.55)) drop-shadow(0 0 16px rgba(255,194,205,.28))}
-/* the breathing animation drives `filter`, so the bloom has to live in the
-   keyframes too or it is wiped the moment the animation starts */
-/* ONE drop-shadow per keyframe, not two — an animated `filter` repaints every
-   frame and two blurred shadows on four tags at once was measurably costing us
-   the frame budget. */
-@keyframes indBreatheP{
-  from{filter:drop-shadow(0 0 calc(5px * var(--gl,1)) rgba(176,255,225,.6)) brightness(1)}
-  to  {filter:drop-shadow(0 0 calc(14px * var(--gl,1)) rgba(176,255,225,.45)) brightness(1.12)}}
-@keyframes indBreatheE{
-  from{filter:drop-shadow(0 0 calc(5px * var(--gl,1)) rgba(255,194,205,.6)) brightness(1)}
-  to  {filter:drop-shadow(0 0 calc(14px * var(--gl,1)) rgba(255,194,205,.45)) brightness(1.12)}}
-.ind.ms-p{--anims:indIn .22s steps(3) both,
-          indFloat 1.05s ease-in-out infinite alternate,
-          indBreatheP var(--bd,1700ms) ease-in-out infinite alternate}
-.ind.ms-e{--anims:indIn .22s steps(3) both,
-          indFloat 1.05s ease-in-out infinite alternate,
-          indBreatheE var(--bd,1700ms) ease-in-out infinite alternate}
-/* pointy: a rectangle that ends in sideways triangles. clip-path clips
-   box-shadow, so the drop is a filter instead — and the filter is animated, so
-   it has to ride in the keyframes (see indBreatheEC). */
-.ind.ec{color:#fff; padding:4px 20px;
-  background-image:linear-gradient(90deg,var(--anger),var(--surprise),var(--disgust),
-    var(--joy),var(--sadness),var(--fear),var(--anger));
-  background-size:50vw 100%; background-repeat:repeat-x; box-shadow:none;
-  clip-path:polygon(0 50%, 13px 0, calc(100% - 13px) 0, 100% 50%,
-                    calc(100% - 13px) 100%, 13px 100%);
-  --anims:rainbow 7s linear infinite,
-          indIn .22s steps(3) both,
-          indFloat 1.05s ease-in-out infinite alternate,
-          indBreatheEC var(--bd,1700ms) ease-in-out infinite alternate;
-  animation:var(--anims)}
-@keyframes indBreatheEC{
-  from{filter:drop-shadow(0 0 calc(3px * var(--gl,1)) rgba(255,255,255,.55)) brightness(1)}
-  to  {filter:drop-shadow(0 0 calc(11px * var(--gl,1)) rgba(255,255,255,.95)) brightness(1.4)}}
-.ball{position:absolute; z-index:25; width:48px; height:48px; border-radius:50%;
-  pointer-events:none; box-shadow:0 0 26px currentColor,0 0 60px currentColor;
-  background:radial-gradient(circle,#fff 0%,currentColor 55%,transparent 72%)}
-.crash{position:absolute; z-index:26; pointer-events:none;
-  box-shadow:1px 1px 0 rgba(6,4,14,.8)}
+/* ---------- floating numbers ----------
+   Three stages in one animation: rise while fading in, ease to a stop, fade out.
+   No box, no background — just the number, the way a brawler does it. */
+.fnum{position:absolute; z-index:26; pointer-events:none; white-space:nowrap;
+  font-size:var(--fs,26px); font-weight:900; letter-spacing:.02em;
+  transform:translate(-50%,-50%);
+  text-shadow:3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  animation:fnumRise var(--in,600ms) cubic-bezier(.15,.75,.4,1) both,
+            fnumSettle var(--hold,600ms) cubic-bezier(.2,1,.3,1) var(--in,600ms) both,
+            fnumOut var(--out,400ms) ease-in calc(var(--in,600ms) + var(--hold,600ms)) both}
+@keyframes fnumRise{
+  from{opacity:0; transform:translate(-50%,-50%)}
+  to  {opacity:1; transform:translate(calc(-50% + var(--drift,0px)),calc(-50% - var(--rise,34px)))}}
+@keyframes fnumSettle{
+  from{transform:translate(calc(-50% + var(--drift,0px)),calc(-50% - var(--rise,34px)))}
+  to  {transform:translate(calc(-50% + var(--drift,0px)),calc(-50% - var(--rise,34px) - 9px))}}
+@keyframes fnumOut{ from{opacity:1} to{opacity:0} }
+.fnum.ms-p{color:var(--mint)}
+.fnum.ms-e{color:var(--rose)}
+/* charge runs the moving emotion ramp, clipped to the glyphs */
+.fnum.ec{color:#fff; background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px; -webkit-background-clip:text; background-clip:text;
+  color:transparent; -webkit-text-stroke:0;
+  filter:drop-shadow(2px 2px 0 #000) drop-shadow(0 0 7px rgba(255,255,255,.45));
+  text-shadow:none;
+  animation:
+            fnumRise var(--in,600ms) cubic-bezier(.15,.75,.4,1) both,
+            fnumSettle var(--hold,600ms) cubic-bezier(.2,1,.3,1) var(--in,600ms) both,
+            fnumOut var(--out,400ms) ease-in calc(var(--in,600ms) + var(--hold,600ms)) both}
+
 
 /* ---------- status tags: what is currently wrong with a unit ---------- */
 .statusrow{display:flex; gap:7px; justify-content:center; flex-wrap:wrap;
@@ -422,14 +581,20 @@ body{background:var(--void); color:var(--ink);
   position:relative; z-index:6}   /* .stage paints at z-index 1 and would bury these */
 .statusrow.on{margin:4px 0}
 /* A long, hard black drop — pure #000, no blur — and an inner glow that breathes
-   in the status's own colour. The glow is an inset shadow so it reads as light
-   coming from inside the tag rather than a halo around it. */
-.stag{position:relative; display:flex; align-items:center; gap:6px; padding:5px 11px;
-  font-size:13px; letter-spacing:.08em; color:#0c0a16; cursor:pointer;
+   in the status's own colour. */
+.stag{position:relative; display:flex; align-items:center; gap:6px;
+  padding:5px 11px; font-size:13px; letter-spacing:.08em; cursor:pointer;
   background:var(--sc2,var(--ink));
   box-shadow:var(--bevel), 5px 6px 0 #000, 9px 11px 0 #000;
-  animation:stagIn .2s steps(3) both, stagBreathe 1.15s ease-in-out infinite alternate}
-.stag svg{width:16px; height:16px; display:block; fill:#0c0a16}
+  animation:stagIn .2s steps(3) both, stagBreathe 1.15s steps(14) infinite alternate}
+.stag svg{width:16px; height:16px; display:block; fill:var(--chipInk)}
+/* Overload rides the shared scrolling ramp and pulses hard — it is the one status
+   you are meant to notice immediately. */
+.stag.overloadtag{animation:stagIn .2s steps(3) both,
+                  overloadPulse .34s steps(4) infinite alternate}
+@keyframes overloadPulse{
+  from{box-shadow:var(--bevel), 5px 6px 0 #000, 0 0 6px #fff}
+  to  {box-shadow:var(--bevel), 5px 6px 0 #000, 0 0 22px #fff, 0 0 34px var(--anger)}}
 .stag b{font-size:14px}
 .stag:active{transform:translate(1px,1px)}
 @keyframes stagIn{from{opacity:0; transform:translateY(-4px)} to{opacity:1; transform:none}}
@@ -439,25 +604,130 @@ body{background:var(--void); color:var(--ink);
   to  {box-shadow:var(--bevel), 5px 6px 0 #000, 9px 11px 0 #000,
        inset 0 0 17px rgba(255,255,255,.95), 0 0 16px var(--sc2,var(--ink))}}
 
-/* ---------- tooltips ---------- */
+/* ---------- tooltips ----------
+   A speech bubble with a stepped tail pointing at whatever opened it, bordered in
+   that thing's own colour. POSITION IS ABSOLUTE and set from JS — without it the
+   element simply flows to the bottom of the screen. */
 .tipveil{position:absolute; inset:0; z-index:96; display:none}
 .tipveil.on{display:block}
-.tip{position:absolute; z-index:97; display:none; max-width:80%; padding:9px 11px;
+.tip{position:absolute; z-index:97; display:none; max-width:76%; padding:8px 10px;
   background:linear-gradient(180deg,var(--panelHi),var(--panel) 55%,var(--dark));
-  border:var(--px) solid var(--line); box-shadow:var(--bevel), 4px 5px 0 #000;
+  border:3px solid var(--tipc,var(--line));
+  box-shadow:var(--bevel), 6px 7px 0 #000;   /* hard, no blur */
   text-transform:none; letter-spacing:.01em}
 .tip.on{display:block; animation:tipIn .16s steps(3) both}
 @keyframes tipIn{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
-.tiphead{font-size:12px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:5px}
-.tipbody{font-size:11px; line-height:1.55; color:var(--ink); font-weight:700}
-.tipturns{margin-top:7px; font-size:10px; letter-spacing:.13em; color:var(--muted);
-  text-transform:uppercase}
+.tip::after{content:""; position:absolute; left:var(--tail,50%); transform:translateX(-50%);
+  top:100%; width:18px; height:12px; background:var(--tipc,var(--line));
+  clip-path:polygon(0 0,100% 0,72% 34%,50% 68%,28% 34%)}
+.tip.below::after{top:auto; bottom:100%;
+  clip-path:polygon(0 100%,100% 100%,72% 66%,50% 32%,28% 66%)}
+/* same size as an ability's name, so the two read as one voice */
+.tipbody{font-size:14px; line-height:1.45; color:var(--ink); font-weight:700}
+.tipstats{display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; justify-content:center}
+/* the value tags on the bars are the nicest chip in the game, so these are those:
+   same padding, same rounding, same wobble */
+.tstat{font-size:var(--chipFont); font-weight:900; padding:var(--chipPad);
+  background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0);
+  animation:floaty 3.4s steps(41) infinite alternate}
+.tstat.ec{color:#fff;
+  background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px;
+  animation:floaty 3.4s steps(41) infinite alternate; animation-delay:-1.7s}
 .tip .kw{font-weight:900}
 .tip .em{font-weight:900; color:#fff}
-.tip .kw.rain{background-image:linear-gradient(90deg,var(--anger),var(--surprise),
-    var(--disgust),var(--joy),var(--sadness),var(--fear),var(--anger));
-  background-size:50vw 100%; -webkit-background-clip:text; background-clip:text;
-  color:transparent; animation:rainbow 7s linear infinite}
+.tip .kw.rain{background-image:var(--ramp); background-size:var(--rampW) 100%;
+  background-repeat:repeat-x; background-attachment:fixed;
+  background-position:var(--rampPos,0px) 0px;
+  -webkit-background-clip:text; background-clip:text; color:transparent}
+
+/* ---------- CRITICAL ---------- */
+.crittag.unittag{font-size:15px; padding:4px 10px}
+.crittag{position:absolute; z-index:29; pointer-events:none;
+  transform:translate(-50%,-50%) rotate(var(--tilt,0deg));
+  padding:5px 12px; font-size:19px; font-weight:900; letter-spacing:.12em;
+  color:var(--chipInk); background:#fff;
+  border:3px solid var(--emo,var(--anger));
+  box-shadow:var(--bevel), var(--chipDrop), 0 0 18px var(--emo,var(--anger));
+  animation:critPop var(--ct,700ms) steps(8) both}
+@keyframes critPop{
+  0%  {opacity:0; transform:translate(-50%,-50%) rotate(var(--tilt,0deg)) scale(.3)}
+  22% {opacity:1; transform:translate(-50%,-50%) rotate(var(--tilt,0deg)) scale(1.35)}
+  60% {opacity:1; transform:translate(-50%,-50%) rotate(var(--tilt,0deg)) scale(1)}
+  100%{opacity:0; transform:translate(-50%,-50%) rotate(var(--tilt,0deg)) scale(1.1)}}
+
+/* one wash of the screen in the attacking emotion, when a critical lands */
+.colourflash{position:absolute; inset:0; z-index:31; pointer-events:none; mix-blend-mode:screen;
+  animation:cflash var(--cf,260ms) steps(4) both}
+@keyframes cflash{0%{opacity:0} 30%{opacity:.62} 100%{opacity:0}}
+/* the earned slot, travelling from the tag to the line that earned it */
+.critslot{position:absolute; z-index:30; width:34px; height:34px; pointer-events:none;
+  transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 18px currentColor)}
+.critslot svg{width:100%; height:100%; display:block; fill:currentColor}
+
+/* ---------- impact: shards of the attack's own emotion ---------- */
+.shard{position:absolute; z-index:27; pointer-events:none; transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 7px currentColor) drop-shadow(0 0 18px currentColor);
+  animation:shardPop var(--sd,260ms) steps(4) var(--dl,0ms) both}
+.shard svg{width:100%; height:100%; display:block; fill:currentColor}
+@keyframes shardPop{
+  0%  {opacity:0; transform:translate(-50%,-50%) rotate(var(--rot,0deg)) scale(.35)}
+  35% {opacity:1; transform:translate(-50%,-50%) rotate(var(--rot,0deg)) scale(1.25)}
+  100%{opacity:0; transform:translate(-50%,-50%) rotate(var(--rot,0deg)) scale(1.6)}}
+
+/* ---------- buff / debuff: streaks over the body, up or down ---------- */
+.actionlines{position:absolute; z-index:25; pointer-events:none; overflow:visible}
+.actionlines i{position:absolute; width:4px; height:var(--h,40%);
+  background:linear-gradient(180deg,transparent,#fff 40%,#fff 60%,transparent);
+  box-shadow:0 0 8px #fff; opacity:0;
+  animation:alStreak var(--alt,620ms) steps(8) var(--dl,0ms) both}
+.actionlines.up i   {bottom:-10%; animation-name:alUp}
+.actionlines.down i {top:-10%;    animation-name:alDown}
+@keyframes alUp{
+  0%{opacity:0; transform:translateY(30%)}
+  30%{opacity:1} 100%{opacity:0; transform:translateY(-150%)}}
+@keyframes alDown{
+  0%{opacity:0; transform:translateY(-30%)}
+  30%{opacity:1} 100%{opacity:0; transform:translateY(150%)}}
+
+/* ---------- a status taking hold ---------- */
+/* The body buckles hard. The first version was far too polite to survive a small
+   bright phone screen — the skew, the scale and the colour shift are all roughly
+   trebled, and it now inverts and blows out on the peaks so it reads at a glance. */
+.warp{animation:warpPulse var(--wt,1000ms) steps(11) 1}
+@keyframes warpPulse{
+  0%  {filter:none; transform:none}
+  12% {filter:blur(4px) hue-rotate(120deg) saturate(3) contrast(2.2) brightness(1.6);
+       transform:skewX(16deg) scaleX(1.28) scaleY(.86)}
+  28% {filter:blur(1px) hue-rotate(-150deg) saturate(2.4) invert(.65) brightness(1.3);
+       transform:skewX(-18deg) scaleX(.8) scaleY(1.2)}
+  44% {filter:blur(5px) hue-rotate(90deg) saturate(3.2) contrast(2.6);
+       transform:skewX(13deg) scaleX(1.22) scaleY(.9) translateX(7px)}
+  60% {filter:blur(.5px) hue-rotate(-60deg) saturate(2) invert(.4);
+       transform:skewX(-10deg) scaleX(.88) scaleY(1.12) translateX(-6px)}
+  78% {filter:blur(3px) hue-rotate(45deg) saturate(2.6) brightness(1.5);
+       transform:skewX(7deg) scaleX(1.1) scaleY(.95)}
+  100%{filter:none; transform:none}}
+/* and a great bloom of its colour swells behind */
+.statusbloom{position:absolute; z-index:2; pointer-events:none;
+  width:150vw; height:150vw; transform:translate(-50%,-50%);
+  background:radial-gradient(circle at center, currentColor 0%,
+             rgba(0,0,0,0) 62%);
+  animation:bloomSwell var(--wt,1000ms) steps(11) both}
+@keyframes bloomSwell{
+  0%  {opacity:0;   transform:translate(-50%,-50%) scale(.15)}
+  35% {opacity:.62; transform:translate(-50%,-50%) scale(.75)}
+  100%{opacity:0;   transform:translate(-50%,-50%) scale(1.25)}}
+/* the ability's name flies from the body to the row its tag will occupy */
+.statusname{position:absolute; z-index:28; pointer-events:none;
+  transform:translate(-50%,-50%); padding:6px 13px;
+  font-size:19px; font-weight:900; letter-spacing:.1em; color:var(--chipInk);
+  box-shadow:var(--bevel), var(--chipDrop);
+  animation:statusNameIn .18s steps(3) both}
+@keyframes statusNameIn{from{opacity:0; transform:translate(-50%,-50%) scale(.5)}
+  to{opacity:1; transform:translate(-50%,-50%) scale(1)}}
 
 /* ---------- OVERLOAD: the container itself starts to fail ---------- */
 .panel.overloaded{animation:overloadEdge .28s steps(1) infinite}
@@ -502,6 +772,9 @@ body{background:var(--void); color:var(--ink);
 .intro.masking .introrail{display:none}
 /* held back until its own entrance animation starts */
 .drawin{opacity:0}
+/* the entrance scales out of the edge it arrives from */
+#ePanel,#eStatus,#eLane{transform-origin:50% 0%}
+#pPanel,#pStatus,#pLane,#pstrip,#actionRow,#emoCue{transform-origin:50% 100%}
 
 /* ---------- enemy dialogue ----------
    The wrapper is unclipped so the tail and the drop shadow can escape; the
@@ -522,9 +795,9 @@ body{background:var(--void); color:var(--ink);
 .personaname{position:absolute; left:50%; top:-30px; white-space:nowrap; z-index:4;
   font-size:12px; letter-spacing:.24em; color:var(--c); min-height:1em;
   text-shadow:2px 2px 0 #000, 0 0 16px currentColor;
-  animation:namefloat 4.6s ease-in-out infinite alternate; pointer-events:none}
+  animation:namefloat 4.6s steps(55) infinite alternate; pointer-events:none}
 .personaname.typing{font-size:15px;
-  animation:namefloat 4.6s ease-in-out infinite alternate, nameGlow .5s steps(2) infinite alternate}
+  animation:namefloat 4.6s steps(55) infinite alternate, nameGlow .5s steps(2) infinite alternate}
 @keyframes nameGlow{
   from{text-shadow:2px 2px 0 #000, 0 0 10px currentColor}
   to  {text-shadow:2px 2px 0 #000, 0 0 26px currentColor, 0 0 52px currentColor}}
@@ -536,25 +809,35 @@ body{background:var(--void); color:var(--ink);
 .title{position:absolute; inset:0; z-index:90; background:#000; display:flex;
   align-items:center; justify-content:center; transition:opacity .5s ease}
 .title.gone{opacity:0; pointer-events:none}
-.titlewrap{display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
-  width:100%; padding:0 0 10px}
+/* The title screen has to FIT. Its content is taller than a short phone once the
+   square logo is full-width, and because `.title` centres, the overflow pushed the
+   mood line clean off the top of the screen — it was rendering perfectly, just
+   above the viewport. The logo is now the thing that gives way. */
+.titlewrap{display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; text-align:center; width:100%; height:100%; padding:6px 0 26px;
+  overflow:hidden}
+.titlewrap > *{flex:0 0 auto; min-height:0}
 /* ---- Barcelona's current moment, above the logo ---- */
-.moment{font-size:10px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
-  padding:0 14px 10px; min-height:13px; text-wrap:balance}
+/* Drawn by pixelText() and upscaled with nearest-neighbour — see src/screens.js.
+   White, twice the size it was, with a faint bloom. */
+.moment{display:block; margin:0 auto 10px; image-rendering:pixelated;
+  filter:drop-shadow(0 0 4px rgba(255,255,255,.55))
+         drop-shadow(0 0 14px rgba(255,255,255,.28))}
 /* ---- screen-wide square frame ----
    `isolation` matters: without it the glow's colour-dodge would blend with the
    black page behind rather than with the logo, and dodge against black is a
    no-op — the effect would silently not exist. */
 .logoframe{position:relative; width:100%; aspect-ratio:1/1; overflow:hidden;
+  flex:0 1 auto; max-height:44vh;      /* shrinks first, so nothing is pushed off */
   isolation:isolate; border-top:var(--px) solid var(--line);
   border-bottom:var(--px) solid var(--line); background:#000}
-.logoimg{width:100%; height:100%; object-fit:cover; display:block;
+.logoimg{width:100%; height:100%; object-fit:contain; display:block;
   filter:url(#logoWave)}          /* faint, permanent swim */
 /* the glow drifts through the six emotions and breathes in opacity */
 .logoglow{position:absolute; inset:-6%; pointer-events:none; mix-blend-mode:color-dodge;
   background:radial-gradient(ellipse 58% 48% at 50% 46%, currentColor 0%,
              rgba(0,0,0,0) 68%);
-  animation:logoHue 23s linear infinite, logoBreathe 7.5s ease-in-out infinite alternate}
+  animation:logoHue 23s steps(276) infinite, logoBreathe 7.5s steps(90) infinite alternate}
 @keyframes logoHue{
   0%{color:var(--anger)}    17%{color:var(--surprise)} 34%{color:var(--disgust)}
   50%{color:var(--joy)}     67%{color:var(--sadness)}  84%{color:var(--fear)}
@@ -572,11 +855,17 @@ body{background:var(--void); color:var(--ink);
 .confront{margin-top:16px; padding:13px 22px; font:inherit; font-size:12px; letter-spacing:.18em;
   cursor:pointer; color:var(--void); border:var(--px) solid var(--ink); box-shadow:var(--bevel);
   background:linear-gradient(180deg,#ffe08a,var(--joy) 55%,#c98f16);
-  animation:confrontPulse 1.6s ease-in-out infinite alternate}
+  animation:confrontPulse 1.6s steps(19) infinite alternate}
 .confront:active{transform:translate(1px,1px)}
 @keyframes confrontPulse{
   from{box-shadow:var(--bevel), 0 0 10px rgba(255,198,61,.5)}
   to  {box-shadow:var(--bevel), 0 0 26px rgba(255,198,61,.95)}}
+
+/* the build stamp: what you are looking at, and when it last changed */
+.buildstamp{position:absolute; left:0; right:0; bottom:6px;
+  text-align:center; font-size:10px; letter-spacing:.12em;
+  color:var(--joy); opacity:.75; pointer-events:none;
+  text-shadow:1px 1px 0 rgba(6,4,14,.9)}
 
 /* ---------- how to play ---------- */
 .howto{position:absolute; inset:0; z-index:92; background:#000; display:none;

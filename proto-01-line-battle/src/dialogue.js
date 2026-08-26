@@ -61,8 +61,14 @@ function checkDialogue(){
 function applyBackdrop(){
   const e=EMOTIONS[S.enemy.emotion];
   const bg=(e&&e.bg_hex)||"#1a1e20";
+  const hex=(e&&e.hex)||"#929fa5";
+  const [r,g,b]=hexRGB(hex), a=RULES.backdropGlow;
+  /* `bg_hex` alone is nearly black, so the emotion barely registered. The tint is
+     now the emotion's REAL colour, hung above the entity, over that dark base. */
   document.querySelector(".phone").style.background=
-    `linear-gradient(180deg,#000 0%,#050408 22%,${bg} 100%)`;
+    `radial-gradient(120% 70% at 50% -8%, rgba(${r},${g},${b},${a}) 0%, `+
+      `rgba(${r},${g},${b},${(a*0.35).toFixed(3)}) 38%, rgba(0,0,0,0) 72%), `+
+    `linear-gradient(180deg,#000 0%,#050408 20%,${bg} 100%)`;
 }
 function applyPersona(){
   const P=pickPersona(S.enemy);

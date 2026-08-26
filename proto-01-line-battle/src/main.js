@@ -4,7 +4,7 @@
    file:// as well as from a static host. Load order is fixed in index.html;
    every file shares one global scope. */
 
-renderMoment(); applyPersona(); buildPanel(); wireTips(); applyOverload(S.player); buildEnemyLine(); render();
+renderMoment(); renderBuildStamp(); applyPersona(); buildPanel(); wirePanelGestures(); wireTips(); newPrompt(); applyOverload(S.player); buildEnemyLine(); render();
 $("howtoBtn").addEventListener("click",()=>{ $("howto").classList.add("show"); sfx("tap"); });
 $("howtoBack").addEventListener("click",()=>{ $("howto").classList.remove("show"); sfx("tap"); });
 $("confrontBtn").addEventListener("click",()=>{

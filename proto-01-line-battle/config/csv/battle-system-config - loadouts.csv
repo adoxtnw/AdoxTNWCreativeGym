@@ -1,0 +1,9 @@
+One Loadout per emotion; the player carries `equippedSlots` of them into a battle (units.loadouts). A Loadout may hold any ability whose emotion set includes its own emotion — see abilities.emotions for hybrids. Blank slots render as empty.,,,,,,,,
+id,emotion,name,slot1,slot2,slot3,slot4,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
+LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,
+LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,
+LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,,,1,
+LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,
+LO_SURPRISE,SURPRISE,Surprise,,,,,1,No Surprise abilities exist yet.
+LO_FEAR,FEAR,Fear,,,,,1,No Fear abilities exist yet.
