@@ -9,6 +9,12 @@ const ICONS={
   BOLT :["....xxx.","...xxx..","..xxx...",".xxxxxx.","....xxx.","...xxx..","..xxx...",".xxx...."],
   DROP :["...xx...","...xx...","..xxxx..","..xxxx..",".xxxxxx.","xxxxxxxx",".xxxxxx.","..xxxx.."],
   SPARK:["...xx...","...xx...","x..xx..x",".xxxxxx.",".xxxxxx.","x..xx..x","...xx...","...xx..."],
+  /* SURPRISE asks for this in the emotions sheet, and neither app had it — so
+     `iconSVG` fell back to BOLT and Surprise wore Anger's symbol everywhere a
+     glyph was drawn from the sheet. A core with spikes coming off it: related
+     to SPARK, which is a clean four-point star, but deliberately busier. */
+  BURST:["..x..x..","x.x..x.x",".xxxxxx.","..xxxx..",
+         "..xxxx..",".xxxxxx.","x.x..x.x","..x..x.."],
   SHIELD:["xxxxxxxx","xxxxxxxx","xx....xx","xx....xx","xx....xx",".xx..xx.","..xxxx..","...xx..."],
   CHARGE:["...xx...","..xxxx..",".xxxxxx.","xxxxxxxx","...xx...","...xx...","...xx...","...xx..."],
   WARN :["...xx...","...xx...","..xxxx..","..x..x..",".xx..xx.",".x.xx.x.","xx.xx.xx","xxxxxxxx"],

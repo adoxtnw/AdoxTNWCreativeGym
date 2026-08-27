@@ -10,13 +10,12 @@
    is the part that matters — the `sounds` sheet — so a sound is defined once
    even though the synth that plays it is built twice.
 
-   Nothing is an audio file: every effect is a swept oscillator (or noise)
-   through a bit-crusher, which is where the crunch comes from. The one
-   exception is the music, which is a real recording and therefore bypasses the
-   crusher entirely — see MUSIC below.                                       */
+   Nothing here is an audio file: every effect is a swept oscillator (or noise)
+   through a bit-crusher, which is where the crunch comes from. The music is
+   the exception in every sense — it is a real recording, and it does not touch
+   this graph at all. See MUSIC below for why.                               */
 
-let actx = null, master = null, sfxBus = null, cleanBus = null,
-    delay = null, noiseBuf = null;
+let actx = null, master = null, sfxBus = null, delay = null, noiseBuf = null;
 
 function crushCurve(steps){
   const n = 1024, c = new Float32Array(n);
@@ -39,11 +38,6 @@ function initAudio(){
   const dOut = actx.createGain(); dOut.gain.value = 0.75;
   delay.connect(dOut); dOut.connect(crusher);
   master.connect(crusher); crusher.connect(lp); lp.connect(actx.destination);
-  /* A CLEAN bus, straight out, for anything already recorded. The crusher and
-     the 7.2 kHz lowpass exist to make SYNTHESISED effects crunchy; run a real
-     mix through them and they do nothing but damage it. */
-  cleanBus = actx.createGain(); cleanBus.gain.value = 0.7;
-  cleanBus.connect(actx.destination);
   const len = actx.sampleRate * 1.2;
   noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
   const d = noiseBuf.getChannelData(0);
@@ -105,79 +99,100 @@ const TRACKS = {
   RIDE: {src: "audio/ride.m4a", gain: 0.60, loop: true}
 };
 const FADE_OUT_MS = 380;          /* quick: a cut, not a dissolve */
+/* EXCEPT WHEN LEAVING A STATION. Every other change of music is a cut, because
+   a cut is what makes a change of place feel abrupt and deliberate. Departure
+   is the one moment that is meant to feel long: the map drains, the camera
+   falls into the station, and the two tracks trade places across the whole of
+   it. Passed in per call rather than decided in here, so this file still knows
+   nothing about phases. */
 
+/* NOT THROUGH THE WEB AUDIO GRAPH, DELIBERATELY. Routing a media element
+   through `createMediaElementSource` makes it subject to a CORS check, and a
+   failed check does not throw — the graph simply outputs SILENCE. On file://
+   every origin is opaque, so that check can never pass and the music is
+   guaranteed silent while every synthesised effect keeps working, which is a
+   miserable thing to debug. The graph was only ever there to hold a gain node
+   for fading, and `<audio>.volume` does that with none of the risk. */
 const Music = {
   want: null,          /* what SHOULD be playing */
   cur: null,           /* what IS playing */
   armed: false,        /* has a gesture unlocked audio yet */
-  _nodes: {},          /* id -> {el, src, gain} */
+  _els: {},            /* id -> HTMLAudioElement */
+  _fades: {},          /* id -> interval handle */
 
   /* Ask for a track (or null for silence). Idempotent: calling it every frame
      with the same answer does nothing, which is what lets the phase table below
      simply state what should be true. */
-  set(id){
+  set(id, opt){
     if(this.want === id && !this.stalled()) return;
     this.want = id;
+    this.opt = opt || null;          /* {inMs, outMs}: how THIS change sounds */
     if(this.armed) this.apply();
   },
+  opt: null,
   /* IS WHAT WE ASKED FOR ACTUALLY SOUNDING? A track can be left paused by a
      fade that was scheduled and then immediately re-requested, and the plain
      `cur === want` check would then agree that it is playing while the game sat
      in silence. Cheap to ask, and it turns a dead-air bug into a non-event. */
   stalled(){
     if(!this.cur) return false;
-    const n = this._nodes[this.cur];
-    return !!n && (n.el.paused || n.gain.gain.value < 0.01);
+    const el = this._els[this.cur];
+    return !!el && (el.paused || el.volume < 0.01);
   },
   apply(){
     if(this.cur === this.want && !this.stalled()) return;
-    if(this.cur && this.cur !== this.want) this.fade(this.cur, FADE_OUT_MS);
+    const o = this.opt || {};
+    if(this.cur && this.cur !== this.want) this.fade(this.cur, o.outMs || FADE_OUT_MS);
     const id = this.want;
     this.cur = id;
     if(!id) return;
-    const n = this.node(id);
-    if(!n) return;
-    const t = actx.currentTime;
-    clearTimeout(n.stopAt);                      /* cancel a pending pause */
-    n.gain.gain.cancelScheduledValues(t);
-    /* both: `.value` snaps it now, `setValueAtTime` anchors the automation
-       curve so a later ramp starts from full rather than from wherever the
-       previous fade had got to */
-    n.gain.gain.value = TRACKS[id].gain;
-    n.gain.gain.setValueAtTime(TRACKS[id].gain, t);   /* abrupt, at full */
-    try{ n.el.currentTime = 0; }catch(e){}
-    const p = n.el.play(); if(p && p.catch) p.catch(() => {});
+    const el = this.el(id); if(!el) return;
+    clearInterval(this._fades[id]);              /* cancel a fade in progress */
+    if(o.inMs > 0) this.ramp(id, 0, TRACKS[id].gain, o.inMs);
+    else el.volume = TRACKS[id].gain;            /* abrupt, at full */
+    try{ el.currentTime = 0; }catch(e){}
+    const p = el.play();
+    /* A rejected play() means the gesture did not count after all. Disarm so
+       the next tap tries again rather than leaving the map permanently mute. */
+    if(p && p.catch) p.catch(() => { this.armed = false; this.cur = null; });
   },
-  fade(id, ms){
-    const n = this._nodes[id]; if(!n || !actx) return;
-    const t = actx.currentTime;
-    n.gain.gain.cancelScheduledValues(t);
-    n.gain.gain.setValueAtTime(Math.max(0.0001, n.gain.gain.value), t);
-    n.gain.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-    /* pause only after the ramp, or the fade is a cut */
-    clearTimeout(n.stopAt);
-    n.stopAt = setTimeout(() => { try{ n.el.pause(); }catch(e){} }, ms + 60);
+  fade(id, ms){ this.ramp(id, this._els[id] && this._els[id].volume, 0, ms, true); },
+  /* One ramp, both directions. `pauseAtEnd` is what makes a fade out actually
+     stop the track rather than leave it running silently — and it happens only
+     when the ramp completes, so a fade that is overtaken by a new request never
+     pauses the thing that request just started. */
+  ramp(id, from, to, ms, pauseAtEnd){
+    const el = this._els[id]; if(!el) return;
+    clearInterval(this._fades[id]);
+    if(from == null) from = el.volume;
+    const steps = Math.max(1, Math.round(ms / 25));
+    let i = 0;
+    el.volume = Math.max(0, Math.min(1, from));
+    this._fades[id] = setInterval(() => {
+      i++;
+      const k = Math.min(1, i / steps);
+      el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+      if(i >= steps){
+        clearInterval(this._fades[id]);
+        if(pauseAtEnd){ try{ el.pause(); }catch(e){} }
+      }
+    }, 25);
   },
-  node(id){
-    if(this._nodes[id]) return this._nodes[id];
-    if(!audioReady()) return null;
+  el(id){
+    if(this._els[id]) return this._els[id];
     const t = TRACKS[id]; if(!t) return null;
     const el = new Audio(t.src);
-    el.loop = !!t.loop; el.preload = "auto"; el.crossOrigin = "anonymous";
-    let src;
-    try{ src = actx.createMediaElementSource(el); }
-    catch(e){ return null; }
-    const gain = actx.createGain();
-    gain.gain.value = 0.0001;
-    src.connect(gain); gain.connect(cleanBus);   /* clean: never bit-crushed */
-    return (this._nodes[id] = {el, src, gain, stopAt: 0});
+    /* no crossOrigin: see the note above — it buys nothing and can only mute */
+    el.loop = !!t.loop; el.preload = "auto"; el.volume = 0;
+    return (this._els[id] = el);
   },
-  /* The first gesture anywhere unlocks audio and starts whatever is wanted. */
+  /* The first gesture anywhere unlocks audio and starts whatever is wanted.
+     Called on EVERY pointerdown, not just the first, so a play() the browser
+     refused earlier gets another go. */
   arm(){
-    if(this.armed) return;
-    if(!audioReady()) return;
+    if(this.armed && !this.stalled()) return;
     this.armed = true;
-    const w = this.want; this.cur = null; this.want = w;
+    if(this.cur === this.want) this.cur = null;   /* force apply() to act */
     this.apply();
   }
 };
@@ -187,10 +202,27 @@ const Music = {
    HUD syncs, so there is one place to read and one place to change. */
 function musicForPhase(){
   const p = J.phase;
-  if(p === "RIDING" || p === "ANNOUNCE" || p === "ENCOUNTER" || p === "WIPE_IN")
+  /* the long one: the ride's theme rises through the zoom while the map's
+     drains away under it, both finishing as the wipe opens */
+  if(p === "ZOOM"){
+    const ms = Math.max(400, num(RULES.departSecs, 3) * 1000);
+    return Music.set("RIDE", {inMs: ms, outMs: ms});
+  }
+  /* ENCOUNTER IS NOT IN THIS LIST, AND THAT MATTERS. It used to be — back when
+     an encounter was a debug panel over a paused ride, and the ride's theme
+     carrying on underneath was right. It is a real fight now, with its own
+     music, and because this branch is tested FIRST a stale entry here silently
+     beat the silence rule below: the table said two contradictory things and
+     the earlier one won. */
+  if(p === "RIDING" || p === "ANNOUNCE" || p === "WIPE_IN")
     return Music.set("RIDE");
-  /* FLASH is the white flooding in; by the time the card lands it is silent */
-  if(p === "FLASH" || p === "BANNER" || p === "DILEMMA" || p === "BOSSWAIT")
+  /* FLASH is the white flooding in; by the time the card lands it is silent.
+     ENCOUNTER and its flood belong to the battle system, which brings its own
+     theme — two pieces of music over each other is the one thing worse than
+     silence. The ride's comes back abruptly at full on the way out, which is
+     already how every other return to this app's music works. */
+  if(p === "FLASH" || p === "BANNER" || p === "DILEMMA" || p === "BOSSWAIT" ||
+     p === "ENCOUNTER" || p === "ENCOUNTER_IN")
     return Music.set(null);
   Music.set("MAP");
 }

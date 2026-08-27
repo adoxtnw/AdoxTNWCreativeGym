@@ -59,12 +59,17 @@ const chanceOf = e =>
 /* ---- the ride's element state -------------------------------------------- */
 const Trip = {
   live: [],          /* every element currently in the world */
-  queue: [],         /* {id, at} — spawns rolled for but not yet emitted */
   made: {},          /* how many of each this ride has produced, ever */
-  collected: 0,
+  collected: 0,      /* the true count */
+  shown: 0,          /* what the bar is currently drawing — it chases `collected` */
+  from: 0, tw: 0,    /* the tween the bar is in the middle of */
+  flash: 0,          /* ms of white left on the bar */
   target: 10,
   nextRoll: 0
 };
+/* HOW MANY MAY BE OUT AT ONCE, ALL KINDS TOGETHER. The per-kind caps in the
+   sheet are ceilings on variety; this is the ceiling on noise. */
+const maxLive = () => Math.max(1, num(RULES.travelMaxLive, 5));
 /* GDD 4: the roll comes round every 1-3 seconds, and enemy density squeezes it
    toward the fast end — so a dangerous stretch is busier as well as nastier.
    Re-rolled each time rather than fixed, or the track would tick like a metronome. */
@@ -81,9 +86,9 @@ const capOf = v => (num(v, 0) <= 0 ? Infinity : num(v, 0));
    there is nothing else holding a reference to an element. */
 function resetTrip(){
   Trip.live.length = 0;
-  Trip.queue.length = 0;
   Trip.made = {};
   Trip.collected = 0;
+  Trip.shown = 0; Trip.from = 0; Trip.tw = 0; Trip.flash = 0;
   Trip.target = Math.max(1, RULES.travelTarget || 10);
   Trip.nextRoll = 0;
   TravelMods.prune();
@@ -95,27 +100,34 @@ const liveCount = id => {
 };
 
 /* ---- rolling ------------------------------------------------------------- */
-/* Every `travelRollSecs` each element type is offered every FREE SLOT it has,
-   and each slot is rolled independently against the resolved chance. Rolling
-   once per type instead would make a cap of fifteen unreachable — at one
-   success per three seconds against a life of one to three, there would never
-   be more than one on screen. The successes are then spread across the coming
-   interval rather than all appearing at once, so the window fills steadily
-   instead of pulsing. */
+/* ONE ROLL PRODUCES AT MOST ONE ELEMENT, AND OFTEN NOTHING.
+
+   Every eligible kind's resolved chance is a SLICE of the same single draw, so
+   the kinds compete for one outcome instead of each flipping its own coin — and
+   whatever the slices do not cover is the chance that the roll produces nothing
+   at all. That gap is the whole point. A ride needs quiet stretches; rolling
+   each kind separately meant something appeared on almost every tick, which
+   made the interval meaningless and the window permanently full.
+
+   A kind that has hit its own ceiling simply is not offered a slice, which
+   hands its share of the draw to the empty remainder — a board thick with
+   segments naturally goes quieter rather than substituting something else in. */
 function rollElements(){
+  const slices = [];
+  let total = 0;
   Object.keys(ELEMENTS).forEach(id => {
     const e = ELEMENTS[id];
-    const made = Trip.made[id] || 0;
-    const queued = Trip.queue.reduce((n, q) => n + (q.id === id ? 1 : 0), 0);
-    const free = Math.min(capOf(e.max_on_screen) - liveCount(id) - queued,
-                          capOf(e.max_per_trip) - made - queued);
-    if(free <= 0) return;
-    const p = chanceOf(e), span = ROLL_FRAMES();
-    for(let i = 0; i < free; i++){
-      if(Math.random() >= p) continue;
-      Trip.queue.push({id, at: frame + Math.floor(Math.random() * span)});
-    }
+    if(liveCount(id) >= capOf(e.max_on_screen)) return;
+    if((Trip.made[id] || 0) >= capOf(e.max_per_trip)) return;
+    const p = chanceOf(e);
+    if(p <= 0) return;
+    total += p;
+    slices.push({id, upto: total});
   });
+  const r = Math.random();
+  for(let i = 0; i < slices.length; i++)
+    if(r < slices[i].upto){ spawnElement(slices[i].id); return true; }
+  return false;
 }
 function spawnElement(id){
   const e = ELEMENTS[id];
@@ -133,6 +145,11 @@ function spawnElement(id){
     life: secsToMs(num(e.life_min, 3) + Math.random() * (num(e.life_max, 3) - num(e.life_min, 3))),
     age: 0,                            /* ms */
     spin: Math.random() * 6.283,       /* prisms start at their own angle */
+    /* AND SO DOES EVERY SEGMENT. They are identical squares otherwise, and a
+       stream of identical squares all sitting square to the frame reads as one
+       repeated sprite rather than as debris. Half turn one way, half the other. */
+    rot: Math.random() * 6.283,
+    rspin: (Math.random() < 0.5 ? -1 : 1) * (0.012 + Math.random() * 0.045),
     seed: Math.random(),
     sway: 0.4 + Math.random() * 0.9,
     state: "LIVE",
@@ -158,15 +175,21 @@ function spawnElement(id){
 function stepElements(){
   if(J.phase !== "RIDING" && J.phase !== "ANNOUNCE"){
     /* Anything still in the air when the ride ends is dropped, not carried. */
-    if(J.phase !== "FLASH" && J.phase !== "ENCOUNTER"){
-      Trip.live.length = 0; Trip.queue.length = 0;
-    }
+    if(J.phase !== "FLASH" && J.phase !== "ENCOUNTER" && J.phase !== "ENCOUNTER_IN")
+      Trip.live.length = 0;
     return;
   }
   TravelMods.prune();
-  if(--Trip.nextRoll <= 0){ Trip.nextRoll = ROLL_FRAMES(); rollElements(); }
-  for(let i = Trip.queue.length - 1; i >= 0; i--)
-    if(Trip.queue[i].at <= frame){ spawnElement(Trip.queue[i].id); Trip.queue.splice(i, 1); }
+  if(Trip.nextRoll > 0) Trip.nextRoll--;
+  /* A FULL BOARD HOLDS THE ROLL RATHER THAN WASTING IT. When the timer comes
+     round and there is no room, the roll is not skipped and rescheduled — it
+     waits, so the instant something leaves the frame or is tapped away the next
+     one happens. Skipping instead would mean a busy stretch went quiet for a
+     further whole interval after it finally cleared. */
+  if(Trip.nextRoll <= 0 && Trip.live.length < maxLive()){
+    rollElements();                  /* which may well decide on nothing */
+    Trip.nextRoll = ROLL_FRAMES();   /* either way, the wait starts again */
+  }
   for(let i = 0; i < Trip.live.length; i++)
     if(Trip.live[i].flash > 0) Trip.live[i].flash--;
 }
@@ -178,6 +201,7 @@ function stepElementsSmooth(dt){
   const k = dt / STEP;                 /* how much of a 12 fps frame this was */
   const bar = tripBarTip(), purse = {x: 10, y: H - 8};
   const t = performance.now();
+  stepTripBar(dt);
 
   for(let i = Trip.live.length - 1; i >= 0; i--){
     const el = Trip.live[i];
@@ -191,9 +215,16 @@ function stepElementsSmooth(dt){
       el.x = lerp(el.fx, tgt.x, p);
       el.y = lerp(el.fy, tgt.y, p);
       if(el.fly >= 260){
-        Trip.collected += num(el.e.worth, 0);
+        const worth = num(el.e.worth, 0);
+        if(worth > 0){
+          /* the bar sets off from wherever it had reached, not from the last
+             whole number, or a quick second pickup snaps backwards first */
+          Trip.from = Trip.shown; Trip.tw = 0;
+          Trip.collected += worth;
+          Trip.flash = num(RULES.tripFlashMs, 260);
+          sfx("map_tripup");
+        }else sfx("map_collect");
         payOut(el);
-        sfx("map_collect");
         Trip.live.splice(i, 1);
         /* filling the bar is what actually ends the ride */
         if(Trip.collected >= Trip.target && J.phase === "RIDING") endRide();
@@ -221,26 +252,19 @@ function stepElementsSmooth(dt){
     if(gone) Trip.live.splice(i, 1);
   }
 }
-const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL" ||
-                          el.e.kind === "LOOT";
+const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL";
 
 /* What a collected element leaves in the vault. Crystals take the emotion of
    the LINE being ridden — what you bring back from a stretch of track is
-   coloured by the track. Items are rolled by weight from the items sheet. */
+   coloured by the track.
+
+   THERE IS NO ITEM DROP. Items are not designed yet, and a payload of
+   placeholders is worse than an empty pocket: it fills the Baggage screen with
+   things that mean nothing and quietly teaches the player they are worthless.
+   The `items` sheet still exists, empty, so the machinery has a shape to fill. */
 function payOut(el){
   const pay = el.e.payload, n = el.e.amount || 1;
   if(pay === "CRYSTAL" && Run.active) Run.addCrystal(J.line.emotion, n);
-  else if(pay === "ITEM" && Run.active){ const it = rollItem(); if(it) Run.addItem(it); }
-}
-function rollItem(){
-  const ids = Object.keys(ITEMS); if(!ids.length) return null;
-  let total = 0; ids.forEach(i => { total += (ITEMS[i].weight || 1); });
-  let r = Math.random() * total;
-  for(let i = 0; i < ids.length; i++){
-    r -= (ITEMS[ids[i]].weight || 1);
-    if(r <= 0) return ids[i];
-  }
-  return ids[ids.length - 1];
 }
 
 /* ---- what each kind looks like, and what a tap does ---------------------- */
@@ -266,7 +290,7 @@ const elAlpha = el => {
    white. The distortion is the point, so it is deliberately overdriven. */
 ElementFx.define("SEGMENT", {
   draw(el, col){
-    const a = elAlpha(el), s = el.e.size, h = s / 2;
+    const a = elAlpha(el), h = el.e.size / 2;
     const t = frame * 0.75 + el.seed * 6.3;
     const beat = 0.5 + 0.5 * Math.sin(frame * 0.9 + el.seed * 6.3);
     /* LIT, not the raw line colour. A segment painted in the line's own hue
@@ -275,17 +299,28 @@ ElementFx.define("SEGMENT", {
     const lit = mix(col, 1.45);
     const c = el.flash > 0 ? [255, 255, 255]
                            : [lerp(lit[0], 255, beat), lerp(lit[1], 255, beat), lerp(lit[2], 255, beat)];
-    for(let dy = -h; dy <= h; dy++){
-      /* the row slides, AND its width breathes — one alone reads as a shear.
-         Kept under about a quarter of the width, or the square tears into
-         shreds and stops reading as an object at all. */
-      const slide = Math.sin(dy * 0.9 + t) * 1.5 + Math.sin(dy * 0.37 - t * 1.7) * 0.9;
-      const half = h + Math.sin(dy * 0.55 + t * 0.8) * 1.5;
-      for(let dx = -half; dx <= half; dx++){
-        const edge = Math.abs(dx) / (half + 0.001);
-        blendPx(el.x + dx + slide, el.y + dy, c, a * (0.78 + 0.22 * (1 - edge)));
+    /* ROTATED, AND EACH ONE DIFFERENTLY. Drawn by walking the DESTINATION
+       pixels and asking each one where it falls inside the unrotated square,
+       rather than by rotating the source: rotating the source leaves holes,
+       because a turned grid does not land on whole pixels. */
+    const ang = el.rot + frame * el.rspin;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const R = Math.ceil(h * 1.45) + 2;                /* the turned bounding box */
+    for(let dy = -R; dy <= R; dy++)
+      for(let dx = -R; dx <= R; dx++){
+        const lx =  dx * ca + dy * sa;                /* into the square's own frame */
+        const ly = -dx * sa + dy * ca;
+        if(Math.abs(ly) > h) continue;
+        /* the row slides, AND its width breathes — one alone reads as a shear.
+           Kept under about a quarter of the width, or the square tears into
+           shreds and stops reading as an object at all. */
+        const slide = Math.sin(ly * 0.9 + t) * 1.5 + Math.sin(ly * 0.37 - t * 1.7) * 0.9;
+        const half  = h + Math.sin(ly * 0.55 + t * 0.8) * 1.5;
+        const ox = lx - slide;
+        if(Math.abs(ox) > half) continue;
+        const edge = Math.abs(ox) / (half + 0.001);
+        blendPx(el.x + dx, el.y + dy, c, a * (0.78 + 0.22 * (1 - edge)));
       }
-    }
   },
   tap(el){
     if(el.state !== "LIVE") return false;
@@ -336,33 +371,6 @@ ElementFx.define("CRYSTAL", {
       blendPx(el.x + 1, el.y - h + 2, edge, a);
       blendPx(el.x + 2, el.y - h + 2, edge, a * 0.6);
     }
-  },
-  tap(el){
-    if(el.state !== "LIVE") return false;
-    el.state = "FLY"; el.fly = 0; el.fx = el.x; el.fy = el.y;
-    sfx("map_pick");
-    return true;
-  }
-});
-
-/* LOOT — an echo. Same beating colour as a segment so it reads as collectable,
-   but round and softer-edged so it is never confused with progress. */
-ElementFx.define("LOOT", {
-  draw(el, col){
-    const a = elAlpha(el), r = el.e.size / 2;
-    const beat = 0.5 + 0.5 * Math.sin(frame * 0.7 + el.seed * 6.3);
-    const lit = mix(col, 1.5);
-    const c = el.flash > 0 ? [255, 255, 255]
-                           : [lerp(lit[0], 255, beat), lerp(lit[1], 255, beat), lerp(lit[2], 255, beat)];
-    const t = frame * 0.5 + el.seed * 6.3;
-    for(let dy = -r; dy <= r; dy++){
-      const k = dy / r;
-      const half = r * Math.sqrt(Math.max(0, 1 - k * k)) * (1 + 0.16 * Math.sin(t + dy * 0.8));
-      for(let dx = -half; dx <= half; dx++)
-        blendPx(el.x + dx, el.y + dy, c, a * 0.9);
-    }
-    /* a hard glint, so it catches the eye going past at speed */
-    blendPx(el.x - 1, el.y - 1, [255, 255, 255], a);
   },
   tap(el){
     if(el.state !== "LIVE") return false;
@@ -469,21 +477,54 @@ function tapElement(px, py){
    siblings, but the numbers they share come from the spreadsheet. */
 /* TRIP_Y clears the DOM route header above it — that strip is about 22 CSS
    pixels tall, which is 7-8 of ours, and the bar's own caption sits 9 above
-   TRIP_Y. Any less and the two titles print on top of each other. */
-const TRIP_X = 9, TRIP_Y = 25, TRIP_H = 11;
-const tripW = () => W - TRIP_X * 2;
+   TRIP_Y. Any less and the two titles print on top of each other.
+
+   EDGE TO EDGE. The bar is the ride's one measure of progress, and an inset
+   bar reads as a widget sitting on the screen; a bar that runs off both sides
+   reads as part of the vehicle. */
+const TRIP_X = 0, TRIP_Y = 25, TRIP_H = 11;
+const tripW = () => W;
 const barWave = (x, amp, half, ph) => Math.sin((x / half + ph) * Math.PI) * amp;
-/* Where a collected segment flies to: the leading edge of the fill. */
+/* Where a collected segment flies to: the leading edge of the fill AS DRAWN,
+   not as counted — the segment has to land on the end of the bar the player can
+   actually see, which is still on its way to the new value. */
 function tripBarTip(){
-  const k = Trip.target ? Math.min(1, Trip.collected / Trip.target) : 0;
+  const k = Trip.target ? Math.min(1, Trip.shown / Trip.target) : 0;
   return {x: TRIP_X + tripW() * k, y: TRIP_Y + TRIP_H / 2};
+}
+/* THE BAR CHASES THE COUNT, IT DOES NOT JUMP TO IT.
+
+   A number that changes is information; a bar that surges forward and settles
+   is a reward, and this is the only reward the ride has. It overshoots slightly
+   and comes back — the ease that reads as something with weight arriving rather
+   than a value being assigned — and it flashes white on the way, so the eye is
+   pulled to the bar at the moment the thing it was chasing lands in it. */
+const easeOutBack = k => {
+  const c1 = 1.34, c3 = c1 + 1, p = k - 1;
+  return 1 + c3 * p * p * p + c1 * p * p;
+};
+function stepTripBar(dt){
+  if(Trip.flash > 0) Trip.flash = Math.max(0, Trip.flash - dt);
+  if(Trip.shown === Trip.collected) return;
+  const dur = Math.max(60, num(RULES.tripFillMs, 520));
+  Trip.tw = Math.min(dur, Trip.tw + dt);
+  const k = Trip.tw / dur;
+  Trip.shown = Trip.from + (Trip.collected - Trip.from) * easeOutBack(k);
+  if(k >= 1) Trip.shown = Trip.collected;
 }
 function drawTripBar(col){
   const w = tripW(), cy = TRIP_Y + TRIP_H / 2, core = TRIP_H / 2;
   const ph = frame * (RULES.barWaveSpeed || 0.1);
-  const k = Trip.target ? Math.min(1, Trip.collected / Trip.target) : 0;
+  /* the DRAWN value, and clamped — easeOutBack deliberately overshoots, and an
+     overshoot at the far end would run the fill off the end of the bar */
+  const k = Trip.target ? Math.max(0, Math.min(1, Trip.shown / Trip.target)) : 0;
   const fill = w * k;
   const ink = [244, 239, 228], dark = [22, 19, 17];
+  /* the flash rides on TOP of the fill colour rather than replacing the bar, so
+     the shape never disappears at the moment it is being looked at */
+  const fk = Trip.flash > 0 ? Trip.flash / Math.max(1, num(RULES.tripFlashMs, 260)) : 0;
+  if(fk > 0) col = [lerp(col[0], 255, fk * 0.85), lerp(col[1], 255, fk * 0.85),
+                    lerp(col[2], 255, fk * 0.85)];
   for(let x = 0; x < w; x++){
     const wv = barWave(x, RULES.barWaveAmp || 1.4, RULES.barWaveHalf || 5.6, ph);
     const top = cy - core - wv, bot = cy + core + wv;
@@ -502,5 +543,9 @@ function drawTripBar(col){
     }
   }
   text("EMOTIONAL TRIP", W >> 1, TRIP_Y - 9, packRGB(ink), 0);
-  text(Trip.collected + "/" + Trip.target, W - TRIP_X, TRIP_Y + TRIP_H + 3, packRGB(ink), -1);
+  /* the COUNT is the true value: it ticks over the instant the segment lands,
+     while the bar is still catching up to it */
+  /* clear of the bar's LOWER WAVE, not just of the bar: the silhouette swings
+     about 1.4px past the body, and at +3 the digits sat in it */
+  text(Trip.collected + "/" + Trip.target, W - 3, TRIP_Y + TRIP_H + 6, packRGB(ink), -1);
 }

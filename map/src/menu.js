@@ -29,11 +29,38 @@ const Menu = {
   open: false,
   tab: "PROFILE",
 
-  show(t){ this.open = true; if(t) this.tab = t; this.render(); syncHud(); dirty = true; },
-  hide(){ this.open = false; this.pick = null; this.openSet = null; this.msg = "";
-          this.render(); syncHud(); dirty = true; },
+  show(t){
+    clearTimeout(this._shut);                     /* a re-open cancels the fade */
+    const el = $("menu"); if(el) el.classList.remove("closing");
+    this.open = true; if(t) this.tab = t;
+    this.render(); syncHud(); dirty = true;
+  },
+  /* CLOSING IS A FADE, AND IT HAPPENS ANYWAY. The panel is left up for the
+     length of the fade and then torn down — but `open` goes false IMMEDIATELY,
+     so the map is interactive again on the tap rather than 130ms later, and a
+     second tap during the fade cannot land on a menu that is on its way out.
+     The timer is stored so a re-open cancels it; without that, opening quickly
+     after closing let the old teardown fire and blank the fresh panel. */
+  hide(){
+    if(!this.open) return;
+    this.open = false; this.pick = null; this.openSet = null; this.msg = "";
+    const el = $("menu");
+    syncHud(); dirty = true;
+    if(!el){ this.render(); return; }
+    el.classList.add("closing");
+    clearTimeout(this._shut);
+    this._shut = setTimeout(() => { el.classList.remove("closing"); this.render(); }, 140);
+  },
+  _shut: 0,
   toggle(){ this.open ? this.hide() : this.show(); },
-  go(t){ this.tab = t; this.render(); },
+  /* A TAB CHANGE REPLACES THE BODY, so the body is what animates — not the
+     whole menu, which would flash its own frame every time. */
+  go(t){
+    if(t === this.tab) return;
+    this.tab = t; this.render();
+    const b = $("menu") && $("menu").querySelector(".mbody");
+    if(b){ b.classList.remove("swap"); void b.offsetWidth; b.classList.add("swap"); }
+  },
 
   render(){
     const el = $("menu"); if(!el) return;
@@ -53,6 +80,9 @@ const Menu = {
       b.addEventListener("click", () => Menu.go(b.dataset.tab)));
     $("menuClose").addEventListener("click", () => Menu.hide());
     this.bind();
+    MenuGauge.attach();                 /* new canvases every render */
+    wireAbilityInfo(el);
+    stagger(el);                        /* everything arrives from below */
   },
 
   body(){
@@ -62,33 +92,82 @@ const Menu = {
     return this.inventory();
   },
 
-  /* ---------------------------------------------------------- PROFILE ---- */
+  /* ---------------------------------------------------------- PROFILE ----
+     THE WHOLE TAB IS ONE OBJECT: a travel card with everything about the
+     passenger crammed onto it. That is not decoration — it is what makes the
+     screen legible. A list of headed sections says "here are five unrelated
+     facts"; a card says "this is you, and these are the things printed on
+     you", which is the same claim the game is making.
+
+     It sits slightly askew and drifts, with its shadow thrown a long way down
+     and to the right, so it reads as a physical thing lying ON the interface
+     rather than as another panel built into it. */
   profile(){
-    const aff = Player.affinities.map(e =>
-      '<span class="pill" style="background:' + EMOTIONS[e].hex + '">' +
-      esc(EMOTIONS[e].name) + '</span>').join("");
+    const st = Player.stats();
+    const aff = Player.affinities.map((e, i) =>
+      '<span class="pill" style="background:' + EMOTIONS[e].hex +
+      ';--fd:' + (i * 0.31).toFixed(2) + 's">' + esc(EMOTIONS[e].name) + '</span>').join("");
     const bonuses = Player.affinities.map(e => {
       const fx = AffinityFx.of(EMOTIONS[e].affinity_bonus);
       return '<li>' + esc(fx.blurb) + '</li>';
     }).join("");
-    const keys = LINES.map(l => {
+
+    /* KEYS AS STAMPS. A key is a thing that gets stamped into a travel card,
+       so it is drawn as one: the line's emotion symbol struck into a disc. The
+       ones not yet earned are left as empty grey rings rather than hidden —
+       the shape of what is missing is the whole point of a stamp page. */
+    const stamps = LINES.map((l, i) => {
       const has = Player.hasKey(l.id);
-      return '<span class="pill key' + (has ? '' : ' off') + '" style="' +
-        (has ? 'background:' + EMOTIONS[l.emotion].hex : '') + '">' + l.id + '</span>';
+      const em = EMOTIONS[l.emotion] || {};
+      return '<div class="stamp' + (has ? '' : ' off') + ' "' +
+        (has ? ' style="--emo:' + em.hex + ';--fd:' + (i * 0.23).toFixed(2) + 's"' : '') +
+        ' title="' + esc(l.id + " — " + (em.name || "")) + '">' +
+        '<i class="sym">' + glyphSVG(em.icon || "DISC") + '</i>' +
+        '<b>' + esc(l.id) + '</b></div>';
     }).join("");
+
     return '' +
-      '<h3 style="color:' + Player.affinityHex(0) + '">' + esc(Player.name) +
-        '<button class="editbtn hudbtn" id="mEditName" title="Change your name">' +
-        '<i class="sym">' + glyphSVG("GLASS") + '</i></button></h3>' +
-      sect("Affinities", '<div class="pills">' + aff + '</div>' +
-           '<ul class="pending">' + bonuses + '</ul>', "SPARK") +
-      sect("Passenger Code", '<p class="code2">' + esc(Player.code || "\u2014") + '</p>',
-           "FLOPPY") +
-      sect("Docked at", '<p class="big">' +
-           esc((STATIONS[Player.at] || {}).name || "\u2014") + '</p>', "DISC") +
-      sect("Line Keys", '<div class="pills">' + keys + '</div>' +
-           '<p class="hint">Keys come from Line Managers, which do not exist yet.</p>',
-           "KEY");
+      '<div class="mcard">' +
+        '<div class="cardtop">' +
+          '<div class="avatar">' + silhouetteSVG() + '</div>' +
+          '<div class="who">' +
+            '<b class="cname" style="color:' + Player.affinityHex(0) + '">' +
+              esc(Player.name) + '</b>' +
+            '<button class="editbtn hudbtn" id="mEditName" title="Change your name">' +
+              '<i class="sym">' + glyphSVG("GLASS") + '</i></button>' +
+            '<div class="pills">' + aff + '</div>' +
+            '<div class="ccode">' + esc(Player.code || "\u2014") + '</div>' +
+          '</div>' +
+        '</div>' +
+
+        /* THE BAR IS THE BATTLE SYSTEM'S BAR, not a copy of it — same renderer,
+           same rules, so the number you carry between fights is drawn by the
+           code that will draw it during one. */
+        '<div class="cstat wide">' +
+          /* the tags sit in their own ROW, as they do in battle — laid over the
+             bar they cover the very thing they are labelling */
+          '<div class="gwrap">' +
+            '<canvas class="gaugecv dead" id="mGaugeDead"></canvas>' +
+            '<canvas class="gaugecv" id="mGauge"></canvas>' +
+          '</div>' +
+          '<div class="tagrow">' +
+            '<span class="tag ms pxr" id="mTagMs"></span>' +
+            '<span class="tag ec ramp pxr" id="mTagEc"></span>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="cstats">' +
+          '<div class="cstat"><small>Emotional Layers</small>' + layers6(st.layers) + '</div>' +
+          '<div class="cstat"><small>Abilities</small><b>' + st.pool.length + '</b></div>' +
+          '<div class="cstat wide"><small>Docked at</small><b>' +
+            esc((STATIONS[Player.at] || {}).name || "\u2014") + '</b></div>' +
+        '</div>' +
+
+        '<div class="cstat wide affs"><small>Affinities</small>' +
+          '<ul class="pending">' + bonuses + '</ul></div>' +
+
+        '<div class="stamps">' + stamps + '</div>' +
+      '</div>';
   },
 
   /* ---------------------------------------------------------- LOADOUT ---- */
@@ -98,16 +177,13 @@ const Menu = {
      set itself opens its abilities instead, because "what is in this?" and
      "swap this" are different questions and should not share a target. */
   loadout(){
-    const st = Player.stats();
     const n = RULES.equippedSlots || 3;
 
-    const stats =
-      '<dl class="stats2">' +
-        '<dt>Mental Stamina</dt><dd><span class="tag ms">' + st.maxMs + '</span></dd>' +
-        '<dt>Emotional Charge</dt><dd><span class="tag ec ramp">' + st.maxEc + '</span></dd>' +
-        '<dt>Layers</dt><dd>' + layers6(st.layers) + '</dd>' +
-        '<dt>Abilities</dt><dd><span class="big">' + st.pool.length + '</span></dd>' +
-      '</dl>';
+    /* THE STAT BLOCK LIVES ON THE CARD NOW, not here. It was printed beside the
+       slots that produce it, which was the right instinct — but printing the
+       same four numbers on two tabs is an invitation for them to disagree, and
+       the card is where a player looks for "what am I". What stays here is the
+       one line that says where they came from. */
 
     const a = ARMOR[Player.armor];
     const armorSlot =
@@ -128,10 +204,10 @@ const Menu = {
       '</div>';
     }
 
-    return stats +
-      sect("Emotional Armor", armorSlot, "SHIELD") +
+    return sect("Emotional Armor", armorSlot, "SHIELD") +
       sect("Move Sets", slots, "BOLT") +
-      '<p class="hint">Loadouts cannot be changed once a trip has begun.</p>';
+      '<p class="hint">These add up to the stats on your card. Loadouts cannot ' +
+      'be changed once a trip has begun.</p>';
   },
 
   /* -------------------------------------------------------- INVENTORY ---- */
@@ -183,6 +259,19 @@ const Menu = {
           '<button class="lnk hudbtn" data-snapload="' + esc(n) + '">load</button>' +
           '<button class="lnk hudbtn" data-snapdrop="' + esc(n) + '">delete</button></div>'
         ).join("") : '<p class="hint">None yet.</p>')) +
+      sect("Leave",
+        /* THE WAY BACK OUT. It lives in SAVE and nowhere else on purpose: this
+           is the one tab where the player is already thinking about what
+           survives, and it is the only place a warning about leaving mid-run
+           can be read in the same breath as the button that downloads the
+           file. */
+        '<p class="hint">' +
+          (Run.active
+            ? 'A run is in progress. <b>Leaving abandons it</b> &mdash; anything ' +
+              'unbanked is lost. Download the file first if you want it kept.'
+            : 'Back to the title screen. Your progress is saved.') +
+        '</p>' +
+        '<button class="cbtn hudbtn" id="vExit">MAIN SCREEN</button>', "PERSON") +
       (this.msg ? '<p class="cnote">' + esc(this.msg) + '</p>' : '');
   },
   say(m){ this.msg = m; sfx("ui_deny"); this.render(); },
@@ -272,6 +361,18 @@ const Menu = {
       Player.name = clean; Player.save(); Menu.render(); dirty = true;
     });
 
+    /* ---- leaving ---- */
+    on("vExit", () => {
+      /* SAVE FIRST, ALWAYS. The game saves on the map anyway, but this is the
+         one action that walks away from the page — a profile edited in this
+         menu and not yet written would be gone, and there is no coming back
+         from that to ask about it. */
+      try{ Player.save(); }catch(e){}
+      /* No confirm dialog even mid-run: the section above says plainly what
+         leaving costs, and a run is not a thing worth trapping someone in. */
+      location.href = "../BATTLE SYSTEM/index.html";
+    });
+
     /* ---- saves ---- */
     on("vFile", () => { const r = Vault.exportFile();
       Menu.say(r.ok ? "Downloaded " + r.name : r.why); });
@@ -336,19 +437,24 @@ function setCard(s, slot){
   const moves = setMoves(s);
   const icon = (moves.length && ABILITIES[moves[0]].icon) || "SPARK";
   const fd = ((s.id.length * 7) % 20) / 10;
-  return '<button class="card pxr" data-openset="' + s.id + '"' +
+  /* THE TRIANGLE IS THE ONLY THING THAT SAYS THIS OPENS. A card that expands
+     with no affordance is a card that gets tapped once by accident and never
+     again; inverted while open, it is also the only thing that says it can be
+     shut. */
+  const open = Menu.openSet === s.id;
+  return '<button class="card pxr' + (open ? ' open' : '') + '" data-openset="' + s.id + '"' +
     (slot != null ? ' data-slot="' + slot + '"' : '') + ' style="--emo:' + col + '">' +
     '<i class="sym" style="--fd:' + fd + 's">' + glyphSVG(icon) + '</i>' +
     '<span class="cardtxt"><b>' + setName(s) + '</b>' +
       '<small>' + moves.length + ' moves &middot; ' +
-        (num(s.ec_mod, 0) >= 0 ? "+" : "") + num(s.ec_mod, 0) + ' EC &middot; tap to see</small>' +
-    '</span></button>';
+        (num(s.ec_mod, 0) >= 0 ? "+" : "") + num(s.ec_mod, 0) + ' EC</small>' +
+    '</span><i class="caret"></i></button>';
 }
 /* The abilities inside a set, drawn the way the battle panel draws them. */
 function abilityPanel(s){
   const moves = setMoves(s);
   if(!moves.length) return '<p class="hint">This set has no abilities yet.</p>';
-  return '<div class="abpage">' + moves.map(id => abilCard(ABILITIES[id])).join("") + '</div>';
+  return '<div class="abpage opening">' + moves.map(id => abilCard(ABILITIES[id])).join("") + '</div>';
 }
 
 /* Every heading carries a symbol, and every symbol breathes — a still glyph in
@@ -373,12 +479,20 @@ function abilCard(a){
   line += '<div class="link" style="color:' + col + '"></div>' +
           '<div class="station" style="color:' + col + '">' + stationSVG(a.icon) + '</div>';
   const bob = ((a.id.length * 7) % 20) / 10;
-  return '<div class="abrow pxr" style="--emo:' + col + ';--fd:' + bob + 's">' +
+  /* `data-a` is what the INFO button looks the ability back up by — the same
+     attribute the battle panel uses, so the wiring is the same wiring. */
+  return '<div class="abrow pxr" data-a="' + esc(a.id) + '" style="--emo:' + col +
+    ';--fd:' + bob + 's">' +
     (a.uses ? '<div class="shots">' +
        Array.from({length: a.uses}, () => '<div class="shot"></div>').join("") + '</div>' : '') +
     '<div class="abline">' + line + '</div>' +
     '<div class="abinfo"><div class="abname">' + esc(a.name.toUpperCase()) + '</div>' +
-    '<div class="abcost">' + num(a.cost, 0) + ' EC</div></div></div>';
+    '<div class="abcost">' + num(a.cost, 0) + ' EC</div></div>' +
+    /* THE SAME "i" THE BATTLE PANEL USES, and it has to be here for the same
+       reason it is there: the box has room for a name and a cost, and what the
+       ability actually DOES is a sentence. Nothing new is invented — the tip,
+       the chips and the keyword colouring are the battle system's, ported. */
+    '<div class="infotag pxr" title="What does this do?">i</div></div>';
 }
 /* The GDD writes sets as "Set of Anger II". The sheet keeps the short name
    because the battle system prints it on a button, so the tier is appended
@@ -387,3 +501,18 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI"];
 const setName = s => esc(s.name) + " " + (ROMAN[num(s.tier, 1)] || num(s.tier, 1));
 const setMoves = s => ["slot1","slot2","slot3","slot4"]
   .map(k => s[k]).filter(a => a && ABILITIES[a]);
+
+/* THE "i" EXPLAINS, IT DOES NOT OPEN. `stopPropagation` because the info button
+   sits inside a card whose own click toggles the abilities panel — without it,
+   asking what a move does would also collapse the list you are reading. */
+function wireAbilityInfo(root){
+  root.querySelectorAll(".abrow[data-a] .infotag").forEach(info => {
+    const row = info.closest(".abrow");
+    const a = ABILITIES[row.dataset.a];
+    if(!a) return;
+    info.addEventListener("click", ev => {
+      ev.stopPropagation();
+      showTip(abilityTip(a), row, abAccent(a));
+    });
+  });
+}

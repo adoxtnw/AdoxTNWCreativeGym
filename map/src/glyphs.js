@@ -18,6 +18,12 @@ const ICONS = {
   BOLT :["....xxx.","...xxx..","..xxx...",".xxxxxx.","....xxx.","...xxx..","..xxx...",".xxx...."],
   DROP :["...xx...","...xx...","..xxxx..","..xxxx..",".xxxxxx.","xxxxxxxx",".xxxxxx.","..xxxx.."],
   SPARK:["...xx...","...xx...","x..xx..x",".xxxxxx.",".xxxxxx.","x..xx..x","...xx...","...xx..."],
+  /* SURPRISE asks for this in the emotions sheet, and neither app had it — so
+     `iconSVG` fell back to BOLT and Surprise wore Anger's symbol everywhere a
+     glyph was drawn from the sheet. A core with spikes coming off it: related
+     to SPARK, which is a clean four-point star, but deliberately busier. */
+  BURST:["..x..x..","x.x..x.x",".xxxxxx.","..xxxx..",
+         "..xxxx..",".xxxxxx.","x.x..x.x","..x..x.."],
   SHIELD:["xxxxxxxx","xxxxxxxx","xx....xx","xx....xx","xx....xx",".xx..xx.","..xxxx..","...xx..."],
   CHARGE:["...xx...","..xxxx..",".xxxxxx.","xxxxxxxx","...xx...","...xx...","...xx...","...xx..."],
   WARN :["...xx...","...xx...","..xxxx..","..x..x..",".xx..xx.",".x.xx.x.","xx.xx.xx","xxxxxxxx"],
@@ -78,3 +84,27 @@ function glyphSVG(key){
    FEAR's grey and read as an emotion they are not, so they take the stamina
    mint instead — the same rule the battle panel uses. */
 const abAccent = a => a && a.emotion && EMOTIONS[a.emotion] ? EMOTIONS[a.emotion].hex : "#b0ffe1";
+
+/* A PASSENGER PHOTO THAT IS NOT A PHOTO. Drawn on the same 8x8 grid as every
+   other glyph so it belongs to the same alphabet — a smooth vector portrait
+   next to this typeface would read as clip-art dropped in from elsewhere. It
+   is deliberately anonymous: the card is the player's, and a face on it would
+   be a claim about who they are that the game has no business making. */
+const SILHOUETTE = [
+  "..xxxx..",
+  ".xxxxxx.",
+  ".xxxxxx.",
+  "..xxxx..",
+  "...xx...",
+  ".xxxxxx.",
+  "xxxxxxxx",
+  "xxxxxxxx"
+];
+function silhouetteSVG(){
+  let r = "";
+  SILHOUETTE.forEach((row, y) => {
+    for(let x = 0; x < row.length; x++) if(row[x] === "x") r += RECT(x, y);
+  });
+  return '<svg viewBox="0 0 8 8" width="100%" height="100%" ' +
+         'shape-rendering="crispEdges" fill="currentColor">' + r + '</svg>';
+}

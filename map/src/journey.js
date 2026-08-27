@@ -31,7 +31,13 @@ const J = {
 
 /* Lengths in 12 fps frames. RIDING has none — it runs until END is pressed. */
 const PHASE = {
-  ZOOM:     {n:  8, next: "WIPE_IN"},
+  /* LEAVING IS THE SLOWEST THING IN THE GAME, on purpose. Three seconds of the
+     camera falling into the station you are standing on, the map draining to
+     that station's colour and the two pieces of music trading places — then the
+     wipe, which is the fast part. The whole point of a run is the decision to
+     board; the departure has to feel like the consequence of it, not a
+     transition. Sheet-driven so it can be tuned without touching the code. */
+  ZOOM:     {n: Math.max(2, Math.round(num(RULES.departSecs, 3) * 12)), next: "WIPE_IN"},
   WIPE_IN:  {n:  9, next: "RIDING"},
   RIDING:   {n:  0, next: null},
   ANNOUNCE: {n: 17, next: "FLASH"},
@@ -39,6 +45,11 @@ const PHASE = {
   BANNER:   {n: 30, next: null},        /* branches: dilemma, boss, or the map */
   DILEMMA:  {n:  0, next: null},        /* waits on the player */
   BOSSWAIT: {n:  0, next: null},        /* waits on the encounter screen */
+  /* THE SAME FLOOD THE DEPARTURE USES, in the enemy's colour rather than the
+     line's. Tapping an enemy and leaving for a fight is the same KIND of event
+     as leaving a station for a ride, so it is the same piece of theatre — and
+     it ends, as that one does, on a circular wipe. */
+  ENCOUNTER_IN:{n: Math.max(2, Math.round(num(RULES.encounterWashSecs, 1.1) * 12)), next: null},
   ENCOUNTER:{n:  0, next: null},        /* a fight on the track; the ride is paused */
   WIPE_OUT: {n: 10, next: "ARRIVE"},
   ARRIVE:   {n: 13, next: "IDLE"}
@@ -49,6 +60,10 @@ const ZOOM_IN   = 2.4;       /* how close the camera gets before the wipe */
 const RING      = 3;         /* the wipe's thick leading edge, in buffer px */
 
 const ease = k => k * k * (3 - 2 * k);
+/* STARTS SLOW, ENDS FAST — the opposite of `ease`, which settles. A zoom that
+   settles has already finished before the wipe opens; this one is still
+   accelerating when the wipe takes over, so the two read as one movement. */
+const easeIn = k => k * k * k;
 const lerp = (a, b, k) => a + (b - a) * k;
 const busy = () => J.phase !== "IDLE";
 /* the phases in which a tap lands on a passing element, not on the map */
@@ -115,13 +130,13 @@ function enterPhase(p){
   const s = STATIONS[J.at], d = STATIONS[J.to] || s;
   switch(p){
     case "ZOOM":
+      /* the departure sound belongs at the START of the fall into the station,
+         not at the wipe — it is what the zoom is a reaction to */
+      sfx("map_depart");
       J.cam0 = {x: cam.x, y: cam.y, z: cam.z};
       J.cam1 = {x: s.x, y: s.y, z: Math.min(ZOOM_IN, MAX_Z)};
       break;
-    case "WIPE_IN":
-      /* the music runs from here to the flood of white at the far end */
-      sfx("map_depart");
-      break;
+    case "WIPE_IN": break;
     case "RIDING": J.wipeFrom = "MAP"; break;
     case "ANNOUNCE": sfx("map_announce"); break;
     case "FLASH":    sfx("map_flash");   break;
@@ -139,6 +154,12 @@ function enterPhase(p){
     case "ARRIVE":   sfx("map_step"); break;
     case "IDLE":
       J.at = Player.at; J.to = null; J.line = null;
+      /* THE MAP RESTORES YOU. MS only moves during a ride, so stepping off the
+         train is where it comes back — and EC returns to its resting level with
+         it. This is the single place that happens, so there is no way to reach
+         the map in a half-spent state. */
+      Player.restOnMap();
+      Player.save();
       break;
   }
   syncHud();
@@ -154,16 +175,25 @@ function journeyStep(){
   if(J.phase === "DILEMMA" || J.phase === "BOSSWAIT" || J.phase === "ENCOUNTER"){
     dirty = true; return;
   }
+  /* The flood runs on its own, then hands over exactly once. `launched` rather
+     than a phase change, because what comes next is asynchronous — the frame
+     has to load and answer before there is anything to change TO. */
+  if(J.phase === "ENCOUNTER_IN"){
+    if(++J.f >= PHASE.ENCOUNTER_IN.n) Encounter.launch();
+    dirty = true; return;
+  }
   const P = PHASE[J.phase], k = P.n ? Math.min(1, J.f / P.n) : 0;
   const s = STATIONS[J.at], d = STATIONS[J.to] || s;
   J.markX = s.x; J.markY = s.y;
 
   switch(J.phase){
-    case "ZOOM":
-      cam.x = lerp(J.cam0.x, J.cam1.x, ease(k));
-      cam.y = lerp(J.cam0.y, J.cam1.y, ease(k));
-      cam.z = lerp(J.cam0.z, J.cam1.z, ease(k));
+    case "ZOOM": {
+      const e = easeIn(k);
+      cam.x = lerp(J.cam0.x, J.cam1.x, e);
+      cam.y = lerp(J.cam0.y, J.cam1.y, e);
+      cam.z = lerp(J.cam0.z, J.cam1.z, e);
       break;
+    }
     case "RIDING":
       /* pulls away, then settles at line speed */
       J.speed = RIDE_TOP * ease(Math.min(1, J.f / RIDE_RAMP));
@@ -243,42 +273,34 @@ function drawPlayer(g){
   drawPlayerTag(x, ay, bob);
 }
 
-/* WHO YOU ARE AND WHAT STATE YOU ARE IN, on the map itself.
+/* WHO YOU ARE, on the map itself.
 
-   The progression GDD puts the name above the location indicator, and combat
-   GDD 13.1.3 requires Overflow to be legible OUTSIDE combat — MS and EC persist
-   between fights, so someone who won their last one at 20 MS with 90 EC has to
-   see that before they choose to board. Both belong to the marker, not to a
-   panel: this is the one readout that must never need opening.
+   NOT WHAT STATE YOU ARE IN. MS and EC used to print here, on the reasoning
+   that they persist between fights and so had to be seen before boarding. That
+   reasoning is gone: MS is always full on the map and EC always sits at its
+   resting level, so the numbers were the same two values every time anyone
+   looked — a readout that never changes is furniture, not information. They
+   live on the profile card, where the equipment that decides them lives too.
+
+   The name sits on a dark plate rather than straight on the map, because the
+   map underneath it is every colour at once: white interchanges, six line
+   hues, and station names in the gaps. Coloured type alone lost against about
+   half of them. The plate is translucent so the network still reads through it
+   — it is a contrast floor, not a label.
 
    Coloured by the first Affinity, which is the whole of what an affinity does
    today (the mechanical bonus is pending). */
 function drawPlayerTag(x, ay, bob){
   const name = foldText(Player.name || "");
+  if(!name) return;
   const aff = hexRGB(Player.affinityHex(0));
-  const ink = [244, 239, 228], shade = [12, 10, 22];
-  let ty = ay - FONT_H - 3;
-
-  if(name) text(name, x, ty, packRGB(aff), 0);
-
-  /* MS / EC, tinted only when they are trying to tell you something */
-  const low = Player.ms <= Player.maxMs * 0.25;
-  const over = Player.overflowing();
-  const ms = String(Math.round(Player.ms)), ec = String(Math.round(Player.ec));
-  const line = ms + " " + ec;
-  const wAll = textW(line), x0 = x - (wAll >> 1);
-  ty -= FONT_H + 2;
-  text(ms, x0, ty, packRGB(low ? [255, 194, 205] : [176, 255, 225]), 1);
-  text(ec, x0 + textW(ms + " "), ty, packRGB(over ? [255, 194, 205] : ink), 1);
-
-  /* and the warning itself, on its own line, blinking on the game clock so it
-     cannot be mistaken for part of the numbers */
-  if(over && (frame % 12) < 8){
-    const tag = "OVERFLOW", tw = textW(tag);
-    ty -= FONT_H + 3;
-    rect(x - (tw >> 1) - 2, ty - 1, tw + 4, FONT_H + 3, packRGB([255, 194, 205]));
-    text(tag, x, ty + 1, packRGB(shade), 0, false);
-  }
+  const w = textW(name), ty = ay - FONT_H - 3;
+  /* one pixel of air on every side, so the plate is a plate and not an outline */
+  const x0 = x - (w >> 1) - 2, y0 = ty - 2;
+  for(let py = y0; py < y0 + FONT_H + 4; py++)
+    for(let px = x0; px < x0 + w + 4; px++)
+      blendPx(px, py, [6, 5, 10], 0.62);
+  text(name, x, ty, packRGB(aff), 0);
 }
 
 /* ---- overlays ------------------------------------------------------------ */
@@ -332,7 +354,62 @@ function drawBannerScreen(){
   textScaled(l, W >> 1, y0 - 14, packRGB(col), 0, 1);
 }
 
+/* HOW FAR THE MAP HAS DRAINED TO THE DEPARTURE STATION'S COLOUR.
+
+   Across the zoom the whole frame bleeds toward the emotion of the station
+   being left, so that by the time the wipe opens, what surrounds it is not the
+   map any more — it is already the colour of the line you are about to be on.
+   That is what stops the wipe reading as a panel swap: there is nothing left
+   outside it worth looking at. Held just short of solid so the station and the
+   marker stay faintly visible underneath, which keeps the zoom legible as a
+   zoom rather than a fade to a flat field. */
+const DEPART_WASH = 0.88;
+function departWash(){
+  /* an enemy is not a line, so it floods in ITS colour — that is the whole
+     information the flood carries: what you are about to be up against */
+  if(J.phase === "ENCOUNTER_IN")
+    return {col: Encounter.washCol || lineCol(),
+            a: DEPART_WASH * easeIn(Math.min(1, J.f / PHASE.ENCOUNTER_IN.n))};
+  if(J.phase === "ZOOM")
+    return {col: lineCol(), a: DEPART_WASH * easeIn(Math.min(1, J.f / PHASE.ZOOM.n))};
+  if(J.phase === "WIPE_IN" && J.wipeFrom !== "BANNER")
+    return {col: lineCol(), a: DEPART_WASH};
+  return null;
+}
+/* The colour of the leg: the line's emotion if one is chosen, the departure
+   station's own otherwise — a station on two lines still has to drain to
+   SOMETHING before the line is picked. */
+function lineCol(){
+  const e = (J.line && J.line.emotion) ||
+            ((STATIONS[J.at].emotions || [])[0]) || "ANGER";
+  return hexRGB((EMOTIONS[e] || EMOTIONS.ANGER).hex);
+}
+
+/* THE COLOUR OF THE RIDE, published once for every panel that wants it.
+
+   The travel popup gets its stroke from the lines a trip will ride; everything
+   that appears DURING the ride — the leg header, the platform decision, the
+   encounter, the baggage screen — belongs to the one line under the train right
+   now. Set as a CSS variable rather than passed into each renderer, so a panel
+   opts in by naming `--ride` in its own stylesheet and nothing has to be
+   threaded through the markup. */
+function setRideGradient(){
+  const e = (J.line && J.line.emotion) ||
+            ((STATIONS[J.at] && STATIONS[J.at].emotions) || [])[0];
+  const hex = (EMOTIONS[e] || {}).hex;
+  const root = document.documentElement;
+  if(!hex){ root.style.removeProperty("--ride"); return; }
+  const c = hexRGB(hex);
+  const dark = rgbHex([c[0] * 0.40, c[1] * 0.40, c[2] * 0.40]);
+  root.style.setProperty("--ride",
+    "linear-gradient(90deg," + hex + "," + dark + "," + hex + ")");
+}
+
 /* ---- what gets drawn, this frame ----------------------------------------- */
+function applyWash(){
+  const w = departWash();
+  if(w) washScene(w.col, w.a);
+}
 function drawScene(g){
   switch(J.phase){
     case "WIPE_IN": {
@@ -343,7 +420,7 @@ function drawScene(g){
       const sx = fromBanner ? (W >> 1) : bx(s.x) | 0;
       const sy = fromBanner ? (H >> 1) : by(s.y) | 0;
       const r = ease(J.f / PHASE.WIPE_IN.n) * wipeMaxR(sx, sy);
-      if(fromBanner) drawBannerScreen(); else drawMapScene(g);
+      if(fromBanner) drawBannerScreen(); else { drawMapScene(g); applyWash(); }
       clipC = {x: sx, y: sy, r2: r * r};
       drawTravelScene(J);
       clipC = null;
@@ -368,6 +445,8 @@ function drawScene(g){
     case "DILEMMA":
     case "BOSSWAIT": drawBannerScreen(); return;
     case "ENCOUNTER": drawTravelScene(J); overlayTrip(); return;
+    case "ENCOUNTER_IN": drawTravelScene(J); overlayTrip(); applyWash(); return;
+    case "ZOOM":     drawMapScene(g); applyWash(); return;
     default:         drawMapScene(g);    return;
   }
 }
@@ -389,7 +468,9 @@ function syncHud(){
   if(busy() && Menu.open) Menu.hide();
   if(J.phase === "DILEMMA") renderDilemma();
   on("dilemma",  J.phase === "DILEMMA");
-  syncEncounterHud();
   renderRouteHead();
+  setRideGradient();             /* every panel on this ride wears its colour */
+  CityBar.render();              /* the city, whenever the HUD resyncs */
+  renderMenuBtn();
   musicForPhase();               /* what should be playing is a fact of the phase */
 }

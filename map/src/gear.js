@@ -90,6 +90,13 @@ function deriveStats(armorId, setIds){
     /* EC has no ceiling of its own in the sheet: the bar is measured against
        MaxMS, so a set's ec_mod moves the charge cap relative to that. */
     maxEc: Math.max(1, maxMs + sets.reduce((n, s) => n + num(s.ec_mod, 0), 0)),
+    /* WHERE EC SITS AT REST — half of MaxMS, plus whatever the equipment says.
+       It is a DERIVED value like every other stat here, never stored: writing
+       it into the profile would freeze it at the loadout the player happened to
+       be wearing when it was written, and it would then disagree with the armor
+       on their back for ever. */
+    restEc: Math.max(0, Math.round(maxMs * num(base.start_ec_pct, 0.5)) +
+                        sets.reduce((n, s) => n + num(s.ec_mod, 0), 0)),
     layers: layersOf(armorId),
     pool: poolOf(setIds),
     passives: [a && a.passive].concat(sets.map(s => s.passive)).filter(Boolean),

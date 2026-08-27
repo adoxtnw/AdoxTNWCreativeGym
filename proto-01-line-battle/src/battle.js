@@ -239,9 +239,16 @@ function endCheck(){
   return false;
 }
 function finish(kind){
-  S.phase="OVER"; setFps(12); stopMusic(); sfx(kind);
+  /* AN ULTRA-QUICK FADE, not the long one. The theme has to be gone by the time
+     the enemy finishes falling — a fight that is over while its music is still
+     playing reads as the game not having noticed. `stopMusic` already took a
+     duration; this just asks for a short one. */
+  S.phase="OVER"; setFps(12); stopMusic(RULES.musicCutMs||120); sfx(kind);
   $("pPanel").classList.remove("overloaded");   // the fight is over; stop the alarm
   $("ePanel").classList.remove("overloaded");
+  /* CAME FROM THE MAP? Then the map decides what happens next, and this app
+     does not get to offer RUN AGAIN — there is a ride waiting. */
+  if(Handoff.on){ Handoff.finish(kind); return; }
   const o=document.createElement("div"); o.className="over "+kind;
   o.innerHTML=`<h1 class="hard">${kind==="win"?"LINE CLEAR":"BREAKDOWN"}</h1>
     <button class="depart pxr pxr-sh" style="width:auto;padding:13px 28px" onclick="location.reload()">RUN AGAIN</button>`;

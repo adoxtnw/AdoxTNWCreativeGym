@@ -8,7 +8,7 @@
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "day", "weather", "keys"]
+        "day", "weather", "keys", "drops"]
 };
 
 const DATA = {
@@ -142,6 +142,19 @@ segBase,5,"Track Segments to bridge a link, before diltransience and world state
 rollMinSecs,1,Fastest the track event roll can come round (navigation GDD 4: every 1-3s).,,,
 rollMaxSecs,3,Slowest the track event roll can come round. Enemy density moves it.,,,
 aggroLockSecs,5,Default countdown before an aggro enemy forces the encounter.,,,
+travelMaxLive,5,"How many elements may be out at once, ALL KINDS TOGETHER. No roll happens while the board is full, so it has to clear before anything new appears.",,,
+tripFillMs,520,How long the Emotional Trip bar takes to ease across to a newly collected segment.,,,
+tripFlashMs,260,How long the bar flashes white when a segment lands in it.,,,
+departSecs,3,How long the camera spends zooming into the departure station before the wipe opens.,,,
+leanEaseMs,520,"How long the map takes to tilt into, and back out of, the focused-station lean.",,,
+leanDeg,20,How far the map tilts when a destination is being considered.,,,
+camEaseMs,620,How long the camera takes to travel to a station the player has just picked.,,,
+orbMsPct,0.18,"How much of MaxMS one Stamina Orb gives back. Orbs only matter mid-ride, which is the only time MS moves.",,,
+encounterWashSecs,1.1,How long the travel screen floods with the enemy's colour before the wipe onto the fight.,,,
+battleWipeMs,820,The circular wipe that opens onto the battle.,,,
+battleFadeMs,620,The fade to white that unloads the battle and gives the ride back.,,,
+musicCutMs,120,The ultra-quick fade that kills the battle theme the moment an enemy falls.,,,
+enterWipeMs,1100,The circular wipe that opens the map when arriving from the title screen.,,,
 exitKeepPct,0.6,Crystals kept when EXITING at an intermediate platform.,,,
 defeatKeepPct,0.1,Crystals kept on defeat.,,,
 itemLossOnExit,0.4,Chance each unbanked item is lost when exiting early.,,,
@@ -201,13 +214,14 @@ ui_close,square,1180,520,110,0.2,0.22,MAP: a panel goes away.
 ui_page,square,760,1010,60,0.18,0.16,MAP: moving between tabs.
 ui_equip,square,640,1560,170,0.26,0.32,MAP: something is put on.
 ui_deny,sawtooth,340,180,150,0.24,0.2,"MAP: refused - not owned, no route, no key."
+map_tripup,sine,520,880,180,0.22,0.18,A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click.
 ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
 
 /* --- units ---
    layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
-units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave."`,
 
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
@@ -378,22 +392,16 @@ L6,Línia 6,FEAR,CATALUNYA|PROVENCA|GRACIA|SANT_GERVASI|MUNTANER|LA_BONANOVA|LES
    `drift` is how fast it moves relative to the track — above 1 reads as nearer the
    camera. Every one of these is a BASE, scaled by the target station's `spawn` column
    and by any temporary modifier in play.  */
-travel_elements: `id,name,kind,motion,chance,max_on_screen,max_per_trip,life_min,life_max,size,drift,worth,payload,amount,lock_secs,enabled,notes
-TRACK_SEGMENT,Track Segment,SEGMENT,FLYBY,0.25,8,0,6,9,11,1.15,1,NONE,0,0,1,"Bridges the link. 0 in max_per_trip means UNLIMITED. Its life is longer than a crossing on purpose: a segment must stay tappable until it leaves the bottom, never fade out mid-screen."
-CRYSTAL_SHARD,Crystal Shard,CRYSTAL,FLYBY,0.09,2,0,6,9,12,1.0,0,CRYSTAL,1,0,1,A rotating prism in the line's own colour. Rare on purpose.
-SETTLED_ECHO,Settled Echo,LOOT,PARALLEL,0.12,3,12,4.0,8.0,10,0.15,0,ITEM,1,0,1,Holds station alongside the train for a while. Rolls an item.
-EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.1,2,4,5.0,15.0,13,0.45,0,NONE,0,0,1,Floats past. Tap to pick the fight; ignore it and it leaves.
-HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.05,1,2,8.0,14.0,14,0.3,0,NONE,0,5,1,Locks on. When the countdown runs out it forces the encounter.`,
+travel_elements: `id,name,kind,motion,chance,max_on_screen,max_per_trip,life_min,life_max,size,drift,worth,payload,amount,lock_secs,unit,enabled,notes
+TRACK_SEGMENT,Track Segment,SEGMENT,FLYBY,0.55,5,0,6,9,11,1.15,1,NONE,0,0,,1,"Bridges the link. 0 in max_per_trip means UNLIMITED. Its life is longer than a crossing on purpose: a segment must stay tappable until it leaves the bottom, never fade out mid-screen."
+CRYSTAL_SHARD,Crystal Shard,CRYSTAL,FLYBY,0.10,2,0,6,9,12,1.0,0,CRYSTAL,1,0,,1,A rotating prism in the line's own colour. Rare on purpose.
+EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.14,2,4,5.0,15.0,13,0.45,0,NONE,0,0,enemy,1,Floats past. Tap to pick the fight; ignore it and it leaves.
+HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.06,1,2,8.0,14.0,14,0.3,0,NONE,0,5,enemy,1,Locks on. When the countdown runs out it forces the encounter.`,
 
 /* --- items ---
    PLACEHOLDERS. Item design is not written yet; these exist so the roll-and-lose
    machinery has something to roll. `weight` is relative drop likelihood.  */
-items: `id,name,emotion,weight,cost,enabled,notes
-TOKEN_RUST,Rusted Token,ANGER,30,,1,PLACEHOLDER — item design is not written yet.
-TICKET_TORN,Torn Ticket,SADNESS,30,,1,PLACEHOLDER
-CHARM_BENT,Bent Charm,JOY,20,,1,PLACEHOLDER
-LENS_CRACKED,Cracked Lens,FEAR,12,,1,PLACEHOLDER
-KEYRING_LOST,Lost Keyring,SURPRISE,8,,1,PLACEHOLDER`,
+items: `id,name,emotion,weight,cost,enabled,notes`,
 
 /* --- armor ---
    Emotional Armor (progression GDD 3). `ms_mod` is added to the player's base
@@ -421,7 +429,19 @@ RUSH_PM,MON|TUE|WED|THU|FRI,18,21,*,0.9,1.3,1.2,0.9,3,1,Packed and fraying.
 WEEKEND,SAT|SUN,0,24,*,1.1,0.9,0.85,1.1,1,1,"Slower, stranger."
 RAIN,*,0,24,RAIN,1.6,1.1,1.05,1.2,4,1,Wet track. Poor visibility.
 STORM,*,0,24,STORM,2.2,1.4,1.5,1.35,5,1,Everything is worse.
-CLEAR,*,0,24,CLEAR,0.85,1,1,0.95,4,1,You can see what is coming.`
+CLEAR,*,0,24,CLEAR,0.85,1,1,0.95,4,1,You can see what is coming.`,
+
+/* --- city_status ---
+   CITY-WIDE CONDITIONS. A status is a thing happening to Barcelona that
+   picks a SUBSET of stations on the lines it names and changes them: their attributes
+   multiply, and the map paints `fx` around them. `hours` holds one or more BARCELONA
+   local windows (7-10|17-20), to_hour exclusive, and a window may wrap past midnight.
+   `share` is the fraction of eligible stations affected — which ones is decided by a
+   hash of the station, the status and the current window, so every client picks the same
+   set and it holds still until the window ends. `emotions` drives the colours the effect
+   is drawn in; `blurb` is what the tag says when tapped.  */
+city_status: `id,name,emotions,fx,lines,share,day,hours,density,aggro,fog,diltransience,blurb,enabled,notes
+RUSH_HOUR,Rush Hour,DISGUST|ANGER,RUSH,L1|L2|L5,0.4,MON|TUE|WED|THU|FRI,7-10|17-20,1.6,1.5,,,"The platforms are packed. Far more of them are out on the affected stretches, and they are quicker to take an interest.",1,"The reference status, and the only one designed. Everything else waits on the design."`
 };
 
 /* --- CSV reader: handles quoted fields, so notes may contain commas ---- */
@@ -470,3 +490,4 @@ const ELEMENTS  = byId(parseCSV(DATA.travel_elements).filter(r=>r.enabled));
 const ITEMS     = byId(parseCSV(DATA.items).filter(r=>r.enabled));
 const ARMOR     = byId(parseCSV(DATA.armor).filter(r=>r.enabled));
 const WORLD_BANDS = parseCSV(DATA.world_bands).filter(r=>r.enabled);
+const CITY_STATUS = parseCSV(DATA.city_status).filter(r=>r.enabled);

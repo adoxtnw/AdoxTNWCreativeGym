@@ -28,9 +28,7 @@ const Peek = {
     const r = routeFor(id);
     if(id !== Player.at && r.ok){
       const s = STATIONS[id];
-      cam.x = s.x; cam.y = s.y;
-      cam.z = clamp(Math.max(cam.z, 1.5), fitZ(), MAX_Z);
-      clampCam();
+      camTo(s.x, s.y, Math.max(cam.z, 1.5));
       /* lean away from whichever edge the station is nearest, so the map does
          not swing the destination off screen */
       leanTo(bx(s.x) > W / 2 ? -1 : 1);
@@ -56,6 +54,17 @@ const Peek = {
   tripGradient(lines){
     const hex = lines.map(l => EMOTIONS[l.emotion].hex);
     if(!hex.length) return "linear-gradient(90deg,#5c5348,#5c5348)";
+    /* A TRIP ON ONE LINE STILL HAS TO MOVE. A single colour makes a flat band,
+       and a flat band is the one thing on this panel that says nothing is
+       happening — on a journey that is entirely on the red line, the red IS the
+       information. So it scrolls against a darker version of ITSELF: the same
+       hue travelling, rather than a second colour that would imply a second
+       line in the trip. */
+    if(hex.length === 1){
+      const c = hexRGB(hex[0]);
+      const dark = rgbHex([c[0] * 0.40, c[1] * 0.40, c[2] * 0.40]);
+      return "linear-gradient(90deg," + hex[0] + "," + dark + "," + hex[0] + ")";
+    }
     const stops = hex.concat([hex[0]]).join(",");
     return "linear-gradient(90deg," + stops + ")";
   },
@@ -71,8 +80,12 @@ const Peek = {
     const lines = (LINES_AT[this.id] || []);
     const trip = this.tripLines(r);
 
+    /* the bob is offset per line, so two tags side by side drift out of step
+       instead of moving as one block */
+    let chipN = 0;
     const chip = l => '<span class="lchip" style="background:' +
-      EMOTIONS[l.emotion].hex + '">' + l.id + '</span>';
+      EMOTIONS[l.emotion].hex + ';--fd:' + ((chipN++ * 0.29).toFixed(2)) + 's">' +
+      l.id + '</span>';
     const rate = v => v >= 1.25 ? "high" : v <= 0.8 ? "low" : "normal";
 
     let body;
@@ -135,13 +148,19 @@ const Peek = {
   }
 };
 
-/* A chunky arrow whose shaft ripples — five bars, each a beat behind the last,
+/* A chunky arrow whose shaft ripples — seven bars, each a beat behind the last,
    so the motion runs from the station you are leaving toward the one you are
-   going to rather than pulsing in place. */
+   going to rather than pulsing in place.
+
+   The COUNT is fixed and the WIDTHS are not: the bars stretch to fill whatever
+   the two names leave between them (see .tarrow in map.css), so the arrow spans
+   its gap without needing to be measured. Seven rather than five because the
+   bars are wider now, and four would read as a row of blocks rather than as a
+   wave travelling along a shaft. */
 function waveArrow(){
   let bars = "";
-  for(let i = 0; i < 5; i++)
-    bars += '<i style="animation-delay:' + (i * -0.12).toFixed(2) + 's"></i>';
+  for(let i = 0; i < 7; i++)
+    bars += '<i style="animation-delay:' + (i * -0.1).toFixed(2) + 's"></i>';
   return bars + '<u></u>';
 }
 

@@ -45,6 +45,26 @@ const SHADOW  = [8, 6, 4];
 
 const cam = {x: 0, y: 0, z: 1, tz: null, ax: 0, ay: 0};
 let cv, ctx, img, buf, W = 0, H = 0, dirty = true;
+/* ---- THE BUFFER IS BIGGER THAN THE FRAME -----------------------------------
+   W and H stay what they have always been: the size of the VISIBLE frame, in
+   art pixels. Everything that lays anything out — the trip bar, the train, a
+   label deciding whether it fits — still measures against those and is
+   untouched by any of this.
+
+   What changed is that the buffer now carries a MARGIN of MX by MY around that
+   frame, and the canvas element is drawn that much larger and centred, so the
+   margin hangs off all four sides and is clipped away. It exists for one
+   reason: when the map leans (see Lean), the rotated rectangle no longer covers
+   the frame, and the corners that swing inward were showing the void beyond the
+   map. Scaling the canvas up to cover would have worked too, but that zooms the
+   art; rendering MORE MAP costs a few thousand pixels and keeps the framing and
+   the pixel scale exactly as they were.
+
+   Because the projection puts world (cam.x, cam.y) at the buffer's CENTRE, and
+   the margin is symmetric, adding it moves nothing — it only reveals more.   */
+let MX = 0, MY = 0;                 /* margin each side, in art pixels */
+let BW = 0, BH = 0;                 /* the buffer's real size, W+2MX by H+2MY */
+const bufI = (x, y) => (y + MY) * BW + (x + MX);
 let frame = 0, lastStep = 0, liveStates = false;
 
 const packRGB = c => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
@@ -60,9 +80,9 @@ let clipC = null;
 
 function plot(x, y, col){
   x |= 0; y |= 0;
-  if(x < 0 || y < 0 || x >= W || y >= H) return;
+  if(x < -MX || y < -MY || x >= W + MX || y >= H + MY) return;
   if(clipC){ const dx = x - clipC.x, dy = y - clipC.y; if(dx*dx + dy*dy > clipC.r2) return; }
-  buf[y * W + x] = col;
+  buf[(y + MY) * BW + (x + MX)] = col;
 }
 /* CLEARING THE SCREEN HAS TO RESPECT THE CLIP TOO. `buf.fill()` writes the
    typed array directly and so goes straight past `plot`, which meant the
@@ -74,10 +94,27 @@ function fillScene(col){
   const r = Math.ceil(Math.sqrt(clipC.r2));
   for(let dy = -r; dy <= r; dy++){
     const y = clipC.y + dy;
-    if(y < 0 || y >= H) continue;
+    if(y < -MY || y >= H + MY) continue;
     const half = Math.floor(Math.sqrt(Math.max(0, clipC.r2 - dy * dy)));
-    const x0 = Math.max(0, clipC.x - half), x1 = Math.min(W - 1, clipC.x + half);
-    for(let x = x0; x <= x1; x++) buf[y * W + x] = col;
+    const x0 = Math.max(-MX, clipC.x - half), x1 = Math.min(W + MX - 1, clipC.x + half);
+    for(let x = x0; x <= x1; x++) buf[(y + MY) * BW + (x + MX)] = col;
+  }
+}
+/* EVERYTHING ON SCREEN, PULLED TOWARD ONE COLOUR. Written straight into the
+   typed array rather than through blendPx: it touches every pixel in the
+   buffer, and a function call per pixel is the difference between a free
+   operation and a visible one. It covers the MARGIN too — the lean can be on
+   while this runs, and a washed frame with an unwashed border would be worse
+   than no wash at all. */
+function washScene(col, a){
+  if(a <= 0) return;
+  if(a > 1) a = 1;
+  const r = col[0], g = col[1], b = col[2], n = buf.length;
+  for(let i = 0; i < n; i++){
+    const p = buf[i], pr = p & 255, pg = (p >> 8) & 255, pb = (p >> 16) & 255;
+    buf[i] = (255 << 24) | (((pb + (b - pb) * a) | 0) << 16)
+                         | (((pg + (g - pg) * a) | 0) <<  8)
+                         |  ((pr + (r - pr) * a) | 0);
   }
 }
 /* A circle's outline, thick and blended — the wipe's leading edge, and the
@@ -218,8 +255,8 @@ function drawGrid(){
   let step = 10; while(step * cam.z < 11) step *= 2;
   const x0 = Math.floor((cam.x - W / (2 * cam.z)) / step) * step;
   const y0 = Math.floor((cam.y - H / (2 * cam.z)) / step) * step;
-  for(let wy = y0; by(wy) < H + step; wy += step)
-    for(let wx = x0; bx(wx) < W + step; wx += step) plot(bx(wx), by(wy), g);
+  for(let wy = y0; by(wy) < H + MY + step; wy += step)
+    for(let wx = x0; bx(wx) < W + MX + step; wx += step) plot(bx(wx), by(wy), g);
 }
 function drawLines(w){
   LINES.forEach(l => {
@@ -228,8 +265,8 @@ function drawLines(w){
       const ax = bx(p[i][0]), ay = by(p[i][1]);
       const bx2 = bx(p[i + 1][0]), by2 = by(p[i + 1][1]);
       /* whole segment off-screen: skip before rasterising hundreds of pixels */
-      if((ax < -20 && bx2 < -20) || (ax > W + 20 && bx2 > W + 20) ||
-         (ay < -20 && by2 < -20) || (ay > H + 20 && by2 > H + 20)) continue;
+      if((ax < -MX - 20 && bx2 < -MX - 20) || (ax > W + MX + 20 && bx2 > W + MX + 20) ||
+         (ay < -MY - 20 && by2 < -MY - 20) || (ay > H + MY + 20 && by2 > H + MY + 20)) continue;
       thickLine(ax, ay, bx2, by2, w, col);
     }
   });
@@ -256,10 +293,15 @@ function drawStops(g){
     const s = STATIONS[id], hub = isInterchange(id);
     if(!hub && !minor) return;
     const x = bx(s.x) | 0, y = by(s.y) | 0, r = hub ? g.ri : g.r;
-    if(x < -r - 6 || y < -r - 6 || x > W + r + 6 || y > H + r + 6) return;
+    if(x < -MX - r - 6 || y < -MY - r - 6 || x > W + MX + r + 6 || y > H + MY + r + 6) return;
 
     const base = hub ? INK : lineRGB(LINES_AT[id][0]);
-    const fx = StationFx.of(s.state), b = fx ? brushAt(x, y, r, base) : null;
+    /* The brush is a shared singleton, so making one unconditionally costs
+       nothing and means a city status can paint at a station whose `state` is
+       blank — which is almost all of them. */
+    const b = brushAt(x, y, r, base);
+    const fx = StationFx.of(s.state);
+    paintCityStatus(s, b);                 /* the city, before the place */
     if(fx && fx.under) fx.under(s, b);
 
     const rim  = (fx && fx.ring && fx.ring(s, b)) || null;
@@ -291,7 +333,7 @@ function badges(w){
       const dx = end[0] - prev[0], dy = end[1] - prev[1];
       const m = Math.hypot(dx, dy) || 1, off = w + 8;
       const x = (bx(end[0]) + dx / m * off) | 0, y = (by(end[1]) + dy / m * off) | 0;
-      if(x < -20 || y < -20 || x > W + 20 || y > H + 20) return;
+      if(x < -MX - 20 || y < -MY - 20 || x > W + MX + 20 || y > H + MY + 20) return;
       out.push({l, x, y, cw, ch,
                 x0: x - (cw >> 1), x1: x + (cw >> 1),
                 y0: y - (ch >> 1), y1: y + (ch >> 1)});
@@ -330,7 +372,7 @@ function drawLabels(g, taken){
   Object.keys(STATIONS).forEach(id => {
     const s = STATIONS[id];
     s._bx = bx(s.x) | 0; s._by = by(s.y) | 0;
-    if(s._bx < -90 || s._by < -20 || s._bx > W + 90 || s._by > H + 20) return;
+    if(s._bx < -MX - 90 || s._by < -MY - 20 || s._bx > W + MX + 90 || s._by > H + MY + 20) return;
     (isInterchange(id) ? hubs : rest).push(s);
   });
   const order = [];
@@ -354,7 +396,7 @@ function drawLabels(g, taken){
        ESPANYA arrives as "PANYA" — which reads as a rendering fault rather
        than as an edge. Dropping it instead means names appear as you pan to
        them, the way they do on any map. */
-    if(box.x0 < 0 || box.x1 > W || box.y0 < 0 || box.y1 > H) return;
+    if(box.x0 < -MX || box.x1 > W + MX || box.y0 < -MY || box.y1 > H + MY) return;
     for(let k = 0; k < taken.length; k++) if(hits(box, taken[k])) return;
     const fx = StationFx.of(s.state);
     const tint = fx && fx.ink && fx.ink(s, brushAt(s._bx, s._by, g.r, INK));
@@ -372,19 +414,17 @@ function drawLabels(g, taken){
   });
 }
 /* What the player marker covers: the station, its glow, the widest the
-   travelling ring gets, AND the tag stack above it — name, MS/EC, and the
-   OVERFLOW warning. All of that is painted last and so paints OVER any name
-   that was placed there, which had PASSENGER stamped across CAMP DE L'ARPA.
-   Reserving it is what keeps the surrounding labels out of the way. */
+   travelling ring gets, AND the name plate above it. All of that is painted
+   last and so paints OVER any name that was placed there, which had PASSENGER
+   stamped across CAMP DE L'ARPA. Reserving it is what keeps the surrounding
+   labels out of the way. */
 function markerBox(g){
   const x = bx(J.markX) | 0, y = by(J.markY) | 0;
   const r = (isInterchange(J.at) ? g.ri : g.r) + 1 + 5;
-  const tag = Math.max(textW(foldText(Player.name || "")),
-                       textW("OVERFLOW"),
-                       textW(Math.round(Player.ms) + " " + Math.round(Player.ec)));
+  const tag = textW(foldText(Player.name || "")) + 4;   /* + the plate's air */
   const half = Math.max(r, (tag >> 1) + 5);   /* a real gap, not a shave */
   /* the arrow sits ~8 above the dot and the stack climbs three rows from there */
-  const top = y - r - 8 - (FONT_H + 3) * 3 - 2;
+  const top = y - r - 8 - (FONT_H + 3) - 2;
   return {x0: x - half, x1: x + half, y0: top, y1: y + r};
 }
 /* Every dot a name must not be written over. A station never blocks its OWN
@@ -397,7 +437,7 @@ function dotBoxes(g){
     const hub = isInterchange(id);
     if(!hub && !minor) return;
     const s = STATIONS[id], x = bx(s.x) | 0, y = by(s.y) | 0, r = hub ? g.ri : g.r;
-    if(x < -r - 6 || y < -r - 6 || x > W + r + 6 || y > H + r + 6) return;
+    if(x < -MX - r - 6 || y < -MY - r - 6 || x > W + MX + r + 6 || y > H + MY + r + 6) return;
     out.push({x0: x - r, x1: x + r + 1, y0: y - r, y1: y + r + 1});
   });
   return out;
@@ -431,6 +471,36 @@ function draw(){
    and the opening view is the one asked for. It also clears LABEL_Z, so the
    map opens with its stations named rather than as an anonymous diagram. */
 let posed = false;
+/* ---- THE CAMERA TRAVELS TO A STATION, IT DOES NOT CUT TO IT ---------------
+   Choosing a destination used to assign cam.x/y/z outright, so the map arrived
+   somewhere else between one frame and the next and the player had to re-find
+   themselves. Eased, the movement itself says "this is where you were, and this
+   is the thing you just picked" — which is the only moment on the map where
+   those two facts need relating.
+
+   It runs on the DISPLAY's clock, like the lean and the travel elements: a pan
+   stepped twelve times a second is a stutter. Position and zoom share one
+   curve, so the two never finish at different moments and leave the frame
+   drifting after it has apparently arrived. */
+let camTw = null;
+function camTo(x, y, z, ms){
+  cam.tz = null;                            /* the pinch easing must not fight it */
+  camTw = {x0: cam.x, y0: cam.y, z0: cam.z,
+           x1: x, y1: y, z1: clamp(z, fitZ(), MAX_Z),
+           t: 0, dur: Math.max(60, ms || num(RULES.camEaseMs, 620))};
+}
+function camCancel(){ camTw = null; }
+function camTweenStep(dt){
+  if(!camTw) return;
+  camTw.t = Math.min(camTw.dur, camTw.t + dt);
+  const k = ease(camTw.t / camTw.dur);
+  cam.x = lerp(camTw.x0, camTw.x1, k);
+  cam.y = lerp(camTw.y0, camTw.y1, k);
+  cam.z = lerp(camTw.z0, camTw.z1, k);
+  clampCam();
+  dirty = true;
+  if(camTw.t >= camTw.dur) camTw = null;
+}
 function home(){
   /* On the player, not on the city centre and not on the bounding box: the
      first thing you should see is where you are standing. */
@@ -446,13 +516,23 @@ function resize(){
      down would letterbox or force a fractional scale and soften every edge. */
   const nw = Math.max(40, Math.ceil(r.width  / PX));
   const nh = Math.max(40, Math.ceil(r.height / PX));
-  if(nw !== W || nh !== H){
-    W = nw; H = nh;
-    cv.width = W; cv.height = H;
-    cv.style.width = (W * PX) + "px"; cv.style.height = (H * PX) + "px";
+  /* HOW MUCH MARGIN A LEAN NEEDS. A w-by-h frame turned by t only stays covered
+     if the source is (w·cos + h·sin) by (w·sin + h·cos) — for a tall frame at
+     20 degrees that is most of another half-width. Worked out from the lean's
+     own angle plus its sway, so raising leanDeg in the sheet widens the buffer
+     rather than putting the void back. */
+  const rad = (num(RULES.leanDeg, 20) + 6) * Math.PI / 180;
+  const c = Math.abs(Math.cos(rad)), sn = Math.abs(Math.sin(rad));
+  const mx = Math.ceil((nw * c + nh * sn - nw) / 2);
+  const my = Math.ceil((nw * sn + nh * c - nh) / 2);
+  if(nw !== W || nh !== H || mx !== MX || my !== MY){
+    W = nw; H = nh; MX = mx; MY = my;
+    BW = W + MX * 2; BH = H + MY * 2;
+    cv.width = BW; cv.height = BH;
+    cv.style.width = (BW * PX) + "px"; cv.style.height = (BH * PX) + "px";
     ctx = cv.getContext("2d", {alpha: false});
     ctx.imageSmoothingEnabled = false;
-    img = ctx.createImageData(W, H);
+    img = ctx.createImageData(BW, BH);
     buf = new Uint32Array(img.data.buffer);
   }
   /* POSE ON THE FIRST REAL LAYOUT, not at boot. A frame that has not been laid
@@ -494,12 +574,22 @@ function tapAt(px, py){
 }
 
 function local(e){
+  /* The canvas is larger than the frame by the lean margin and centred on it,
+     so its top-left is MX,MY OUTSIDE the frame — take that back off, or every
+     tap lands up and to the left of where the finger actually was. */
   const r = cv.getBoundingClientRect();
-  return {x: (e.clientX - r.left) / PX, y: (e.clientY - r.top) / PX};
+  return {x: (e.clientX - r.left) / PX - MX, y: (e.clientY - r.top) / PX - MY};
 }
 function snapshot(){
   const [a, b] = [...pointers.values()];
   return {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1};
+}
+/* IS SOMETHING IN FRONT OF THE MAP? One predicate rather than three copies of
+   the same list, because the copies are what let `wheel` and `dblclick` fall
+   out of step with `pointerdown` in the first place. */
+function blocked(){
+  return busy() || Menu.open || Baggage.open || Create.open || Peek.open ||
+         $("tip").classList.contains("on");
 }
 function bindInput(){
   const host = $("screen");
@@ -513,8 +603,9 @@ function bindInput(){
     /* the menu covers the map; a press on it is not a press on a station */
     if(Menu.open) return;
     /* and while the camera is leaning, screen coordinates no longer match the
-       projection — the panel has the controls */
-    if(Lean.on) return;
+       projection — the panel has the controls. Held through the ease OUT too,
+       or a tap during the settle lands somewhere the map never was. */
+    if(Lean.on || Lean.k > 0.02) return;
     /* A RIDE IS A CUTSCENE. Its wipes are anchored to screen positions, so
        letting the map be panned underneath one would tear it apart — but a
        press still has to be TRACKED while riding, or there is nothing to
@@ -530,6 +621,7 @@ function bindInput(){
     pointers.set(e.pointerId, p);
     down = {x: p.x, y: p.y, moved: false};
     cam.tz = null;                             /* a touch cancels an easing zoom */
+    camCancel();                               /* and an easing pan: the hand wins */
     if(pointers.size === 2) pinch = snapshot();
     host.classList.add("drag");
   });
@@ -571,21 +663,33 @@ function bindInput(){
   host.addEventListener("pointerup", drop);
   host.addEventListener("pointercancel", drop);
 
+  /* EVERY GESTURE ASKS, NOT JUST THE FIRST ONE. These listeners sit on
+     `#screen`, which is an ANCESTOR of the menu — so an event that lands on a
+     panel still bubbles down here, and `pointer-events:auto` on the panel does
+     nothing to stop it. `pointerdown` was guarded and these two were not, which
+     is why the map could still be zoomed by scrolling or double-tapping over an
+     open menu. Anything added here needs the same guard. */
   host.addEventListener("wheel", e => {
     e.preventDefault();
-    if(busy()) return;
+    if(blocked()) return;
     const p = local(e);
     applyZoom(cam.z * Math.exp(-e.deltaY * 0.0016), p.x, p.y);
   }, {passive: false});
 
   host.addEventListener("dblclick", e => {
-    if(busy()) return;
+    if(blocked()) return;
     const p = local(e); zoomTo(cam.z * 1.9, p.x, p.y);
   });
 
   $("endRide").addEventListener("click", endRide);
   $("menuBtn").addEventListener("click", () => { if(!busy()) Menu.toggle(); });
   $("bagBtn").addEventListener("click", () => Baggage.toggle());
+
+  /* One listener for the whole screen: any press that is not on the bubble
+     closes it. preventDefault so the press does not also fall through to the
+     map underneath and move the camera. */
+  const veil = $("tipVeil");
+  if(veil) veil.addEventListener("pointerdown", e => { e.preventDefault(); hideTip(); });
 
   new ResizeObserver(resize).observe($("screen"));
   bindUiSound();
@@ -665,6 +769,8 @@ function pump(now){
     stepElementsSmooth(dt);
     dirty = true;
   }
+  leanStep();                             /* the tilt is a camera move: 60 fps */
+  camTweenStep(dt);
   if(cam.tz !== null){
     const step = cam.z + (cam.tz - cam.z) * 0.35;
     const done = Math.abs(cam.tz - cam.z) < 0.004;
@@ -674,9 +780,13 @@ function pump(now){
   if(now - lastStep >= STEP_MS){          /* the 12 fps game clock */
     lastStep = now; frame++;
     rampStep();
-    leanStep();
+    /* THE HOUR CHANGES WITHOUT ANYONE PRESSING ANYTHING. Every five seconds is
+       often enough to catch a rollover that matters and rare enough to cost
+       nothing; CityBar.render() itself no-ops unless something changed. */
+    if((frame % 60) === 0) CityBar.render();
+    MenuGauge.step();                   /* the card's bar, only while it is up */
     journeyStep();                        /* the whole ride runs on this clock */
-    if(liveStates || J.phase === "IDLE") dirty = true;
+    if(liveStates || cityLive() || J.phase === "IDLE") dirty = true;
   }
   if(dirty){ dirty = false; draw(); }
 }
@@ -695,23 +805,42 @@ function pump(now){
    space and know nothing about it. The cost of that is that tap coordinates no
    longer line up, so map taps are refused while the lean is on; the panel
    holding the decision has the only controls that matter anyway. */
-const Lean = {on: false, side: 1, t: 0, deg: 0, zoom: 1};
+const Lean = {on: false, side: 1, t: 0, k: 0, deg: 0, zoom: 1, last: 0};
 function leanTo(side){
-  Lean.on = true; Lean.side = side; Lean.t = 0;
+  /* keep `t` running across a re-target: the drift should carry on rather than
+     snap back to the top of its cycle when the player picks another station */
+  if(!Lean.on) Lean.t = 0;
+  Lean.on = true; Lean.side = side;
 }
-function leanOff(){
-  if(!Lean.on) return;
-  Lean.on = false;
-  if(cv) cv.style.transform = "translate(-50%,-50%)";
-}
+function leanOff(){ Lean.on = false; }        /* eases out; see leanStep */
+
+/* THE TILT ARRIVES AND LEAVES, IT DOES NOT APPEAR.
+
+   `k` is how far into the lean we are, 0 to 1, and EVERYTHING the lean does is
+   multiplied by it — the angle, the extra zoom, the drift. So one eased number
+   carries the whole pose in and back out, and the sway is already at its right
+   phase when it gets there instead of starting from nothing.
+
+   It keeps stepping while k is on its way back down, which is why leanOff only
+   clears the flag: the transform is dropped at the far end, once there is
+   genuinely nothing left to draw. */
 function leanStep(){
   if(!cv) return;
-  if(!Lean.on) return;
-  Lean.t += 1;
+  const now = performance.now();
+  const dt = Lean.last ? Math.min(120, now - Lean.last) : 16;
+  Lean.last = now;
+  const rate = dt / Math.max(60, num(RULES.leanEaseMs, 520));
+  const kWant = Lean.on ? 1 : 0;
+  if(Lean.k === kWant && !Lean.on) return;      /* settled, and nothing to draw */
+  Lean.k = Lean.on ? Math.min(1, Lean.k + rate) : Math.max(0, Lean.k - rate);
+  const e = ease(Lean.k);                       /* smoothstep, both directions */
+
+  Lean.t += dt / 83;                            /* the drift, in 12 fps frames */
   /* two loops at different rates, so the drift never repeats obviously */
   const sway = Math.sin(Lean.t * 0.055) * 3.4 + Math.sin(Lean.t * 0.021) * 1.6;
-  Lean.deg = Lean.side * (20 + sway);
-  Lean.zoom = 1.06 + Math.sin(Lean.t * 0.037) * 0.035;
+  Lean.deg  = Lean.side * (num(RULES.leanDeg, 20) + sway) * e;
+  Lean.zoom = 1 + (0.06 + Math.sin(Lean.t * 0.037) * 0.035) * e;
+  if(Lean.k <= 0){ cv.style.transform = "translate(-50%,-50%)"; return; }
   cv.style.transform = "translate(-50%,-50%) rotate(" + Lean.deg.toFixed(2) +
                        "deg) scale(" + Lean.zoom.toFixed(3) + ")";
 }
@@ -736,15 +865,51 @@ function boot(){
   const n = applyDemoStates();
   liveStates = StationFx.anyLive();
   if(n) console.log("states=demo:", n, "stations given reference states");
+  const forced = applyStatusSwitch();
+  if(forced) console.log("status=" + forced + ":",
+    CityStatus.active().length + " city status forced on");
   syncHud();
   bindInput();
   bindSaveFile();
   tick();
-  /* Nobody plays until they are someone. Creation covers the map rather than
-     replacing it, so the world is already drawn and warm behind it. */
+  enterFromTitle();
+  /* Nobody plays until they are someone — but they usually already are: the
+     title screen asks first-timers on the way in, and this claims that answer
+     before the question can be asked a second time. Creation stays as the
+     fallback for anyone who reaches the map without having been asked. */
+  Player.claimNewPassenger();
   if(Create.needed()) Create.show("START");
   /* A backgrounded tab throttles rAF to nothing, which would strand any
      running animation. The same watchdog the battle system uses. */
   setInterval(() => pump(), STEP_MS);
 }
 addEventListener("DOMContentLoaded", boot);
+
+/* ---- ARRIVING FROM THE TITLE SCREEN ----------------------------------------
+   The other app fades its content out and leaves the screen plain black, then
+   sends us here with `?enter=1`. We start black too and open the SAME circular
+   wipe it uses for its own reveals — so a page load in the middle of a
+   transition is invisible: both halves meet on the same colour, and what the
+   hole opens onto is the city.
+
+   The blackout is a DOM layer rather than a full canvas, because the map needs
+   a laid-out frame before it can draw anything and the black has to be there
+   before that. The wipe canvas is opaque everywhere outside its circle, so the
+   two overlap for a frame and the handover is never seen.
+
+   Nothing new is drawn here: `battleWipeReveal()` is the curtain already ported
+   for the battle handoff, and the reason it is worth having in one place. */
+function enterFromTitle(){
+  if(!/(?:\?|&)enter=1/.test(location.search)) return;
+  const veil = $("battleFlash");
+  if(veil) veil.classList.add("blackout");
+  /* one frame for the map to lay out and pose itself, or the wipe opens onto
+     a view that has not decided where it is looking yet */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    battleWipeReveal(num(RULES.enterWipeMs, 1100)).then(() => {
+      if(veil) veil.classList.remove("blackout");
+    });
+    /* dropped as soon as the curtain is up and carrying the black itself */
+    setTimeout(() => { if(veil) veil.classList.remove("blackout"); }, 90);
+  }));
+}

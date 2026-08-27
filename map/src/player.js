@@ -11,10 +11,10 @@
 
    WHAT PERSISTS, AND WHY (combat GDD 13.1). MS and EC survive between
    encounters; they are restored only by an explicit event, and today the only
-   one is winning a Station Boss. Overload and statuses clear. Overflow is
+   one is winning a Station Boss. Overload and statuses clear. Their state is
    derived from MS and EC and so persists implicitly — you can walk onto the
    platform already over your ceiling, and the map has to SHOW that (13.1.3),
-   which is why `overflowing()` exists here rather than in the HUD.
+   which is why the map draws them on the marker rather than in a panel.
 
    CRYSTALS ARE THE CURRENCY, one per emotion. Items are separate and are lost
    by a roll each rather than by a percentage, so the two are banked
@@ -33,6 +33,11 @@
 
 const SAVE_KEY = "nm.avui.map.v2";
 const SAVE_KEY_V1 = "nm.avui.map.v1";
+/* What the title screen leaves when it has asked a new player who they are.
+   Two fields, not a profile: the other app deliberately does not know what a
+   profile is, so this side reads its answer and builds one. Must match
+   HANDOFF_KEY in BATTLE SYSTEM/src/firstrun.js. */
+const NEW_PASSENGER_KEY = "nm.avui.newpassenger";
 
 const Player = {
   at: "CLOT",
@@ -58,6 +63,35 @@ const Player = {
     const c = {}; Object.keys(EMOTIONS).forEach(e => { c[e] = 0; }); return c;
   },
   /* Derived, never stored. Read it; do not cache it. */
+  /* WHAT THE BAR NEEDS, in the shape the battle system's renderer expects.
+     `shownMs`/`shownEc` are what the bar is DRAWING as opposed to what is
+     true — in a fight they lag behind a landed hit so the value visibly
+     travels. Nothing animates them here, so they are simply the real values. */
+  gaugeUnit(){
+    const st = this.stats();
+    return {ms: this.ms, ec: this.ec, maxMs: st.maxMs, maxEc: st.maxEc,
+            shownMs: Math.round(this.ms), shownEc: Math.round(this.ec),
+            hurtFlash: 0};
+  },
+  /* THE MAP IS WHERE YOU ARE WHOLE.
+
+     MS only moves during a ride, so standing on the network it is always full
+     and EC is always at its resting level. That is a rule about the game, not
+     a display trick: the numbers really are restored, so a run always begins
+     from the same place and nothing is carried between rides except what was
+     banked. It also means the two values printed on the profile card are worth
+     reading — they say what the EQUIPMENT gives you, not where some previous
+     fight happened to leave you.
+
+     Called wherever the map takes over: arriving, being thrown back by a
+     defeat, and boot. */
+  restOnMap(){
+    const st = this.stats();
+    this.ms = st.maxMs;
+    this.ec = st.restEc;
+    this.statuses = {};
+    this.overloaded = false;
+  },
   stats(){ return deriveStats(this.armor, this.sets); },
   get maxMs(){ return this.stats().maxMs; },
   get maxEc(){ return this.stats().maxEc; },
@@ -69,7 +103,7 @@ const Player = {
     this.emotion = u ? u.emotion : "";
     const st = this.stats();
     this.ms = st.maxMs;
-    this.ec = Math.round(st.maxMs * (u ? (u.start_ec_pct || 0) : 0));
+    this.ec = st.restEc;
   },
 
   /* THE KIT, NOT THE IDENTITY. Everyone starts in the same armor with the same
@@ -85,6 +119,34 @@ const Player = {
     if(!this.ownedArmor.length) this.ownedArmor = this.armor ? [this.armor] : [];
     if(!this.ownedSets.length)  this.ownedSets  = this.sets.slice();
   },
+  /* ---- ARRIVING AS SOMEBODY -------------------------------------------
+     The title screen asks the question now, so by the time the map loads the
+     answer is usually already waiting. Applying it here rather than in the
+     creation screen means creation is never SHOWN and then dismissed — it is
+     simply not owed, which is what `needsCreation()` already knows how to say.
+
+     The key is CONSUMED. Left in place it would overwrite the profile of
+     someone who later renamed themselves, every time they opened the game. */
+  claimNewPassenger(){
+    let raw = null;
+    try{ raw = localStorage.getItem(NEW_PASSENGER_KEY); }catch(e){}
+    if(!raw) return false;
+    try{ localStorage.removeItem(NEW_PASSENGER_KEY); }catch(e){}
+    let d = null;
+    try{ d = JSON.parse(raw); }catch(e){ return false; }
+    if(!d || typeof d !== "object") return false;
+    /* SANITISED ON THE WAY IN, the same as any save file: it arrived through
+       storage, which anything on this origin can write to. */
+    this.name = foldText(String(d.name || "").toUpperCase()).slice(0, 14) || "PASSENGER";
+    const want = Array.isArray(d.affinities) ? d.affinities : [];
+    this.affinities = want.filter(e => EMOTIONS[e])
+                          .slice(0, RULES.affinitySlots || 2);
+    this.seedProfile();
+    this.fromSheet();
+    this.save();
+    return true;
+  },
+
   /* The hook character creation will test. Nothing calls it yet. */
   needsCreation(){
     return !this.name || this.affinities.length < (RULES.affinitySlots || 2);
@@ -131,7 +193,6 @@ const Player = {
   hasKey(lineId){ return this.keys.indexOf(lineId) >= 0; },
   grantKey(lineId){ if(!this.hasKey(lineId)) this.keys.push(lineId); this.save(); },
   /* 13.1.3 — the player has to be able to see they are in no state for a fight */
-  overflowing(){ return this.ec > this.ms; },
 
   addCrystals(c){ Object.keys(c).forEach(k => { this.crystals[k] = (this.crystals[k] || 0) + c[k]; }); },
   totalCrystals(){ return Object.keys(this.crystals).reduce((n, k) => n + this.crystals[k], 0); },
@@ -183,8 +244,13 @@ const Player = {
     /* MS and EC persist (combat GDD 13.1) but must not exceed a ceiling that may
        have moved since the save — a v1 save has no armor recorded at all. */
     const st = this.stats();
+    /* A SAVE IS ALWAYS A PLAYER ON THE MAP — the game only saves there — so
+       the stored ms/ec are read for compatibility and then immediately
+       overwritten by the resting values. Keeping them would mean a save made
+       in an older build could restore someone to the map on 12 MS. */
     this.ms = typeof d.ms === "number" ? Math.min(Math.max(0, d.ms), st.maxMs) : st.maxMs;
     this.ec = typeof d.ec === "number" ? Math.max(0, d.ec) : this.ec;
+    this.restOnMap();
     return interrupted;
   },
 

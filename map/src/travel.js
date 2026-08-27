@@ -36,9 +36,9 @@ const noseY   = () => Math.round(H * TRAIN_NOSE);
    was drawn underneath rather than carrying an alpha channel around. */
 function blendPx(x, y, c, a){
   x |= 0; y |= 0;
-  if(x < 0 || y < 0 || x >= W || y >= H || a <= 0) return;
+  if(x < -MX || y < -MY || x >= W + MX || y >= H + MY || a <= 0) return;
   if(clipC){ const dx = x - clipC.x, dy = y - clipC.y; if(dx*dx + dy*dy > clipC.r2) return; }
-  const i = y * W + x, p = buf[i];
+  const i = bufI(x, y), p = buf[i];
   const r = p & 255, g = (p >> 8) & 255, b = (p >> 16) & 255;
   /* CLAMP, DO NOT MASK. `mix(col, 1.45)` deliberately overdrives a colour past
      white to make a thing stand out against a field of its own hue, which puts

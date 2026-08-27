@@ -69,6 +69,220 @@ two of them fired.
 *actually* sounding; a track left paused by a fade that was immediately re-requested would
 otherwise satisfy `cur === want` while the game sat in dead air.
 
+### file:// is not a lesser http, it is a different origin model
+
+Every `file://` document has an **opaque** origin. Two things follow that no amount of code
+works around: a Permissions Policy feature cannot be delegated to an opaque origin, so
+`allow="autoplay"` is ignored; and user activation propagates only to *same-origin*
+descendants, so a tap in the parent never reaches the frame.
+
+This prototype is deliberately built to open off the disk, and almost all of it does —
+which makes the exceptions worth naming rather than rediscovering. `postMessage` crosses an
+opaque boundary fine, and that is why the bridge speaks over it. Audio autoplay does not
+cross, and cannot be made to.
+
+### Autoplay is a permission, and a frame is not given it
+
+A frame does not inherit the parent's right to make noise. Under `file://` it is a different
+origin outright, and even same-origin it has no user activation of its own — the tap that
+started the fight happened in the *parent's* document. So the battle's AudioContext could
+not leave `suspended`, and its theme sat silent behind an intro written to play over it.
+
+`allow="autoplay"` on the iframe delegates the permission the parent already earned. That is
+the fix; starting the music on the first press inside the frame was a workaround for not
+having asked.
+
+There is a second trap underneath it: `startMusic()` sets `musicOn = true` whether or not
+the `resume()` was allowed, so a refusal was **permanent** — every later attempt early-
+returned on a flag that said the music was already playing. `audioAwake()` resumes the
+context instead of restarting the music, which works because a suspended context's clock is
+stopped: sources already scheduled begin from their first note when it wakes.
+
+### A lookup table tested in order can hold two contradictory answers
+
+`musicForPhase()` reads as a list of rules, but it is a sequence of early
+returns — so the FIRST match wins and anything later is unreachable for that
+phase. `ENCOUNTER` was in the "play the ride's theme" branch from when an
+encounter was a debug panel over a paused ride. Adding it to the silence branch
+below did not change anything: the table now said two opposite things about the
+same phase and the earlier one quietly won.
+
+Adding a case to an ordered table is not enough — the existing cases have to be
+checked for one that already claims it.
+
+### A blacklist forgets; a whitelist refuses
+
+The battle system blacks out every child of `#screen` before the intro, as
+`:not(.intro):not(.flash):not(.stage)…`. A new screen added to that container is therefore
+hidden by default — built, inserted, measured correctly, animated, and invisible. Nothing
+warns, because being at `opacity:0` is what the rule is for.
+
+That is the right way round: a whitelist fails safe (a stray element stays dark) where a
+blacklist would fail open (a stray element flashes over the intro). The cost is that
+anything genuinely meant to be seen early has to be named, and the only symptom of
+forgetting is a screen that does not appear.
+
+### A sheet can ask for art that does not exist
+
+`emotions.icon` names `BURST` for Surprise, and neither app's `ICONS` table had it — so
+`iconSVG` fell back to `BOLT` and Surprise wore Anger's symbol everywhere a glyph was drawn
+from the sheet, including the profile card's key stamps. The fallback is right (an unknown
+key must not throw) but it is also silent, so the mismatch survived until something drew all
+six side by side.
+
+### Deleting by anchors deletes what moved in between
+
+Removing the debug encounter's CSS meant cutting "from the DEBUG marker to the MENU header".
+The whole metro-card section had been *inserted* between those two anchors weeks later, so
+the cut took it with it. Nothing threw and nothing logged — the PROFILE tab simply rendered
+as unstyled markup, a giant silhouette above a list of words.
+
+Two anchors bound a region whose contents had changed since the anchors were chosen. When a
+range delete is unavoidable, name what is expected inside it and check the count afterwards;
+a `grep -c` for the classes that should survive would have caught this before the screenshot
+did.
+
+### A stand-in outlives its purpose and starts lying
+
+The debug encounter panel keyed off `Encounter.open`, which is true for a real
+fight as well as a fake one, so it drew itself over actual battles. It had also
+become a second definition of what an encounter result is, with its own
+`choose()` applying its own numbers. Deleted rather than gated: once the real
+path exists, a stand-in that shares its state is a bug waiting for the next
+person to trust it.
+
+### A throw in a Promise executor is a rejection, not a skipped frame
+
+The battle curtain runs `draw()` once synchronously before its executor returns. A zero-size
+rect made `createImageData` throw there — and because the throw happened *inside the
+executor*, it rejected the promise. `launch()` caught the rejection, concluded the fight had
+not happened, and handed back a blank result. **One bad rectangle silently skipped the entire
+battle**, and the ride resumed as though the player had declined it.
+
+Two lessons, both applied: anything that draws must survive a zero rect (`resize()` has
+guarded this since the map was built), and a `catch` that substitutes a plausible fallback
+has to *say so* — a failure that looks like a feature is worse than a crash.
+
+### The spreadsheet is prose, so the generator must escape it
+
+`data.js` embeds each CSV in a template literal. A notes column is written by a person, and a
+person writing about a `column` reaches for a backtick — which closes the literal and takes
+the whole file down with a syntax error a long way from its cause. `${` does the same, more
+quietly, by interpolating.
+
+`build_data.py` escapes both now. A data pipeline that can be broken by punctuation in a
+comment is a trap, not a constraint on how comments may be written.
+
+### An invisible element with no pointer-events fails silently
+
+`.hud` is `pointer-events:none` so the map underneath stays reachable, and every panel in it
+has to opt back in. The tooltip's dismissal veil never did — so it never received the press
+that was meant to close the bubble, and tips stayed up for ever. Nothing threw, and the veil
+is invisible by design, so there was nothing to look at either.
+
+Anything added to the HUD needs `pointer-events:auto` the moment it is expected to be
+pressed, and an element whose whole job is to catch presses is the easiest one to forget.
+
+### A listener on an ancestor is not blocked by pointer-events
+
+The map's gestures are bound to `#screen`, which is an **ancestor** of every panel. An event
+that lands on an open menu still bubbles down to those listeners, and `pointer-events:auto`
+on the panel does nothing about it. `pointerdown` had a `Menu.open` guard; `wheel` and
+`dblclick` never got one, so the map could still be zoomed by scrolling or double-tapping
+over an open menu.
+
+Three copies of the same list are what let them drift apart, so there is now one predicate —
+`blocked()` — and anything added to `bindInput` has to use it.
+
+### Two rules, equal specificity: the later one wins
+
+Three separate regressions in one pass, all the same shape. `.bigbtn{position:relative}`
+sat after `.endbtn{position:absolute}` and threw END out of its corner into the top of the
+frame. `.framed{position:relative}` sat after `.peek,.dilemma{position:absolute}` and
+unpinned the platform decision the same way. Nothing threw; the buttons simply appeared
+somewhere else.
+
+The fix differs by case, and the difference is the point:
+
+- `.bigbtn` never needed `position` — it has no pseudo-elements to contain, so the
+  declaration was removed outright.
+- `.framed` genuinely needs it for its two stroke layers, so **the block moved above** the
+  panels that use it. A utility that carries `position` has to be written before anything
+  that positions itself.
+
+### A clip-path clips the children too
+
+`.pxr` cuts an element's corners — and everything inside it, pseudo-elements included. Two
+things fell out of that:
+
+- The menu button could not be both corner-cut and ringed, because the ring hung off
+  `::after` and got sliced. Pixel-art strokes are just rectangles, so the button is three
+  stacked rectangles — ramp, black, face — each cut with its own slightly smaller radii so
+  the corner steps nest. What shows between the layers *is* the stroke.
+- The travel popup's close button deliberately overhangs the panel's top edge, so cutting
+  the panel sliced the button in half. The corners moved onto `::before` and `::after` — the
+  only two things that need the shape — and the panel itself no longer clips anything.
+
+The same reasoning explains why `.bigbtn` uses an **inset** box-shadow for its stroke and a
+`filter: drop-shadow` for its drop: an ordinary border is drawn outside the clip and gets
+sliced at every step, and a box-shadow drop is cast from the unclipped box.
+
+### A class name is a global
+
+`.cbox` was the character-creation card. Adding a second `.cbox` for the city chips gave
+every chip `width:100%`, so the bar stacked into five full-width bands — and nothing threw,
+nothing logged, the CSS just quietly meant something else. In a stylesheet with no scoping,
+a new class name has to be grepped for before it is used. The chips are `.citybox` now.
+
+### Ask the clock, do not be told
+
+Nothing pushes the hour, the weather or a status change at the HUD. The city bar asks what
+time it is, builds a key out of the answer, and rebuilds its markup **only when that key
+changed** — so it can be called from every HUD sync and from the game clock five times a
+minute without restarting a single animation. The alternative, an event fired when the hour
+rolls over, needs something to own a timer, and would still be wrong the first time a phone
+came back from sleep.
+
+### The buffer is bigger than the frame
+
+`W` and `H` still mean the size of the VISIBLE frame, and everything that lays anything out
+— the trip bar, the train, a label deciding whether it fits — still measures against them.
+What changed is that the buffer carries a margin of `MX` by `MY` around that frame, and the
+canvas element is drawn that much larger and centred, so the margin hangs off all four sides
+and `.screen`'s `overflow:hidden` clips it away.
+
+It exists for the lean. A rectangle turned by 20 degrees no longer covers the frame, and the
+corners swinging inward were showing the void past the edge of the map. Scaling the canvas
+up to cover would also have worked — and would have zoomed the art by nearly three quarters
+on a tall frame. Rendering MORE MAP instead costs a few thousand pixels and leaves both the
+framing and the pixel scale exactly as they were.
+
+The margin is free because the projection puts world `cam.x, cam.y` at the buffer's centre:
+a symmetric margin moves nothing, it only reveals more. What it does cost is vigilance —
+every cull written as `x > W + k` has to become `x > W + MX + k`, or the margin fills with
+nothing and the void comes back in a new shape. `local()` has to subtract it too, since the
+canvas's top-left is now outside the frame.
+
+### One eased number carries a whole pose
+
+The lean multiplies EVERYTHING it does — angle, extra zoom, drift — by a single `k` that
+eases from 0 to 1 and back. So the tilt arrives and leaves instead of appearing, the sway is
+already at its right phase when it gets there, and there is one number to reason about
+rather than three animations to keep in step. `leanOff()` only clears a flag; the transform
+is dropped at the far end, once `k` reaches zero and there is genuinely nothing to draw.
+
+It runs on the display's clock, not the 12 fps game clock: it is a camera move, and a camera
+move that steps twelve times a second is a stutter, not a medium.
+
+### A failure that is silence, not an error
+
+`createMediaElementSource` applies a CORS check to whatever it is given, and when the check
+fails the node does not throw — it outputs silence. Under `file://` it can never pass. The
+music therefore stays out of the graph entirely and fades through `<audio>.volume`; the
+synthesised effects, which have no origin to check, keep the crusher and the delay.
+
+The general shape: prefer the plainer mechanism when the fancier one can fail *quietly*.
+
 ### Serve the container type, not the codec
 
 Python's table calls a `.m4a` `audio/mp4a-latm` — the raw stream type, not the container —

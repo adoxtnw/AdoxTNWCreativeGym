@@ -36,7 +36,7 @@ other defeat keeps — the in-flight vault is part of the save for exactly that 
 | Paths across the network, gated by Line Keys | `src/route.js` |
 | The multi-leg trip and the vault it is wagering | `src/run.js` |
 | Station inspection, and choosing a destination | `src/peek.js` |
-| The debug battle stand-in | `src/encounter.js` |
+| Handing a fight to the battle system | `src/encounter.js`, `src/handoff.js` |
 | Stats strip, route header, dilemma, encounter markup | `src/hud.js` |
 
 **Crystals** are the currency, one per emotion, taken from the line you were riding.
@@ -227,6 +227,24 @@ sails straight past the clip.
 
 ### The travel screen
 
+### Leaving is the slowest thing in the game
+
+The departure runs for three seconds (`departSecs`) before the wipe, and all of it moves at
+once:
+
+- the camera **falls into the station you are standing on**, on an accelerating curve — it
+  is still speeding up when the wipe takes over, so the two read as one movement rather
+  than a move that settles and then a second effect;
+- the whole frame **drains to the departure line's colour**, so by the time the wipe opens
+  there is nothing outside it worth looking at. That is what stops the wipe reading as a
+  panel swap;
+- the map's music **fades out while the ride's fades in**, across the whole three seconds.
+
+That last one is the single exception to the rule that music changes are cuts. Everywhere
+else an abrupt start is what makes a change of place feel deliberate; departure is the one
+moment that is meant to feel long, and it is the only transition the player chose.
+
+
 Neuro-Metro runs through emotional space, not tunnels, so behind the train are three
 parallax depths of the line's own emotion — a circular gradient wider than the screen
 (slowest), a repeating motif belonging to the emotion (Anger is fire), and dust nearest
@@ -243,13 +261,15 @@ Things appear around the train during a ride. **Every knob is a row in
 `travel_elements`** — probability, how many may exist at once, how many one ride may ever
 produce, how long each lasts, size, and how fast it drifts relative to the track:
 
-| | kind | chance | on screen | per trip | life |
+**Three things exist, and nothing else**: Track Segments, Crystals, and enemies.
+
+| | kind | share of a roll | on screen | per trip | life |
 |---|---|---|---|---|---|
-| **Track Segment** | `SEGMENT` | 25% | 8 | **unlimited** | rides to the edge |
-| **Crystal Shard** | `CRYSTAL` | 9% | 2 | unlimited | rides to the edge |
-| **Settled Echo** | `LOOT` | 12% | 3 | 12 | 4–8s |
-| **Emotional Entity** | `ENEMY_PASSIVE` | 10% | 2 | 4 | 5–15s |
-| **Hunter** | `ENEMY_AGGRO` | 5% | 1 | 2 | 8–14s |
+| **Track Segment** | `SEGMENT` | 55% | 5 | **unlimited** | rides to the edge |
+| **Emotional Entity** | `ENEMY_PASSIVE` | 14% | 2 | 4 | 5–15s |
+| **Crystal Shard** | `CRYSTAL` | 10% | 2 | unlimited | rides to the edge |
+| **Hunter** | `ENEMY_AGGRO` | 6% | 1 | 2 | 8–14s |
+| *nothing at all* | — | **15%** | — | — | — |
 
 `0` in `max_per_trip` means **unlimited** — Track Segments must never stop appearing, since
 they are the thing the ride is about. Collectables leave by the bottom edge rather than by
@@ -260,11 +280,48 @@ crossing the screen at 12 fps jumps eight pixels between frames, so what is unde
 when you press is not what was there when you decided to press. Hit boxes are also much
 bigger than the art — `travelTapR` is only the floor.
 
-Every `travelRollSecs` (3), each type is offered **every free slot it has**, and each slot
-is rolled independently. Rolling once per type would make a cap of fifteen unreachable —
-at one success per three seconds against a life of one to three, there would never be more
-than one on screen. Successes are then spread across the coming interval, so the window
-fills steadily instead of pulsing.
+#### One roll, at most one thing, often nothing
+
+The roll comes round every 1–3 seconds (`rollMinSecs`/`rollMaxSecs`, squeezed toward the
+fast end by the target station's enemy density) and produces **at most one element**. Every
+eligible kind's chance is a slice of the same single draw, so the kinds compete for one
+outcome instead of each flipping its own coin — and **whatever the slices do not cover is
+the chance that the roll produces nothing**. That gap is the point: a ride needs quiet
+stretches, and it means the interval has to come round again before anything can appear.
+
+**At most `travelMaxLive` (5) may be out at once, all kinds together.** When the timer comes
+round on a full board the roll is not skipped and rescheduled — it is **held**, so the
+instant something leaves the frame or is tapped away, the next roll happens. Skipping
+instead would leave a busy stretch silent for another whole interval after it finally
+cleared.
+
+A kind that has hit its own per-kind ceiling is simply not offered a slice, which hands its
+share of the draw to the empty remainder: a board thick with segments goes quieter rather
+than substituting something else in.
+
+**Every segment hangs at its own angle** and turns at its own rate, half of them each way.
+They are identical squares otherwise, and a stream of identical squares all square to the
+frame reads as one repeated sprite rather than as debris.
+
+#### There are no items
+
+`payload: ITEM` is gone and the `items` sheet is empty. Item design is not written, and a
+payload of placeholders is worse than an empty pocket — it fills Baggage with things that
+mean nothing and teaches the player they are worthless. The sheet and the vault's `items`
+array both survive, so the machinery has a shape to fill when the design exists.
+
+#### The Emotional Trip bar
+
+Edge to edge, because an inset bar reads as a widget sitting on the screen and one that runs
+off both sides reads as part of the vehicle.
+
+It **chases the count rather than jumping to it**: a collected segment sets off a tween
+(`tripFillMs`) on an ease that overshoots slightly and comes back, so the fill reads as
+something with weight arriving rather than a value being assigned. The bar flashes white
+(`tripFlashMs`) and `map_tripup` sounds as it lands — the one reward the ride has. The
+*number* beside it ticks over immediately, so the true count is never hidden by the
+animation, and a collected segment flies to the fill's leading edge **as drawn**, not as
+counted.
 
 **Rates are a product, not a constant:**
 
@@ -291,13 +348,13 @@ locks on with a countdown ring and forces the encounter when it runs out. Both r
 the debug battle screen.
 
 **Motion** is separate from kind: `FLYBY` enters from the top and rockets past, `PARALLEL`
-is already alongside when you notice it. That is why a Settled Echo and an Emotional Echo
-can carry the same payload and still feel nothing alike.
+is already alongside when you notice it. That is why an enemy and a crystal can share a
+screen and feel nothing alike.
 
 **Nothing owns a timer or a listener.** Every element is a plain object in one array,
 drawn from it and spliced out when it expires — an element that registered its own
 `setTimeout` or DOM node would leak one per spawn, and a ride produces dozens. Verified:
-repeated rides end at zero live and zero queued, and the caps hold.
+repeated rides end at zero live, and the caps hold.
 
 ### Sound and music
 
@@ -337,12 +394,190 @@ afconvert -f m4af -d aac -b 128000 "MUSIC/Rise.wav" "MAP/audio/rise.m4a"
 
 34 MB → 6.9 MB total. Re-run that if you replace a track.
 
+#### Why the music avoids Web Audio
+
+Feeding a media element into `createMediaElementSource` subjects it to a CORS check, and a
+failed check **does not throw — the graph silently outputs nothing**. On `file://` every
+origin is opaque, so that check can never pass: the music would be mute while every
+synthesised effect kept working, which is a miserable thing to diagnose. The graph was only
+ever holding a gain node for fading, and `<audio>.volume` does that with none of the risk.
+
 ### Sound effects, synthesised
 
 Effects are synthesised from the shared `sounds` sheet (`map_*` and `ui_*` rows) — no audio
-files. The music is the exception, and it runs on the **clean bus**: putting a real
-recording through the bit-crusher that makes the effects crunchy would only cost it a few
-bits and replace its top end with aliasing.
+files. **The music does not go through that graph at all** — it is plain `<audio>` elements
+with their own `volume`. Routing a recording through the bit-crusher would only cost it a
+few bits and replace its top end with aliasing, and routing it through Web Audio at all
+carries a nastier risk: see below.
+
+## The rules about MS and EC
+
+**The map is where you are whole.** Mental Stamina only moves during a ride, so standing on
+the network it is always full, and EC is always at its resting level. That is a rule about
+the game rather than a display trick — the values really are restored, in one place
+(`Player.restOnMap()`, called when the phase returns to IDLE), so there is no way to reach
+the map in a half-spent state.
+
+It also makes the two numbers on the profile card worth reading: they say what the
+**equipment** gives you, not where some previous fight happened to leave you.
+
+**EC rests at half of MaxMS**, plus whatever the equipment says — `start_ec_pct` on the
+player's row in `units` (0.5), then every equipped set's `ec_mod`. It is derived, never
+stored: writing it into the profile would freeze it at whatever loadout was worn when it was
+written, and it would disagree with the armor on the player's back for ever.
+
+**Losing a fight is not losing the ride.** A defeat used to zero MS outright, which made
+every loss the end of a run. It costs a large share of MS instead, and the run ends only
+when MS reaches **zero** — so a bad fight early is something you carry, and choosing to keep
+going with it is exactly the wager the Traveler's Dilemma asks about.
+
+The debug encounter screen gained a **WIPED** button for that reason: with the rule in
+place, the one outcome that actually ends a run is otherwise the one nobody can test.
+
+One case the rule does not settle on its own is being beaten by the Station Boss while still
+standing. The station is not taken, so it is not a win — but the run is not lost either, so
+it resolves the way stepping off early does, with the exit share rather than everything.
+
+## The pause menu
+
+### PROFILE is a card, not a list
+
+Everything about the passenger is crammed onto one object. That is not decoration: a list
+of headed sections says *here are five unrelated facts*, and a card says *this is you, and
+these are the things printed on you* — which is the claim the game is actually making. It
+sits askew, drifts, and throws its shadow a long way down and right, so it reads as a
+physical thing lying **on** the interface rather than another panel built into it.
+
+- **The photo is not a photo.** An 8×8 silhouette on the same grid as every other glyph, so
+  it belongs to the same alphabet. Deliberately anonymous — a face would be a claim about
+  who the player is that the game has no business making.
+- **Keys are stamps.** A key is a thing stamped into a travel card, so it is drawn as one:
+  the line's emotion symbol struck into a disc. Unearned ones stay as empty grey rings
+  rather than vanishing — the shape of what is missing is the whole point of a stamp page.
+  Six in one row, always; five-and-one reads as a mistake rather than as a card with six
+  spaces on it.
+- **The bar is the battle system's bar.** `src/gauge.js` is a verbatim port — the same
+  per-pixel renderer reading the same constants out of the same rules sheet, so the number
+  you carry between fights is drawn by the code that will draw it during one. Two changes,
+  both forced: the accent came from `u === S.player` and is now passed in, and `wave` became
+  `gwave` because one shared global scope cannot hold two.
+
+The stat block moved here from LOADOUT. It used to be printed beside the slots that produce
+it, which was the right instinct — but the same four numbers on two tabs is an invitation
+for them to disagree, and the card is where a player looks for *what am I*.
+
+### What a move does
+
+The `i` button is the battle system's, ported whole: same `data-a` hook, same wiring, same
+`{KEYWORD}` / `*emphasis*` markup, same stat chips, same keyword colours (`{EC}` has none of
+its own — it takes the scrolling ramp, because Emotional Charge is not one emotion). Blurbs
+are written once in the sheet, so a line edited for a fight reads correctly in the pause
+menu on the next rebuild.
+
+It stops propagation, because it sits inside a card whose own click toggles the abilities
+panel — without that, asking what a move does would also collapse the list you were reading.
+
+### Motion
+
+Four movements, all from one idea: things arrive **from below**, because the menu comes up
+from the bottom edge where the button that opens it lives.
+
+| | |
+|---|---|
+| opening | every element rises in turn, `--si` set per element in `stagger()` |
+| closing | a quick fade, no movement |
+| changing tab | the body slides up; the frame does not move |
+| abilities panel | scales open from its top edge, with a triangle that inverts |
+
+The stagger is capped at twelve. Past that it stops reading as choreography and starts
+reading as the interface being slow.
+
+Closing is deliberately **not** symmetrical with opening. Arriving is worth watching;
+leaving is something the player has already decided on, and animating it just puts a delay
+between the tap and the map coming back. `Menu.open` goes false immediately while the panel
+is left up for the fade, so the map is interactive on the tap rather than 140ms later.
+
+## One language for every panel
+
+The travel popup set the house style, and everything the player meets now wears it:
+
+- **`.framed`** — a thick stroke that *scrolls*, with the panel's own dark ground inset
+  inside it. The gradient arrives as `--frame`, so the same three rules dress the travel
+  popup (the lines the trip will ride), the platform decision, and the encounter.
+- **`.bigbtn`** — big, corner-cut, hard black stroke, hard drop. `.go` wears the moving
+  gradient, because the eye should land on the choice that carries the risk.
+- **`--ride`** — the colour of the line under the train right now, published on the root
+  element whenever the HUD syncs. A panel opts in by naming it; nothing is threaded through
+  the markup. The leg header, the platform decision, the encounter and the Baggage screen
+  all take it, so a red-line run is red all the way through.
+
+The travel popup's gradient still comes from the *trip* (`--trip`), because a journey that
+changes lines should say so before you board. Once you are aboard there is only one line
+under you, so everything else uses `--ride`.
+
+## What the city is doing
+
+A **city status** is a condition Barcelona is in. It is not a station state: a state is a
+property of a *place* and lives in the stations sheet; a status happens to the *city* and
+then picks which places it lands on. Hence its own sheet, `city_status`, and its own
+registry.
+
+Three things follow from one being active:
+
+1. the top of the map grows a **tag** for it, which explains itself when tapped — the same
+   bubble the battle system explains an ability with;
+2. the stations it landed on have their **live attributes multiplied**, so it is doing
+   something whether or not anyone reads the tag;
+3. the map **paints something around those stations**, so the tag is never the only
+   evidence.
+
+### Rush Hour, the reference status
+
+| | |
+|---|---|
+| emotions | `DISGUST\|ANGER` — drawn as a mix, never averaged |
+| lines | `L1\|L2\|L5` |
+| when | weekdays, `7-10` and `17-20` Barcelona local |
+| share | 40% of the eligible stations |
+| does | `density ×1.6`, `aggro ×1.5` |
+| looks like | a ring of green and red dots that will not hold still |
+
+The shake is the idea: a crowded platform is not a glow, it is a lot of small things
+jostling, so every dot is thrown a pixel or two off its place on the ring **on its own
+phase** — jitter them together and the ring shivers as one piece, which reads as a wobbling
+circle rather than a crowd.
+
+### Which stations, and why it has to be decided that way
+
+Picking at random per client would mean two people playing the same city at the same moment
+see different maps. Re-rolling per frame would mean the set changes while you look at it.
+Both are the bug the weather already solved, so the answer is the same: **a hash of the
+station, the status, and the current window.** Stable for the length of the window,
+identical on every device, and nothing is sent anywhere.
+
+The window *index* is part of that hash, so the morning rush and the evening rush land on
+different stations rather than repeating the same set twice a day. A status that would land
+on nothing is given the one station it came closest to affecting — a tag over an untouched
+map reads as a bug.
+
+### Seeing it out of hours
+
+Rush Hour is only really happening for six hours on a weekday, which is a long time to wait
+while building it:
+
+```bash
+open "http://localhost:8178/?status=RUSH_HOUR"
+```
+
+`?status=none` holds everything off; `CityStatus.force("RUSH_HOUR")` does the same from the
+console, and `force(null)` gives the clock back.
+
+### A trap worth knowing
+
+`emotions` and `lines` are **list columns**, so the parser hands them back already split;
+`hours` and `day` are not. Reading a cell as the wrong one of those fails *silently* — the
+pipes survive into a single string, nothing matches, and the feature simply never happens.
+Every cell in `city.js` goes through `listOf()`, which takes either.
 
 ## Station states
 
@@ -383,17 +618,153 @@ both systems and must exist exactly once.
 
 ## The seam with battle
 
-`AVUI_COMBAT_GDD.md` §13 is the contract, and it is already specified:
+**It is connected now.** The title screen leads here, and tapping an enemy on a ride hands
+the fight to the battle system — which the map mounts in a frame rather than navigating to.
 
-- **§13.2 — what battle needs from here:** player `MaxMS`, `INIT`, emotional type, current
-  loadout, encounter composition, and whether fleeing is allowed.
-- **§13.3 — what battle returns:** `{outcome, ms, ec, rounds, rewards}`.
-- **§13.1 — what persists:** MS and EC both carry between encounters within a day.
-  Overload and statuses clear.
+### Why a frame
 
-Neither system needs the other to be worked on. During map development
-`startEncounter()` is a **stub** returning a fixture; battle already boots from its own
-fixture. See `src/battle-bridge.js`.
+The ride has to be waiting when the fight ends: mid-travel, at line speed, same elements in
+the air. Navigating away and back would throw all of that on the floor and the train would
+pull out from a standing start on the other side. A frame leaves the map running in memory,
+untouched — which is also why neither prototype had to be rebuilt for this. The battle
+system is not imported, it is **asked**.
+
+They speak by `postMessage`, not by reaching across into `contentWindow`: under `file://`
+every origin is opaque and direct access is refused, while `postMessage` crosses an opaque
+boundary happily. This has to keep opening off the disk.
+
+```
+MAP                                        BATTLE (in the frame)
+  mount, ?handoff=1  ─────────────────────▶ boots, title removed, waits
+  {AVUI_START, descriptor}  ──────────────▶ applies it, runs intro()
+                                            …the fight…
+  ◀────────────── {AVUI_RESULT, result}     results panel, then the player taps
+  fade to white, unmount, ride resumes
+```
+
+**Off the disk, the battle theme cannot autoplay — and that is a browser rule, not a bug.**
+Every `file://` document has an opaque origin: a Permissions Policy feature cannot be granted
+to one, so the `allow="autoplay"` below is ignored there, and user activation only propagates
+to *same-origin* descendants, so the tap that started the fight cannot reach the frame
+either. The theme waits for the first touch inside the fight instead. Over http — which is
+what the deployed build is — it plays over the intro as intended. Locally:
+
+```bash
+python3 "AVUI/shared/tools/serve.py" --all 8180
+```
+
+The frame is mounted with `allow="autoplay"`. A frame is not given the parent's right to
+make noise — it has no user activation of its own, since the tap that started the fight
+happened in the map's document — so without the grant the battle's theme cannot start until
+someone presses something inside it. With it, the theme plays over the intro, where it was
+written to.
+
+**The frame speaks first.** The map waits for `AVUI_READY` before sending anything — a timer
+would be a race against however long fourteen scripts take to parse on a cold phone.
+
+### What crosses
+
+The shapes are the ones `battle-bridge.js` has described since before there was anything to
+fill them in — §13.2 out, §13.3 back — and they did not have to change. The map is the
+authority on the player: MS ceiling and Emotional Layers from the armor, the ability pool
+from the three Move Sets. Reading `units.player` on the far side would quietly fight a whole
+progression system, so `handoff.js` overwrites the sheet's defaults with what the map sent.
+Verified: a fight opens at the map's 480 MS / 240 EC, not the sheet's 400 / 200.
+
+### What a won fight leaves
+
+`drops` on the **enemy's own row**, as `kind:amount:chance` —
+`CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40`. Every kind is rolled **separately**, so one
+enemy can leave everything, something or nothing; a single roll across all three would make
+the good haul and the empty one the same event. The amount is "up to".
+
+Each lands through the machinery that already handles it: crystals in the vault, segments
+through the trip bar's own tween and `map_tripup`, orbs adding `orbMsPct` of MaxMS. **Orbs
+only mean anything mid-ride** — MS is restored in full on the map — so a Stamina Orb is a
+decision about whether *this* ride continues, which is the same reason MS is the only thing
+that ends a run.
+
+### The sequence
+
+Tapping an enemy is the same **kind** of event as leaving a station, so it is the same piece
+of theatre: the travel scene floods with the enemy's colour (`departWash`, same curve), then
+a circular wipe opens onto the frame — where battle's own diagonal-line intro is already
+running into its own wipe. Coming back is a fade to white that covers the frame's teardown.
+
+You return to a train **already at line speed**. `J.f` drives the acceleration ramp, so
+restoring it exactly would put a fight in the first seconds of a ride back at a crawl — the
+player would watch the train pull away a second time having just won something.
+
+### Who is riding — asked once, at the door
+
+A first-time player is asked their name and their affinities **on the title screen**, the
+moment they tap ENTER THE NEURO METRO and before the transition runs. It goes there rather
+than on the map because that is the door: someone who has just decided to go in should be
+asked who is going in, not shown a city and interrupted.
+
+It happens once per **save**, not per session — the check is for a map profile, so coming
+back out to the title from the pause menu and going in again never asks twice.
+
+**What it leaves behind is deliberately tiny**: a name and up to two affinities, under
+`nm.avui.newpassenger`. It does not write a profile. The map owns what a profile is — armor,
+keys, crystals, schema version — and a second app writing that structure would be a second
+definition of it, out of date the first time this one changes. Two fields is a message; a
+profile is a claim. `Player.claimNewPassenger()` reads it, builds the real profile, and
+**consumes the key** — left in place it would overwrite the profile of someone who later
+renamed themselves, every time they opened the game.
+
+The map's own creation screen stays as the fallback for anyone who reaches the map without
+having been asked. It is simply never owed, so it is never shown and dismissed.
+
+**The pace is the point.** Every element arrives on its own, and the six emotions take a
+full second each, rising as they fade in, each waiting for the last. Measured: 2799, 3801,
+4810, 5878, 6934, 8017ms. Six seconds to meet six emotions is slow for a menu and about
+right for the only moment in the game that asks the player what they are.
+
+Selecting is tapping: a bright thick stroke glows on the chosen. Re-tap releases. Two is the
+ceiling, and a third tap releases the **oldest** rather than being ignored — a control that
+does nothing reads as broken. PROCEED is visible but dead until at least one is held, so its
+condition is legible as a condition.
+
+### The door, both ways
+
+**In.** The title screen's button — **ENTER THE NEURO METRO** — fades its *content* out over
+three quarters of a second and navigates here with `?enter=1`. It fades the content rather
+than the whole title because `.title` **is** the black: fading all of it would reveal the
+battle screen sitting behind it for half a second, which is the one place the player is not
+going. What is left is plain black.
+
+The map then opens the **same circular wipe** the battle handoff uses, out of that same
+black. So a page load in the middle of a transition is invisible: both halves meet on the
+same colour, and what the hole opens onto is the city. Nothing new was drawn for it —
+`battleWipeReveal()` was already there, which is the payoff for having put the curtain in
+one place.
+
+**Out.** The SAVE tab ends with **MAIN SCREEN**. It lives there and nowhere else on purpose:
+that is the one tab where the player is already thinking about what survives, so a warning
+about leaving mid-run can be read in the same breath as the button that downloads the file.
+It saves before it goes — the game saves on the map anyway, but this is the one action that
+walks away from the page, and a profile edited in the menu and not yet written would be gone
+with no way back to ask about it.
+
+There is no confirm dialog, even mid-run. The section says plainly what leaving costs, and a
+run is not a thing worth trapping someone in.
+
+### Running both locally
+
+The two apps are siblings under one root in production, so `../MAP/` and `../BATTLE SYSTEM/`
+resolve. One server per app cannot reach the other, so serve the **workspace**:
+
+```bash
+python3 "AVUI/shared/tools/serve.py" --all 8180
+```
+
+Then `http://localhost:8180/BATTLE%20SYSTEM/index.html` is the front door.
+
+The debug "battle occurred" panel is **gone**. It existed so map flow could be built with no
+battle system to hand off to; with a real one, it was a second and drifting definition of
+what an encounter result is — and it was appearing over real fights, because `Encounter.open`
+is true for both.
 
 ## Where to look
 

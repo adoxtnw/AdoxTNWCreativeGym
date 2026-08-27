@@ -127,7 +127,18 @@ function startMusicEls(){
 
 async function startMusic(){
   initAudio(); if(!actx||musicOn) return;
-  if(actx.state==="suspended"){ try{ await actx.resume(); }catch(_){} }
+  /* A REFUSED RESUME MUST NOT COUNT AS PLAYING. This used to fall through and
+     set `musicOn` regardless, so a browser that blocked the first attempt made
+     every later one a no-op — the flag said the music was already on while the
+     context sat suspended and silent. Now a refusal leaves everything untouched
+     and the next attempt is a real attempt. */
+  if(actx.state==="suspended"){
+    try{ await actx.resume(); }catch(_){}
+    if(actx.state==="suspended"){
+      console.warn("audio is blocked by this browser; the theme will start on the first touch");
+      return;
+    }
+  }
   musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume;
   musicBus.connect(cleanBus);          // recorded audio bypasses the crusher
   musicOn=true;
@@ -149,6 +160,14 @@ async function startMusic(){
    suspended, which is exactly what browsers require before a gesture. */
 initAudio();
 window.addEventListener("pointerdown",initAudio,{once:true});
+/* A CONTEXT THAT WAS REFUSED CAN BE WOKEN LATER, and the music does not have to
+   be restarted to hear it: while a context is suspended its clock does not
+   advance, so sources already scheduled simply begin when it resumes. That
+   matters because `startMusic()` marks the music as playing whether or not the
+   resume was allowed — so without this, a refusal was permanent. */
+function audioAwake(){
+  if(actx && actx.state === "suspended"){ try{ actx.resume(); }catch(_){} }
+}
 function stopMusic(fadeMs){
   if(!musicOn) return;
   musicOn=false;

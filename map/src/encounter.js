@@ -41,9 +41,60 @@ const Encounter = {
       canFlee: kind !== "BOSS"          /* 13.1.4 — you cannot run from a Line's end */
     });
     sfx("map_entity");
-    syncEncounterHud();
+    /* WHICH ROW THIS THING FIGHTS AS. It comes off the element's own
+       `travel_elements` line, so a second enemy is a row in a sheet rather
+       than a branch in here. */
+    const row = ELEMENTS[this.enemy.id];
+    this.unit = (row && row.unit) || "enemy";
+    const em = (UNITS[this.unit] || {}).emotion;
+    this.washCol = EMOTIONS[em] ? hexRGB(EMOTIONS[em].hex) : null;
+
+    J.phase = "ENCOUNTER_IN"; J.f = 0;      /* the flood; launch() follows it */
+    syncHud();
     dirty = true;
     return true;
+  },
+
+  /* Called by the clock once the colour has finished flooding in. From here on
+     it is asynchronous: the curtain opens onto a frame that is still loading,
+     and the fight answers whenever it is over. */
+  async launch(){
+    if(this._launched) return;
+    this._launched = true;
+    J.phase = "ENCOUNTER"; syncHud(); dirty = true;
+    let result = null;
+    try{
+      const p = startEncounter(this.descriptor, this.unit);   /* §13.2, the seam */
+      await battleWipeReveal(num(RULES.battleWipeMs, 820));
+      result = await p;
+    }catch(err){
+      /* SAY SO. A silent fallback here once swallowed the entire battle: the
+         curtain threw, this caught it, and the ride resumed as though the fight
+         had simply been declined. A failure that looks like a feature is worse
+         than a crash. */
+      console.error("battle handoff failed, resuming the ride:", err);
+      result = null;
+    }
+    /* A frame that never answered is not a defeat — it is a fight that did not
+       happen. Fall back to the descriptor's own state so the ride resumes
+       exactly as it was rather than the run ending on a loading error. */
+    if(!result) result = blankResult(this.descriptor);
+    const got = applyRewards(result);
+    if(got.length) console.log("battle rewards:", got.join(", "));
+    await BattleFrame.close();
+    this.resolve(result);
+  },
+
+  /* Bookkeeping for a result that came from an actual fight. There used to be a
+     second one of these behind a debug panel's buttons; there is one now. */
+  resolve(result){
+    applyEncounterResult(Player, result);
+    const resume = this._resume;
+    this.open = false; this.kind = null; this.enemy = null;
+    this._resume = null; this._launched = false;
+    Player.save();
+    if(resume) resume(result.outcome, result);
+    dirty = true;
   },
 
   /* The conditions the fight would inherit — the same world state the track
@@ -57,26 +108,14 @@ const Encounter = {
 
   /* WIN / LOSS / FLED. A plausible result, shaped exactly as 13.3 specifies,
      goes back through the real seam. */
-  choose(outcome){
-    if(!this.open) return;
-    const d = this.descriptor, boss = this.kind === "BOSS";
-    const cost = Math.round(d.player.ms * (outcome === "LOSS" ? 1 : boss ? 0.45 : 0.22));
-    const result = {
-      outcome,
-      ms: outcome === "LOSS" ? 0 : Math.max(1, d.player.ms - cost),
-      ec: Math.min(Player.maxMs, d.player.ec + (outcome === "FLED" ? 10 : 30)),
-      rounds: outcome === "FLED" ? 1 : boss ? 8 : 4,
-      rewards: []
-    };
-    applyEncounterResult(Player, result);      /* 13.1 — MS/EC persist, statuses clear */
-    const resume = this._resume;
-    this.open = false; this.kind = null; this.enemy = null;
-    this._resume = null;
-    syncEncounterHud();
-    Player.save();
-    if(resume) resume(outcome, result);
-    dirty = true;
-  }
+  /* LOSING A FIGHT IS NOT LOSING THE RIDE.
+
+     A loss used to zero MS outright, which made every defeat the end of the
+     run. It costs a lot of Mental Stamina instead, and the RUN ends only when
+     that reaches zero — so a bad fight early on is something you carry, and
+     the decision to keep going with it is the wager the Traveler's Dilemma is
+     asking about. `WIPED` is the debug button that forces the zero, because
+     otherwise the one outcome that ends a run is the one nobody can test. */
 };
 
 /* Losing on the track is losing the run, exactly as losing to the boss is.
@@ -94,20 +133,34 @@ function encounterOnTrack(enemy){
      a "previous phase" that was itself ENCOUNTER. The ride simply stopped. */
   if(Encounter.open) return false;
   const back = {phase: J.phase, f: J.f};
-  const opened = Encounter.start("TRACK", enemy, outcome => {
-    if(outcome === "LOSS"){ loseRun(); return; }
-    J.phase = back.phase; J.f = back.f;
+  const opened = Encounter.start("TRACK", enemy, () => {
+    /* THE OUTCOME DOES NOT DECIDE THIS, THE STAMINA DOES. Win, lose or flee,
+       the ride resumes — unless there is nothing left to ride with. */
+    if(Player.ms <= 0){ loseRun(); return; }
+    J.phase = back.phase;
+    /* YOU COME BACK TO A TRAIN ALREADY MOVING. `J.f` drives the acceleration
+       ramp, so restoring it exactly would put a fight in the first two seconds
+       of a ride back at a crawl — the player would watch the train pull away a
+       second time, having just won something. Never below line speed; a fight
+       later in the ride keeps its own position. */
+    J.f = Math.max(back.f, RIDE_RAMP);
     syncHud(); dirty = true;
   });
   if(!opened) return false;
-  J.phase = "ENCOUNTER"; syncHud(); dirty = true;
+  /* `start()` has already put the game into the colour flood; `launch()` takes
+     it from there once the colour has finished coming in. */
   return true;
 }
 function encounterBoss(){
-  /* A boss cannot be refused: if a track fight is somehow still open when the
-     platform arrives, close it first rather than silently skipping the boss. */
-  if(Encounter.open) Encounter.choose("FLED");
+  /* A boss cannot be refused — but nor can it barge in on a fight that is
+     still running. One encounter at a time; the platform waits. */
+  if(Encounter.open) return;
   Encounter.start("BOSS", {id: "STATION_BOSS", station: Run.dest}, outcome => {
-    if(outcome === "LOSS") loseRun(); else winRun();
+    /* Same rule, and one more case the rule does not cover on its own: being
+       beaten by the boss while still standing. The station is not taken, so it
+       is not a win — but the run is not lost either, so it resolves the way
+       stepping off early does, with the exit share rather than everything. */
+    if(Player.ms <= 0){ loseRun(); return; }
+    if(outcome === "WIN") winRun(); else exitRun();
   });
 }

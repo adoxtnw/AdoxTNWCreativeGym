@@ -6,9 +6,10 @@
    AVUI_COMBAT_GDD.md §13, which was written to be this interface. Keep the two in
    step — if a field changes here it changes there.
 
-   While the map is being built, `startEncounter()` returns a FIXTURE. That is the
-   point: the map never has to run the battle system to be worked on, and the battle
-   system never has to run the map. Neither can break the other. */
+   `startEncounter()` used to return a FIXTURE so the map could be built without
+   the battle system. It mounts the real thing now. The fixture and the debug
+   panel that showed its result are both gone: with a real fight to hand off to,
+   they were a second and drifting definition of what an encounter result is. */
 
 /* ---- §13.2 — what combat needs FROM the map ---- */
 /* `maxMs`, `layers` and `loadouts` are DERIVED FROM EQUIPMENT, not stored — the
@@ -38,7 +39,7 @@ function blankResult(d){
 }
 
 /* ---- §13.1 — applying a result back to the run ----
-   Overload and statuses clear at encounter end; MS and EC do not. Overflow is
+   Overload and statuses clear at encounter end; MS and EC do not. That is
    derived from MS and EC, so it persists implicitly — you can walk into the next
    encounter already over your ceiling, which is the point of the whole layer. */
 function applyEncounterResult(player, result){
@@ -49,17 +50,12 @@ function applyEncounterResult(player, result){
   return result;
 }
 
-/* ---- the stub ----
-   Replace with a real hand-off once there is a map to hand off FROM. Until then it
-   answers instantly with something plausible so map flow can be built and tested. */
-async function startEncounter(descriptor){
-  const d = descriptor;
-  const spent = Math.round(d.player.ms * 0.25);
-  return {
-    outcome : "WIN",
-    ms      : Math.max(1, d.player.ms - spent),
-    ec      : Math.min(d.player.maxMs, d.player.ec + 30),
-    rounds  : 4,
-    rewards : []
-  };
+/* ---- the hand-off, for real ----
+   This was a fixture returning a plausible answer instantly, so that the map
+   could be built without the battle system and neither could break the other.
+   There is a battle system to hand off TO now, and the shapes above did not
+   have to change to make that true — which was the point of writing them
+   first. */
+async function startEncounter(descriptor, unit){
+  return BattleFrame.open(descriptor, unit);
 }

@@ -28,30 +28,43 @@
      <!-- THE ONLY NON-MAP-ANCHORED ELEMENT ON THE MAP. Zoom lives on wheel,
           pinch and double-tap; the player's name and state are drawn on the
           canvas beside their marker, where they belong. -->
-     <button class="menubtn hudbtn" id="menuBtn">MENU</button>
+     <button class="menubtn hudbtn" id="menuBtn"></button>
+
+     <!-- WHAT CITY THIS IS AND WHAT IS HAPPENING TO IT. Where you are is drawn
+          on the canvas by the marker; this is the other half — WHEN you are,
+          and what the city is doing about it. -->
+     <div class="citybar" id="cityBar"></div>
+
+     <!-- the same bubble the battle system explains an ability with -->
+     <div class="tipveil" id="tipVeil"></div>
+     <div class="tip pxr" id="tip"></div>
      <div class="menu" id="menu"></div>
 
      <!-- the only controls that exist while the train is running -->
-     <button class="endbtn hudbtn" id="endRide">END</button>
-     <button class="bagbtn hudbtn" id="bagBtn">BAGGAGE</button>
+     <button class="endbtn bigbtn pxr hudbtn" id="endRide">END</button>
+     <button class="bagbtn bigbtn pxr hudbtn" id="bagBtn">BAGGAGE</button>
      <div class="baggage" id="baggage"></div>
 
      <!-- GDD 4: where this leg is going and how much of it is bridged -->
      <div class="routehead" id="routeHead"></div>
 
      <!-- GDD 5: the Traveler's Dilemma, at every intermediate platform -->
-     <div class="dilemma" id="dilemma"></div>
+     <div class="dilemma framed" id="dilemma"></div>
 
      <!-- station inspection, and where a destination is chosen -->
-     <div class="peek" id="peek"></div>
-
-     <!-- DEBUG ONLY. The battle system is not connected. -->
-     <div class="encounter" id="encounter"></div>
+     <div class="peek framed" id="peek"></div>
 
      <!-- first boot: name, affinities, and the save file that is the only
           copy of a run that survives a phone clearing its storage -->
      <div class="create" id="create"></div>
    </div>
+
+   <!-- THE BATTLE SYSTEM, WHEN THERE IS ONE. Mounted only for the length of a
+        fight and torn down after, so it is not sitting behind the map keeping
+        its own clock and audio graph alive for the rest of the session. The
+        curtain opens onto it; the flash covers its removal. -->
+   <canvas id="battleWipe"></canvas>
+   <div id="battleFlash"></div>
 
    <!-- ONE file input for the whole app. Hidden; creation and the SAVE tab
         both click it. A drop target would be useless on a phone. -->
@@ -81,12 +94,12 @@
      elements-> what spawns around the train, and the Emotional Trip bar
      run     -> the multi-leg trip and the vault it is wagering
      bridge  -> the 13 contract with combat
-     encounter-> the DEBUG stand-in for a battle. The only file that mentions one
+     encounter-> hands a fight to the battle system, mounted in a frame
      vault   -> saves: the file, the code, snapshots, and the seam for cloud
      peek    -> the station panel
      menu    -> the pause menu: profile, loadout, inventory, save
      create  -> first boot: name, affinities, and the save file
-     hud     -> the DOM panels: stats, route header, dilemma, encounter
+     hud     -> the DOM panels: stats, route header, dilemma, baggage
      journey -> the ride's state machine, the player marker, the wipes
      mapview -> camera, rasteriser, input; boots on DOMContentLoaded
 
@@ -98,10 +111,14 @@
 <script src="src/font.js"></script>
 <script src="src/glyphs.js"></script>
 <script src="data.js"></script>
+<!-- gauge.js builds GAUGE and EC_RAMP at load out of RULES and
+     EMOTIONS, so it can only come after data.js -->
+<script src="src/gauge.js"></script>
 <script src="src/net.js"></script>
 <script src="src/states.js"></script>
 <script src="src/gear.js"></script>
 <script src="src/world.js"></script>
+<script src="src/city.js"></script>
 <script src="src/player.js"></script>
 <script src="src/vault.js"></script>
 <script src="src/route.js"></script>
@@ -110,6 +127,7 @@
 <script src="src/elements.js"></script>
 <script src="src/run.js"></script>
 <script src="src/battle-bridge.js"></script>
+<script src="src/handoff.js"></script>
 <script src="src/encounter.js"></script>
 <script src="src/peek.js"></script>
 <script src="src/menu.js"></script>

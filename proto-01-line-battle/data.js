@@ -8,7 +8,7 @@
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "day", "weather", "keys"]
+        "day", "weather", "keys", "drops"]
 };
 
 const DATA = {
@@ -59,9 +59,9 @@ FEAR,FEAR,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks 
 
 /* --- units ---
    layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
-units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.4,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI."`,
+units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave."`,
 
 /* --- dialogue ---
    what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one
@@ -307,6 +307,19 @@ segBase,5,"Track Segments to bridge a link, before diltransience and world state
 rollMinSecs,1,Fastest the track event roll can come round (navigation GDD 4: every 1-3s).,,,
 rollMaxSecs,3,Slowest the track event roll can come round. Enemy density moves it.,,,
 aggroLockSecs,5,Default countdown before an aggro enemy forces the encounter.,,,
+travelMaxLive,5,"How many elements may be out at once, ALL KINDS TOGETHER. No roll happens while the board is full, so it has to clear before anything new appears.",,,
+tripFillMs,520,How long the Emotional Trip bar takes to ease across to a newly collected segment.,,,
+tripFlashMs,260,How long the bar flashes white when a segment lands in it.,,,
+departSecs,3,How long the camera spends zooming into the departure station before the wipe opens.,,,
+leanEaseMs,520,"How long the map takes to tilt into, and back out of, the focused-station lean.",,,
+leanDeg,20,How far the map tilts when a destination is being considered.,,,
+camEaseMs,620,How long the camera takes to travel to a station the player has just picked.,,,
+orbMsPct,0.18,"How much of MaxMS one Stamina Orb gives back. Orbs only matter mid-ride, which is the only time MS moves.",,,
+encounterWashSecs,1.1,How long the travel screen floods with the enemy's colour before the wipe onto the fight.,,,
+battleWipeMs,820,The circular wipe that opens onto the battle.,,,
+battleFadeMs,620,The fade to white that unloads the battle and gives the ride back.,,,
+musicCutMs,120,The ultra-quick fade that kills the battle theme the moment an enemy falls.,,,
+enterWipeMs,1100,The circular wipe that opens the map when arriving from the title screen.,,,
 exitKeepPct,0.6,Crystals kept when EXITING at an intermediate platform.,,,
 defeatKeepPct,0.1,Crystals kept on defeat.,,,
 itemLossOnExit,0.4,Chance each unbanked item is lost when exiting early.,,,
@@ -366,6 +379,7 @@ ui_close,square,1180,520,110,0.2,0.22,MAP: a panel goes away.
 ui_page,square,760,1010,60,0.18,0.16,MAP: moving between tabs.
 ui_equip,square,640,1560,170,0.26,0.32,MAP: something is put on.
 ui_deny,sawtooth,340,180,150,0.24,0.2,"MAP: refused - not owned, no route, no key."
+map_tripup,sine,520,880,180,0.22,0.18,A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click.
 ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
 
 /* --- status_effects ---

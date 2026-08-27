@@ -298,6 +298,33 @@ body{background:var(--void); color:var(--ink);
 .over.win h1{color:var(--ok); text-shadow:1px 2px 0 var(--void),0 0 14px var(--ok)}
 .over.lose h1{color:var(--anger); text-shadow:1px 2px 0 var(--void),0 0 14px var(--anger)}
 
+/* ---- THE RESULTS PANEL ----
+   Same ground as `.over` — this IS the end-of-fight overlay, it just has
+   something to hand over. The rows wear the value tag's chip, because what
+   they are showing is a number the player earned, which is what that chip has
+   always meant here. `unsheath()` puts each one in place, so they arrive the
+   way the interface itself arrives. */
+.results{position:absolute; inset:0; z-index:40; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; padding:24px;
+  background:rgba(12,10,22,.94)}
+.results h1{font-size:20px; letter-spacing:.22em; color:var(--ok);
+  text-shadow:1px 2px 0 var(--void),0 0 14px var(--ok)}
+.rlines{display:flex; flex-direction:column; gap:9px; align-items:stretch;
+  width:min(300px,86%)}
+.rline{display:flex; align-items:center; gap:12px; padding:11px 14px;
+  font-size:15px; font-weight:900; color:#0c0a16;
+  background:linear-gradient(180deg,#ffffff,var(--ink) 60%,#c9c3b0);
+  box-shadow:var(--bevel), 4px 5px 0 rgba(6,4,14,.85)}
+.rline .rn{font-size:20px; min-width:44px; text-align:right}
+.rline .rk{font-size:12px; letter-spacing:.12em}
+/* an empty haul still gets a row: "nothing" is a result, and a gap where the
+   rewards should be reads as the panel having failed to draw them */
+.rline.empty{color:var(--line); background:none;
+  box-shadow:inset 0 0 0 2px var(--line); justify-content:center}
+.results .rgo{width:auto; padding:14px 26px; font-size:14px; letter-spacing:.16em}
+/* leaving is the map's fade to white, so this only has to stop being in the way */
+.results.going{opacity:0; transition:opacity .18s steps(3)}
+
 /* ---- rainbow charge: gradient is screen-wide, only visible where charge reaches ---- */
 /* one tile is half the screen and starts and ends on the same hue, and the
    animation shifts by exactly one tile — so the loop is seamless */
@@ -747,7 +774,12 @@ body{background:var(--void); color:var(--ink);
 /* ---------- opening sequence ---------- */
 /* the enemy speaks before the interface arrives, so the bubble must be exempt
    from the pre-intro blackout too */
-.screen.preintro > *:not(.intro):not(.flash):not(.stage):not(.title):not(.howto):not(.bubblewrap){opacity:0}
+/* THE PRE-INTRO BLACKOUT IS A WHITELIST, so anything that is meant to be seen
+   before the fight starts has to be named in it. `.firstrun` is one of those:
+   it appears while the title is still up, and without this it was built,
+   inserted and animated at opacity 0 — present in the DOM, correct in every
+   measurement, and invisible. */
+.screen.preintro > *:not(.intro):not(.flash):not(.stage):not(.title):not(.howto):not(.bubblewrap):not(.firstrun){opacity:0}
 .intro{position:absolute; inset:0; z-index:70; overflow:hidden; background:#000}
 .intro.clear{background:transparent}
 .introrail{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(135deg);
@@ -809,6 +841,14 @@ body{background:var(--void); color:var(--ink);
 .title{position:absolute; inset:0; z-index:90; background:#000; display:flex;
   align-items:center; justify-content:center; transition:opacity .5s ease}
 .title.gone{opacity:0; pointer-events:none}
+/* LEAVING FOR THE MAP is a slow fade of the CONTENT, not of the title itself.
+   `.title` is the black; fading the whole thing out would reveal the battle
+   screen sitting behind it for half a second, which is the one place the player
+   is not going. Fading only `.titlewrap` leaves plain black — which is exactly
+   what the map's wipe then opens out of, so the two halves of the transition
+   meet on the same colour across a page load. */
+.title.leaving{pointer-events:none}
+.title.leaving .titlewrap{opacity:0; transition:opacity .75s ease}
 /* The title screen has to FIT. Its content is taller than a short phone once the
    square logo is full-width, and because `.title` centres, the overflow pushed the
    mood line clean off the top of the screen — it was rendering perfectly, just
@@ -886,3 +926,100 @@ body{background:var(--void); color:var(--ink);
 .step .txt{display:flex; flex-direction:column; gap:1px; min-width:0}
 .step .k{font-size:18px; letter-spacing:.13em; color:var(--c)}
 .step .v{font-size:15px; letter-spacing:.01em; color:var(--ink); text-transform:none; line-height:1.3}
+
+/* =====================================================================
+   WHO IS RIDING — the one-time first-run screen
+   Over the title, under nothing. It is the only screen in the game that
+   asks the player a question about themselves, so it is the only one
+   built to be slow.
+   ===================================================================== */
+.firstrun{position:absolute; inset:0; z-index:95; display:flex;
+  align-items:center; justify-content:center; overflow:hidden;
+  background:#07060a; transition:opacity .28s ease}
+.firstrun.gone{opacity:0}
+/* THE MAP'S GROUND, brought to the door. Empty space needs texture or it reads
+   as a loading screen; the map answers that with a dot field, so this does too.
+   Its own layer, because the distortion belongs to the dots and not to the
+   words sitting on them — the map can swim its labels because they are drawn as
+   pixels, and these are real text. */
+.frgrid{position:absolute; inset:-8%; z-index:0; opacity:0;
+  background-image:radial-gradient(circle, #262231 1.5px, transparent 1.6px);
+  background-size:15px 15px;
+  filter:url(#gridWave)}
+.frgrid.in{opacity:1; transition:opacity var(--fr,700ms) ease}
+.frgrid.out{opacity:0; transition:opacity .3s ease}
+
+.frwrap{position:relative; z-index:1; width:min(430px,92%);
+  max-height:100%; overflow-y:auto; padding:22px 14px;
+  display:flex; flex-direction:column; align-items:stretch; gap:11px}
+
+/* every piece arrives the same way: up, and out of nothing */
+.frq,.frname,.frsub,.fremo,.frgo{opacity:0; transform:translateY(26px)}
+.frq.in,.frname.in,.frsub.in,.fremo.in,.frgo.in{
+  opacity:1; transform:none;
+  transition:opacity var(--fr,600ms) ease, transform var(--fr,600ms) cubic-bezier(.16,.78,.3,1)}
+.frq.out,.frname.out,.frsub.out,.fremo.out,.frgo.out{
+  opacity:0; transform:translateY(-16px); transition:opacity .28s ease, transform .28s ease}
+
+.frq{font-size:15px; letter-spacing:.24em; color:var(--ink); text-align:center;
+  text-shadow:2px 2px 0 #000}
+.frsub{font-size:11px; line-height:1.6; color:var(--line); text-align:center;
+  text-transform:none; letter-spacing:.02em; margin-bottom:2px}
+
+/* ---- the name ----
+   A button until it is asked to be a field: an empty text box sitting on the
+   screen is a form, and this is meant to read as a question. */
+.frname{--r1:3px; --r2:6px; padding:13px 14px; font:inherit; font-size:17px;
+  letter-spacing:.14em; color:var(--line); text-align:center; cursor:pointer;
+  background:linear-gradient(180deg,#1b1822,#111019 70%); border:0;
+  box-shadow:inset 0 0 0 3px #2b2740}
+.firstrun.named .frname{color:#fff; text-shadow:2px 2px 0 #000;
+  box-shadow:inset 0 0 0 3px #4a4468}
+.frinput{display:none; width:100%; padding:13px 14px; font:inherit; font-size:17px;
+  letter-spacing:.14em; text-transform:uppercase; text-align:center;
+  color:#fff; background:#111019; border:3px solid #4a4468; border-radius:0;
+  outline:none}
+.firstrun.naming .frname{display:none}
+.firstrun.naming .frinput{display:block}
+
+/* ---- the six ----
+   Name huge, symbol large beside it, the description small and dim: the size
+   ordering IS the reading order, so the eye takes the emotion first and the
+   explanation only if it wants it. */
+.fremos{display:flex; flex-direction:column; gap:9px; margin:2px 0 4px}
+.fremo{--r1:4px; --r2:8px; position:relative; display:flex; align-items:center;
+  gap:12px; width:100%; padding:13px 15px; font:inherit; text-align:left;
+  cursor:pointer; border:0;
+  background:linear-gradient(100deg,var(--emo),color-mix(in srgb,var(--emo) 62%,#000))}
+/* browsers without color-mix still get a solid card rather than nothing */
+@supports not (background:color-mix(in srgb,red 50%,#000)){
+  .fremo{background:var(--emo)}
+}
+.fretxt{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px}
+.frename{font-size:27px; line-height:1; letter-spacing:.08em; color:#fff;
+  text-shadow:3px 3px 0 #000}
+.fredesc{font-size:10px; line-height:1.45; letter-spacing:.02em;
+  text-transform:none; color:rgba(9,8,14,.62)}
+.fresym{flex:none; width:46px; height:46px; color:#fff;
+  filter:drop-shadow(2px 2px 0 rgba(0,0,0,.55))}
+.fresym svg{width:100%; height:100%}
+/* CHOSEN: a bright stroke that glows, and nothing else changes — the card must
+   not move or resize, or six of them shuffle every time one is picked. */
+.fremo.on{box-shadow:inset 0 0 0 4px #fffdf7,
+                     0 0 16px color-mix(in srgb,var(--emo) 70%,#fff),
+                     0 0 34px var(--emo);
+  animation:frpulse 1.5s steps(18) infinite alternate}
+@keyframes frpulse{from{filter:brightness(1)} to{filter:brightness(1.14)}}
+
+/* ---- the way on ---- */
+.frgo{--r1:4px; --r2:8px; margin-top:4px; padding:15px 12px; font:inherit;
+  font-size:15px; letter-spacing:.2em; color:#0c0a16; border:0; cursor:pointer;
+  background:linear-gradient(180deg,#fffdf7,var(--ink) 62%,#bdb6a6);
+  box-shadow:4px 5px 0 rgba(6,4,14,.85)}
+/* Disabled is DIM AND DEAD, not hidden: the button has to be visible from the
+   start so its condition ("choose at least one") is legible as a condition. */
+.frgo[disabled]{color:#5a5468; cursor:default;
+  background:linear-gradient(180deg,#26232f,#171520 70%);
+  box-shadow:inset 0 0 0 3px #322d42}
+.frgo:not([disabled]):active{transform:translate(2px,2px);
+  box-shadow:2px 3px 0 rgba(6,4,14,.85)}

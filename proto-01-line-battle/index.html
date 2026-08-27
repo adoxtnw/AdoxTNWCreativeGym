@@ -21,6 +21,16 @@
     <feDisplacementMap in="SourceGraphic" in2="n" scale="7"
                        xChannelSelector="R" yChannelSelector="G"/>
   </filter>
+  <!-- the map's swim, for the first-run screen's dot field. Slower and
+       shallower than the logo's: this one sits under text. -->
+  <filter id="gridWave" x="-4%" y="-4%" width="108%" height="108%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="2" seed="3" result="n">
+      <animate attributeName="baseFrequency" dur="26s" repeatCount="indefinite"
+               values="0.006 0.011; 0.011 0.006; 0.006 0.011"/>
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="9"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
 </defs></svg>
 <div class="title" id="title"><div class="titlewrap">
     <canvas class="moment" id="momentLine"></canvas>
@@ -34,7 +44,7 @@
     <div class="blurb">Who laughed, who cried, who was riding with a heartbreak
       besides someone with newfound illusion? What emotions were left behind&hellip;
       in Neuro Metro, AVUI</div>
-    <button class="confront pxr pxr-sh" id="confrontBtn">CONFRONT EMOTION</button>
+    <button class="confront pxr pxr-sh" id="confrontBtn">ENTER THE NEURO METRO</button>
     <button class="confront rest pxr pxr-sh" id="howtoBtn"
       style="margin-top:9px;background:linear-gradient(180deg,#b3a7d0,var(--apathy) 55%,#5d5378);color:var(--ink);animation:none">HOW TO PLAY</button>
     <div class="buildstamp" id="buildStamp"></div>
@@ -149,4 +159,8 @@
 <!-- flow -->
 <script src="src/battle.js"></script>
 <script src="src/screens.js"></script>
+<!-- the map's half of the conversation; inert without ?handoff=1 -->
+<script src="src/handoff.js"></script>
+<!-- the one-time "who is riding?" screen; inert once a save exists -->
+<script src="src/firstrun.js"></script>
 <script src="src/main.js"></script>

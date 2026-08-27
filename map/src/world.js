@@ -86,6 +86,12 @@ function stationAttrs(id){
   out.density       = out.threat;
   out.diltransience = num(s.diltransience, 1);
   activeBands().forEach(b => ATTRS.forEach(k => { out[k] *= num(b[k], 1); }));
+  /* AND WHAT THE CITY IS DOING TO THIS PARTICULAR PLACE. World bands apply to
+     everywhere at once — the hour, the weather. A city status applies to the
+     stations it landed on, which is why it multiplies here rather than in
+     activeBands(). Same product, one more term. */
+  ATTRS.forEach(k => { out[k] *= CityStatus.factor(id, k); });
+  out.density = out.threat * CityStatus.factor(id, "density");
   return out;
 }
 
