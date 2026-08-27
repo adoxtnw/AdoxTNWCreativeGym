@@ -776,7 +776,35 @@ a wrong-case path and names the right one:
   the real path : /MAP/index.html
 ```
 
-### Where the other app lives
+### Where the other app lives — and why the name is not trusted
+
+Every link between the two apps is built from one constant per app — `BATTLE_APP` in
+`MAP/src/util.js`, `MAP_APP` in `BATTLE SYSTEM/src/util.js`. **But the name is not asserted,
+it is confirmed.**
+
+A case-only rename is invisible to git on macOS (`core.ignorecase` defaults to true), so a
+folder committed once as `map` stays `map` in the repository however many times it is
+renamed on disk — and Pages serves what the repository says, on Linux, where case is not
+negotiable. The link then works on the machine that wrote it and 404s for everyone else.
+
+So at load each app probes the plausible spellings of its sibling — as configured, lower,
+upper, hyphenated, joined — and keeps the first that answers a `HEAD`. Verified against a
+copy of the deploy with **both folders lowercased and served case-strictly**: configured
+`MAP` resolved `../map/`, configured `BATTLE SYSTEM` resolved `../battle%20system/`, and a
+fight mounted and ran through it.
+
+`file://` cannot be probed (fetch refuses an opaque origin), so there the literal name is
+used — correct, because a local disk is the one place the name really is what it says.
+
+**This makes the deploy survivable, not correct.** The tidy fix is still to get the
+repository agreeing with the disk:
+
+```bash
+git config core.ignorecase false
+git mv MAP map-tmp && git mv map-tmp MAP        # forces the rename to be recorded
+```
+
+
 
 Every link between the two is built from **one constant per app** — `BATTLE_APP` in
 `MAP/src/util.js`, `MAP_APP` in `BATTLE SYSTEM/src/util.js`. Renaming a folder is one line,

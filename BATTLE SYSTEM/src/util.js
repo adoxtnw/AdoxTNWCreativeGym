@@ -38,19 +38,45 @@ const emoName=id=>id&&EMOTIONS[id]?EMOTIONS[id].name.toUpperCase():"NEUTRAL";
 
 /* ---- WHERE THE OTHER APP LIVES -------------------------------------------
    The two prototypes are sibling folders, and every link between them is built
-   from this ONE name. It is here, and only here, because the folder is called
-   different things in different places: on this disk it is "MAP", and a
-   deployment is free to call it anything at all.
+   here. `MAP_APP` is what the folder is called on this disk.
 
-   RENAMING THE FOLDER MEANS EDITING THIS LINE — and nothing else.
+   BUT THE NAME IS NOT TRUSTED, because it does not survive the trip. A case-only
+   rename is invisible to git on macOS (`core.ignorecase` is true by default), so
+   a folder committed once as `map` stays `map` in the repository however
+   many times it is renamed locally — and GitHub Pages serves what the repository
+   says, on Linux, where case is not negotiable. The result is a link that works
+   on the machine that wrote it and 404s for everyone else.
 
-   CASE MATTERS EVERYWHERE BUT A MAC. macOS filesystems are case-INSENSITIVE by
-   default, so `../map/` resolves happily here and 404s the moment
-   it is served from Linux, which is what GitHub Pages runs. The value below
-   must match the folder's real spelling exactly, capital for capital.
+   So instead of asserting the name, we ASK. `mapURLReady` probes the plausible
+   spellings once at load and keeps the first that answers, so a deploy that
+   renamed, lowercased or uppercased the folder still resolves. A HEAD request
+   costs nothing and happens long before anyone taps anything.
 
-   The space is encoded on use rather than written in: a raw space in a URL is
-   tolerated by most browsers and by no strict server. */
+   file:// cannot be probed — fetch refuses an opaque origin — so there the
+   literal name is used, which is correct, because a local disk is the one place
+   the name really is what it says. */
 const MAP_APP = "MAP";
-const mapURL = (page, query) =>
-  "../" + encodeURIComponent(MAP_APP) + "/" + page + (query || "");
+const mapURLCandidates = [MAP_APP, MAP_APP.toLowerCase(), MAP_APP.toUpperCase(),
+                          MAP_APP.toLowerCase().replace(/ /g, "-"),
+                          MAP_APP.toLowerCase().replace(/ /g, "")];
+let mapURLBase = "../" + encodeURIComponent(MAP_APP) + "/";
+const mapURLReady = (function(){
+  const dedup = mapURLCandidates.filter((v, i, a) => a.indexOf(v) === i);
+  if(location.protocol === "file:" || !window.fetch) return Promise.resolve(mapURLBase);
+  return (async () => {
+    for(const name of dedup){
+      const base = "../" + encodeURIComponent(name) + "/";
+      try{
+        const res = await fetch(base + "index.html", {method: "HEAD"});
+        if(res && res.ok){ mapURLBase = base; return base; }
+      }catch(e){ /* try the next spelling */ }
+    }
+    /* None answered. Keep the literal: a wrong link that can be read in the
+       address bar beats a silent refusal to navigate at all. */
+    console.warn("could not find the MAP folder under any spelling; using " + mapURLBase);
+    return mapURLBase;
+  })();
+})();
+/* Await this when you are about to NAVIGATE or mount; read `mapURLBase` when you
+   only need something to show. */
+const mapURL = (page, query) => mapURLBase + page + (query || "");

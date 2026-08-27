@@ -31,6 +31,10 @@ if(!Handoff.on){
     /* `?enter=1` tells the map it is being arrived AT rather than reloaded, so
        it opens with the same circular wipe this app uses — out of the same
        black this fade is ending on. */
+    /* the probe resolved at load; awaiting it is a formality unless the network
+       was slow, and it is the difference between navigating to the folder that
+       EXISTS and the one this disk happens to call it */
+    await mapURLReady;
     setTimeout(()=>{ location.href = mapURL("index.html", "?enter=1"); },780);
   },{once:true});
 }

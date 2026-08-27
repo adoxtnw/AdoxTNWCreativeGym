@@ -64,7 +64,9 @@ const BattleFrame = {
       /* `?handoff=1` is the whole switch. Without it the battle system boots as
          itself, title screen and all; with it, it waits to be told who is
          fighting whom. */
-      f.src = battleURL("index.html", "?handoff=1");
+      /* resolved at load; `.then` rather than `await` because `open()` is not
+         async and the frame is appended below either way */
+      battleURLReady.then(() => { f.src = battleURL("index.html", "?handoff=1"); });
       this.el = f;
       $("screen").appendChild(f);
 
