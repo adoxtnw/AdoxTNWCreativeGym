@@ -35,3 +35,22 @@ const R=(x,y)=>`<rect x="${x}" y="${y}" width="1" height="1"/>`;
 const hexRGB=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
 const emoHex=id=>id&&EMOTIONS[id]?EMOTIONS[id].hex:"#929fa5";
 const emoName=id=>id&&EMOTIONS[id]?EMOTIONS[id].name.toUpperCase():"NEUTRAL";
+
+/* ---- WHERE THE OTHER APP LIVES -------------------------------------------
+   The two prototypes are sibling folders, and every link between them is built
+   from this ONE name. It is here, and only here, because the folder is called
+   different things in different places: on this disk it is "MAP", and a
+   deployment is free to call it anything at all.
+
+   RENAMING THE FOLDER MEANS EDITING THIS LINE — and nothing else.
+
+   CASE MATTERS EVERYWHERE BUT A MAC. macOS filesystems are case-INSENSITIVE by
+   default, so `../map/` resolves happily here and 404s the moment
+   it is served from Linux, which is what GitHub Pages runs. The value below
+   must match the folder's real spelling exactly, capital for capital.
+
+   The space is encoded on use rather than written in: a raw space in a URL is
+   tolerated by most browsers and by no strict server. */
+const MAP_APP = "MAP";
+const mapURL = (page, query) =>
+  "../" + encodeURIComponent(MAP_APP) + "/" + page + (query || "");

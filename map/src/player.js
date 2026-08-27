@@ -149,7 +149,13 @@ const Player = {
 
   /* The hook character creation will test. Nothing calls it yet. */
   needsCreation(){
-    return !this.name || this.affinities.length < (RULES.affinitySlots || 2);
+    /* ONE AFFINITY IS ENOUGH — `affinitySlots` is the CEILING, not the floor.
+       Both screens that ask this question already said so ("Pick at least one
+       affinity", "One is enough. Two is heavier"), but this asked for the full
+       two: a player who deliberately took one was told they were finished by
+       the screen and then handed straight back to a creation screen by this.
+       A maximum read as a minimum. */
+    return !this.name || this.affinities.length < 1;
   },
   /* Debug: back to a playable, NAMED default without going through creation.
      `Vault.wipe()` is the one that sends you to the creation screen. */

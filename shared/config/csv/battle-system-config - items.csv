@@ -1,8 +1,3 @@
 PLACEHOLDERS. Item design is not written yet — these exist so the roll-and-lose machinery has something to roll. `weight` is relative drop likelihood.,,,,,,
 id,name,emotion,weight,cost,enabled,notes
 LIVE,LIVE,LIVE,LIVE,planned,LIVE,planned
-TOKEN_RUST,Rusted Token,ANGER,30,,1,PLACEHOLDER — item design is not written yet.
-TICKET_TORN,Torn Ticket,SADNESS,30,,1,PLACEHOLDER
-CHARM_BENT,Bent Charm,JOY,20,,1,PLACEHOLDER
-LENS_CRACKED,Cracked Lens,FEAR,12,,1,PLACEHOLDER
-KEYRING_LOST,Lost Keyring,SURPRISE,8,,1,PLACEHOLDER

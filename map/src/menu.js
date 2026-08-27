@@ -370,7 +370,7 @@ const Menu = {
       try{ Player.save(); }catch(e){}
       /* No confirm dialog even mid-run: the section above says plainly what
          leaving costs, and a run is not a thing worth trapping someone in. */
-      location.href = "../BATTLE SYSTEM/index.html";
+      location.href = battleURL("index.html");
     });
 
     /* ---- saves ---- */

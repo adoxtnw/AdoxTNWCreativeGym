@@ -269,9 +269,23 @@ function barcelonaNow(){
 /* A band may wrap past midnight (22 -> 5), so the test is not a plain range. */
 const inBand = (h, a, b) => a <= b ? (h >= a && h < b) : (h >= a || h < b);
 
+/* `day` IS A LIST COLUMN, so it arrives already split — `["*"]`, not `"*"`.
+   It became one when the map's `world_bands` needed it, and SCHEMA.list is
+   keyed by column NAME across every sheet rather than per sheet, so retyping it
+   for one table retyped it here too. Nothing threw: the string comparison
+   simply never matched again, every hour fell through to the bare
+   "Barcelona, Thursday." and the twenty-eight written lines stopped appearing.
+
+   Read as a list, and tolerate a string, so it survives the column being
+   retyped in either direction. */
+function momentDayOK(m, day){
+  const d = Array.isArray(m.day) ? m.day
+          : String(m.day == null ? "" : m.day).split(/[|,]/).map(x => x.trim());
+  return !d.length || d.indexOf("*") >= 0 || d.indexOf(day) >= 0;
+}
 function pickMoment(now){
   const hits = MOMENTS.filter(m => inBand(now.hour, m.from_hour, m.to_hour)
-                               && (m.day === "*" || m.day === now.day));
+                               && momentDayOK(m, now.day));
   if(!hits.length) return null;
   const top = Math.max(...hits.map(m => m.priority || 0));   // a day-specific line wins
   const best = hits.filter(m => (m.priority || 0) === top);

@@ -69,6 +69,20 @@ two of them fired.
 *actually* sounding; a track left paused by a fade that was immediately re-requested would
 otherwise satisfy `cur === want` while the game sat in dead air.
 
+### A case-insensitive filesystem hides a case-sensitive deploy
+
+macOS compares filenames without case; Linux does not, and GitHub Pages is Linux. So a
+wrong-case URL is served happily on the machine it was written on and 404s the moment it is
+uploaded — which is exactly how a lowercase `map/` gets into a link and survives long enough
+that nobody remembers writing it.
+
+The dev server now refuses a path whose case does not match the real file and names the
+correct spelling. It is the only place that asymmetry can be caught cheaply: the alternative
+is finding out from a deployed 404, with no clue which of a hundred references is wrong.
+
+The same reasoning gave each app ONE constant naming the other's folder. Three hardcoded
+copies of a name is three places for a rename to be half-applied.
+
 ### file:// is not a lesser http, it is a different origin model
 
 Every `file://` document has an **opaque** origin. Two things follow that no amount of code
@@ -121,6 +135,26 @@ That is the right way round: a whitelist fails safe (a stray element stays dark)
 blacklist would fail open (a stray element flashes over the intro). The cost is that
 anything genuinely meant to be seen early has to be named, and the only symptom of
 forgetting is a screen that does not appear.
+
+### SCHEMA.list is keyed by column NAME, not by sheet
+
+`day` was made a list column so the map's `world_bands` could hold `MON|TUE|WED`. That
+retyped **every** `day` column in **every** sheet, in both apps — including the battle
+system's `moments`, whose matcher compared it as a string:
+
+```js
+m.day === "*" || m.day === now.day        // an array is never equal to either
+```
+
+Nothing threw. The comparison simply stopped matching, every hour fell through to the bare
+"Barcelona, Thursday.", and twenty-eight written lines quietly stopped appearing. The
+failure was in one app, caused by a change made for the other, in a file neither of them
+owns.
+
+Two rules follow. Adding a name to `SCHEMA.list` is a change to **both apps** and needs a
+grep for that column across both. And any code reading a spreadsheet cell should tolerate
+either shape — the map does this with `listOf()`, and `momentDayOK()` is the same idea on
+the battle side.
 
 ### A sheet can ask for art that does not exist
 

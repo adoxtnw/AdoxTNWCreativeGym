@@ -38,6 +38,7 @@ CONST_FOR = {
  "items":          'const ITEMS     = byId(parseCSV(DATA.items).filter(r=>r.enabled));',
  "armor":          'const ARMOR     = byId(parseCSV(DATA.armor).filter(r=>r.enabled));',
  "world_bands":    'const WORLD_BANDS = parseCSV(DATA.world_bands).filter(r=>r.enabled);',
+ "city_status":    'const CITY_STATUS = parseCSV(DATA.city_status).filter(r=>r.enabled);',
 }
 
 DROP_COLUMNS = {"suggested_cost", "cost_delta"}
@@ -55,7 +56,7 @@ APP_TABLES = {
   # MAP's own sheets. More get added here as the map GDD defines them.
   "MAP":           ["emotions", "rules", "sounds", "units", "abilities", "loadouts",
                     "stations", "metro_lines", "travel_elements", "items", "armor",
-                    "world_bands"],
+                    "world_bands", "city_status"],
 }
 TABLES = APP_TABLES.get(os.path.basename(APP), APP_TABLES["BATTLE SYSTEM"])
 # Emitted in CONST_FOR's own order, not TABLES' — declaration order is part
@@ -77,10 +78,22 @@ HEADER_COMMENTS = {
  "travel_elements": "what can appear around the train during a ride. `chance` is rolled\n   per element every `travelRollSecs`; `max_on_screen` caps how many may exist at once\n   and `max_per_trip` how many one ride may ever produce. life_min/life_max are seconds.\n   `drift` is how fast it moves relative to the track — above 1 reads as nearer the\n   camera. Every one of these is a BASE, scaled by the target station's `spawn` column\n   and by any temporary modifier in play.",
  "armor": "Emotional Armor (progression GDD 3). `ms_mod` is added to the player's base\n   MaxMS; layer1/layer2 are the Emotional Layers it grants in battle \u2014 blank means the\n   armor grants none. One `passive` per piece, resolved by ArmorFx in MAP/src/gear.js.\n   `cost` and `trade_in` are for the store, which does not exist yet.",
  "items": "PLACEHOLDERS. Item design is not written yet; these exist so the roll-and-lose\n   machinery has something to roll. `weight` is relative drop likelihood.",
+ "city_status": "CITY-WIDE CONDITIONS. A status is a thing happening to Barcelona that\n   picks a SUBSET of stations on the lines it names and changes them: their attributes\n   multiply, and the map paints `fx` around them. `hours` holds one or more BARCELONA\n   local windows (7-10|17-20), to_hour exclusive, and a window may wrap past midnight.\n   `share` is the fraction of eligible stations affected \u2014 which ones is decided by a\n   hash of the station, the status and the current window, so every client picks the same\n   set and it holds still until the window ends. `emotions` drives the colours the effect\n   is drawn in; `blurb` is what the tag says when tapped.",
  "world_bands": "day / hour / weather -> multipliers on a station's live attributes. Every\n   MATCHING row multiplies, so BASE is the floor and the rest stack on it. Hours are\n   BARCELONA local and to_hour is exclusive; a band may wrap past midnight. `weather`\n   comes from WorldState (stubbed today, a real API later). Higher priority wins nothing\n   on its own \u2014 it only orders the rows for readability.",
  "metro_lines": "one row per line, `stations` in running order. Colour is not stored: it\n   comes from the emotion, so the map cannot drift out of step with battle.",
  "dialogue":  "what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one\n   persona at random from the rows matching the enemy's emotion.",
 }
+
+def js_literal(text):
+    """Make a CSV body safe inside a JS template literal.
+
+    THE SHEET IS PROSE. A notes column is written by a person, and a person
+    writing about a `column` reaches for a backtick — which closes the template
+    literal the CSV is embedded in and takes the whole of data.js down with a
+    syntax error a long way from the cause. `${` does the same, quietly, by
+    interpolating. Escaping here means the spreadsheet can contain any
+    punctuation at all, which is the only way a data file should behave."""
+    return text.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
 
 def find(folder, table):
     for p in glob.glob(os.path.join(folder, "*.csv")):
@@ -126,8 +139,8 @@ def main():
         p = find(folder, t)
         if not p:
             missing.append(t); continue
-        body = clean(p)
-        comment = HEADER_COMMENTS.get(t, "")
+        body = js_literal(clean(p))
+        comment = HEADER_COMMENTS.get(t, "").replace("*/", "*\u200b/")
         blocks.append(f"/* --- {t} ---\n   {comment}  */\n{t}: `{body}`")
     if missing:
         print("! no CSV found for:", ", ".join(missing))
@@ -145,7 +158,7 @@ def main():
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "day", "weather", "keys"]
+        "day", "weather", "keys", "drops"]
 };
 
 const DATA = {

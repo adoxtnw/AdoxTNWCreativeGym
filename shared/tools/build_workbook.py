@@ -229,24 +229,33 @@ sheet("matchups", MU_COLS, MU_LIVE, MUS,
 
 # ───────────────────────────── units ─────────────────────────────
 U_COLS = ["id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir",
-          "line_cap","max_bonus_slots","loadouts",
+          "line_cap","max_bonus_slots","loadouts","drops",
           "ai_profile","init","start_shield","max_layers_override","tags","enabled","notes"]
 U_LIVE = {"id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir","line_cap","max_bonus_slots","loadouts"}
 UNITS_ROWS = [
- dict(id="player", name="You", emotion="", max_ms=400, start_ec_pct=0.40,
+ dict(id="player", name="You", emotion="", max_ms=400, start_ec_pct=0.50,
       layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD", line_dir=1,
       line_cap=3, max_bonus_slots=6, loadouts="LO_ANGER|LO_SADNESS|LO_JOY",
+      drops="",
       ai_profile="", init=10, start_shield=0, max_layers_override="", tags="PLAYER", enabled=1, notes=""),
  dict(id="enemy", name="The Commuter", emotion="ANGER", max_ms=250, start_ec_pct=0.40,
       layers="ANGER|ANGER|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND", line_dir=-1,
       line_cap=3, max_bonus_slots=6, loadouts="",
+      drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
       ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0, max_layers_override="",
-      tags="ENEMY", enabled=1, notes="AI reads the matchups sheet, so retuning it retunes the AI."),
+      tags="ENEMY", enabled=1,
+      notes="AI reads the matchups sheet, so retuning it retunes the AI. `drops` is what "
+            "beating this one may leave."),
 ]
 sheet("units", U_COLS, U_LIVE, UNITS_ROWS,
   widths={"layers":26,"pool":40,"notes":42},
   notes=("One row per combatant. 'layers' is outermost-first and rotates as it takes hits. "
-         "'pool' is which abilities this unit may use. Add enemies by adding rows."))
+         "'pool' is which abilities this unit may use. Add enemies by adding rows. "
+         "`drops` is what BEATING this unit may leave, as kind:amount:chance - "
+         "CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40 means up to two crystals three quarters "
+         "of the time, up to three Track Segments just over half, and a Stamina Orb (which "
+         "gives back orbMsPct of MaxMS) two times in five. Each is rolled on its own, so an "
+         "enemy can leave everything, something, or nothing. Blank means nothing ever."))
 
 # ───────────────────────────── layer_types (reserved) ─────────────────────────────
 LT_COLS = ["id","emotion","display_name","durability","on_break_effect","on_break_value",
@@ -429,6 +438,20 @@ RULES = [
  ("rollMinSecs",1,"Fastest the track event roll can come round (navigation GDD 4: every 1-3s)."),
  ("rollMaxSecs",3,"Slowest the track event roll can come round. Enemy density moves it."),
  ("aggroLockSecs",5,"Default countdown before an aggro enemy forces the encounter."),
+ ("travelMaxLive",5,"How many elements may be out at once, ALL KINDS TOGETHER. No roll happens while the board is full, so it has to clear before anything new appears."),
+ ("tripFillMs",520,"How long the Emotional Trip bar takes to ease across to a newly collected segment."),
+ ("tripFlashMs",260,"How long the bar flashes white when a segment lands in it."),
+ ("departSecs",3,"How long the camera spends zooming into the departure station before the wipe opens."),
+ ("leanEaseMs",520,"How long the map takes to tilt into, and back out of, the focused-station lean."),
+ ("leanDeg",20,"How far the map tilts when a destination is being considered."),
+ ("camEaseMs",620,"How long the camera takes to travel to a station the player has just picked."),
+ # ---- MAP <-> BATTLE: the bridge ----
+ ("orbMsPct",0.18,"How much of MaxMS one Stamina Orb gives back. Orbs only matter mid-ride, which is the only time MS moves."),
+ ("encounterWashSecs",1.1,"How long the travel screen floods with the enemy's colour before the wipe onto the fight."),
+ ("battleWipeMs",820,"The circular wipe that opens onto the battle."),
+ ("battleFadeMs",620,"The fade to white that unloads the battle and gives the ride back."),
+ ("musicCutMs",120,"The ultra-quick fade that kills the battle theme the moment an enemy falls."),
+ ("enterWipeMs",1100,"The circular wipe that opens the map when arriving from the title screen."),
  # ---- MAP: the wager ----
  ("exitKeepPct",0.6,"Crystals kept when EXITING at an intermediate platform."),
  ("defeatKeepPct",0.1,"Crystals kept on defeat."),
@@ -497,6 +520,7 @@ SND = [
  ("ui_page","square",760,1010,60,0.18,0.16,"MAP: moving between tabs."),
  ("ui_equip","square",640,1560,170,0.26,0.32,"MAP: something is put on."),
  ("ui_deny","sawtooth",340,180,150,0.24,0.20,"MAP: refused - not owned, no route, no key."),
+ ("map_tripup","sine",520,880,180,0.22,0.18,"A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click."),
  ("ui_station","triangle",680,1180,140,0.24,0.34,"MAP: a station panel opens."),
 ]
 sheet("sounds", ["id","wave","f0","f1","dur","gain","echo","description"],
@@ -740,6 +764,32 @@ if TE_COLS:
                 "the target station's `spawn` column scales them, and so will weather and time "
                 "of day when those exist.")
 
+CS_COLS, CS_ROWS = _seed("city_status")
+if not CS_COLS:
+    CS_COLS = ["id","name","emotions","fx","lines","share","day","hours",
+               "density","aggro","fog","diltransience","blurb","enabled","notes"]
+    CS_ROWS = [dict(id="RUSH_HOUR", name="Rush Hour", emotions="DISGUST|ANGER", fx="RUSH",
+                    lines="L1|L2|L5", share=0.4, day="MON|TUE|WED|THU|FRI",
+                    hours="7-10|17-20", density=1.6, aggro=1.5, fog="", diltransience="",
+                    blurb="The platforms are packed. Far more of them are out on the "
+                          "affected stretches, and they are quicker to take an interest.",
+                    enabled=1,
+                    notes="The reference status, and the only one designed. Everything else "
+                          "waits on the design.")]
+sheet("city_status", CS_COLS,
+      {"id","name","emotions","fx","lines","share","hours","enabled"}, CS_ROWS,
+      widths={"id":16,"name":18,"emotions":20,"lines":16,"day":26,"hours":16,
+              "blurb":56,"notes":46},
+      notes="CITY-WIDE CONDITIONS. A status is something happening to Barcelona that picks a "
+            "SUBSET of the stations on the lines it names and changes them: their attributes "
+            "multiply by the columns here, and the map paints `fx` around them. `hours` holds "
+            "one or more Barcelona-local windows (7-10|17-20), to_hour exclusive, and a window "
+            "may wrap past midnight. `share` is the fraction of eligible stations affected - "
+            "WHICH ones comes from a hash of the station, the status and the current window, so "
+            "every client picks the same set and it holds still until the window ends. "
+            "`emotions` drives the colours the effect is drawn in (a mix reads as a mix); "
+            "`blurb` is what the tag says when it is tapped.")
+
 ML_COLS, ML_ROWS = _seed("metro_lines")
 if ML_COLS:
     sheet("metro_lines", ML_COLS, {"id","name","emotion","stations","enabled"}, ML_ROWS,
@@ -749,6 +799,6 @@ if ML_COLS:
 
 
 WB._sheets.sort(key=lambda s: ["README","emotions","abilities","loadouts","matchups","units","dialogue","prompts","moments",
-  "layer_types","status_effects","synergies","rules","sounds","stations","metro_lines","travel_elements","items","armor","world_bands","checks"].index(s.title))
+  "layer_types","status_effects","synergies","rules","sounds","stations","metro_lines","travel_elements","items","armor","world_bands","city_status","checks"].index(s.title))
 WB.save(book_path())
 print("saved")

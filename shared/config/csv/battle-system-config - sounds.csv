@@ -46,4 +46,5 @@ ui_close,square,1180,520,110,0.2,0.22,MAP: a panel goes away.
 ui_page,square,760,1010,60,0.18,0.16,MAP: moving between tabs.
 ui_equip,square,640,1560,170,0.26,0.32,MAP: something is put on.
 ui_deny,sawtooth,340,180,150,0.24,0.2,"MAP: refused - not owned, no route, no key."
+map_tripup,sine,520,880,180,0.22,0.18,A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click.
 ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.

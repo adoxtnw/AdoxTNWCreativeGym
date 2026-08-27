@@ -706,6 +706,11 @@ function bindInput(){
    starts whatever the phase says should be playing. Capture phase, so a handler
    that stops propagation cannot silence the interface. */
 function bindUiSound(){
+  /* THE SAME BROADENING THE BATTLE SIDE NEEDED. Safari does not treat every
+     gesture as an unlock, and which one counts is not worth being clever
+     about — these are listeners that do nothing once the music is running. */
+  ["touchstart", "click", "keydown"].forEach(t =>
+    document.addEventListener(t, () => Music.arm(), true));
   document.addEventListener("pointerdown", e => {
     Music.arm();
     const b = e.target.closest && e.target.closest("button");
@@ -872,6 +877,10 @@ function boot(){
   bindInput();
   bindSaveFile();
   tick();
+  /* THE MAP'S THEME STARTS ON ARRIVAL, not on the first tap. `syncHud()` above
+     has already decided what should be playing, so this only has to ask for
+     it; if the browser refuses, `apply()` disarms and the first touch retries. */
+  Music.tryNow();
   enterFromTitle();
   /* Nobody plays until they are someone — but they usually already are: the
      title screen asks first-timers on the way in, and this claims that answer

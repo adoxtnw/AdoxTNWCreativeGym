@@ -31,6 +31,6 @@ if(!Handoff.on){
     /* `?enter=1` tells the map it is being arrived AT rather than reloaded, so
        it opens with the same circular wipe this app uses — out of the same
        black this fade is ending on. */
-    setTimeout(()=>{ location.href="../map/index.html?enter=1"; },780);
+    setTimeout(()=>{ location.href = mapURL("index.html", "?enter=1"); },780);
   },{once:true});
 }

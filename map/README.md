@@ -752,14 +752,39 @@ run is not a thing worth trapping someone in.
 
 ### Running both locally
 
-The two apps are siblings under one root in production, so `../MAP/` and `../BATTLE SYSTEM/`
-resolve. One server per app cannot reach the other, so serve the **workspace**:
+`serve.sh` in **either** app now serves the WHOLE WORKSPACE, not just that app. It has to:
+the two prototypes link to each other as siblings (`../MAP/`, `../BATTLE SYSTEM/`), which is
+what they are in the upload — and a server rooted *inside* one app puts those paths above
+its own root, so every cross-app link 404s. The map cannot open a battle and the title
+screen cannot reach the map.
 
 ```bash
-python3 "AVUI/shared/tools/serve.py" --all 8180
+"AVUI/BATTLE SYSTEM/serve.sh"      # or MAP/serve.sh — same workspace, different port
 ```
 
-Then `http://localhost:8180/BATTLE%20SYSTEM/index.html` is the front door.
+Then start at `http://<ip>:<port>/BATTLE%20SYSTEM/index.html`.
+
+**The dev server is case-sensitive on purpose.** macOS filesystems are not, so
+`/map/index.html`, `/Map/Index.html` and `/battle%20system/…` all resolve here — and all
+404 on GitHub Pages, which is Linux. That asymmetry is how a stray lowercase gets into a
+link, a bookmark or a note and survives: nothing local ever objects. `serve.py` now refuses
+a wrong-case path and names the right one:
+
+```
+404 — wrong case.
+  you asked for : /map/index.html
+  the real path : /MAP/index.html
+```
+
+### Where the other app lives
+
+Every link between the two is built from **one constant per app** — `BATTLE_APP` in
+`MAP/src/util.js`, `MAP_APP` in `BATTLE SYSTEM/src/util.js`. Renaming a folder is one line,
+not a hunt through three files. Both go through a helper that encodes the name, so
+`BATTLE SYSTEM` emits `../BATTLE%20SYSTEM/…` rather than a raw space, which a strict server
+is entitled to reject.
+
+
 
 The debug "battle occurred" panel is **gone**. It existed so map flow could be built with no
 battle system to hand off to; with a real one, it was a second and drifting definition of

@@ -38,3 +38,22 @@ function copyText(text, after){
     ta.remove(); done(ok);
   }catch(e){ done(false); }
 }
+
+/* ---- WHERE THE OTHER APP LIVES -------------------------------------------
+   The two prototypes are sibling folders, and every link between them is built
+   from this ONE name. It is here, and only here, because the folder is called
+   different things in different places: on this disk it is "BATTLE SYSTEM", and a
+   deployment is free to call it anything at all.
+
+   RENAMING THE FOLDER MEANS EDITING THIS LINE — and nothing else.
+
+   CASE MATTERS EVERYWHERE BUT A MAC. macOS filesystems are case-INSENSITIVE by
+   default, so `../battle system/` resolves happily here and 404s the moment
+   it is served from Linux, which is what GitHub Pages runs. The value below
+   must match the folder's real spelling exactly, capital for capital.
+
+   The space is encoded on use rather than written in: a raw space in a URL is
+   tolerated by most browsers and by no strict server. */
+const BATTLE_APP = "BATTLE SYSTEM";
+const battleURL = (page, query) =>
+  "../" + encodeURIComponent(BATTLE_APP) + "/" + page + (query || "");

@@ -194,6 +194,22 @@ const Music = {
     this.armed = true;
     if(this.cur === this.want) this.cur = null;   /* force apply() to act */
     this.apply();
+  },
+  /* TRY WITHOUT WAITING TO BE TOUCHED.
+
+     Arriving from the title screen is a NAVIGATION, and a navigation carries no
+     user activation into the new document — so strictly this page has never
+     been interacted with. But Chrome's autoplay rule is per ORIGIN, not per
+     document: a domain the user has already clicked on is allowed to start
+     audio, and they have just pressed ENTER THE NEURO METRO on it. So the
+     honest thing is to ASK, and fall back gracefully when the answer is no.
+
+     `apply()` already disarms on a rejected `play()`, so a refusal here costs
+     nothing and the first touch tries again. */
+  tryNow(){
+    if(this.armed) return;
+    this.armed = true;
+    this.apply();
   }
 };
 
