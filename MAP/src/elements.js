@@ -56,6 +56,70 @@ function stationFactor(stationId, elementId){
 const chanceOf = e =>
   e.chance * stationFactor(J.to, e.id) * TravelMods.factor(e.id);
 
+/* ---- WHICH ENEMY THIS LINE PRODUCES --------------------------------------
+   An element row says an enemy may appear; it does not say WHO. That comes from
+   the units sheet, off each enemy's own `spawn_lines`:
+
+       L2:0.15|L5:0.15     an uncommon sight on either line
+       L1:1.0|*:0.6        at home on Line 1, and rides everywhere else
+
+   `*` is every line. It is not decoration — without it a line with no units of
+   its own would produce no enemies at all, and L3, L4 and L6 have none yet.
+
+   The weights are RELATIVE, drawn against each other exactly the way the element
+   roll draws its kinds: one enemy comes out, and a 0.15 next to a 1.0 is the
+   rare one. Nothing here decides how OFTEN an enemy appears at all — that is the
+   element row's `chance`. This only decides which one it is once the ride has
+   already decided to produce something.
+
+   THE ELEMENT ROW CAN STILL OVERRULE IT. A `unit` in travel_elements pins that
+   element to one enemy for ever, which is how a scripted encounter would be
+   built. Blank means roll, and both enemy rows are blank today. */
+const ENEMY_UNITS = Object.keys(UNITS).filter(id => {
+  const u = UNITS[id];
+  return u && u.enabled !== false && String(u.tags || "").toUpperCase() === "ENEMY";
+});
+function spawnWeight(unitId, lineId){
+  const spec = UNITS[unitId] && UNITS[unitId].spawn_lines;
+  if(!spec || !spec.length) return 0;
+  let w = 0;
+  for(let i = 0; i < spec.length; i++){
+    const bits = String(spec[i]).split(":");
+    const name = bits[0].trim().toUpperCase();
+    if(name !== "*" && name !== String(lineId).toUpperCase()) continue;
+    const v = parseFloat(bits[1]);
+    /* A NAMED LINE BEATS THE WILDCARD rather than adding to it. "L1:1.0|*:0.6"
+       has to mean "1.0 at home, 0.6 elsewhere", not 1.6 at home. */
+    if(name === "*"){ if(w === 0) w = isNaN(v) ? 1 : v; }
+    else return isNaN(v) ? 1 : v;
+  }
+  return w;
+}
+function pickEnemyUnit(lineId){
+  let total = 0;
+  const slices = [];
+  for(let i = 0; i < ENEMY_UNITS.length; i++){
+    const w = spawnWeight(ENEMY_UNITS[i], lineId);
+    if(w <= 0) continue;
+    total += w; slices.push({id: ENEMY_UNITS[i], upto: total});
+  }
+  /* A line nothing wants to appear on still has to produce something, or the
+     element that already rolled would spawn as nobody. */
+  if(!slices.length) return ENEMY_UNITS[0] || "enemy";
+  const r = Math.random() * total;
+  for(let i = 0; i < slices.length; i++) if(r < slices[i].upto) return slices[i].id;
+  return slices[slices.length - 1].id;
+}
+const isEnemyKind = kind => kind === "ENEMY_PASSIVE" || kind === "ENEMY_AGGRO";
+/* WEAK / REGULAR / STRONG, as a size on the ride. The element row's `size` is
+   still the baseline; a tier scales it, so retuning the element retunes all
+   three at once. */
+function tierSize(base, tier){
+  const k = tier === "WEAK"   ? num(RULES.rideScaleWeak, 0.72)
+          : tier === "STRONG" ? num(RULES.rideScaleStrong, 1.45) : 1;
+  return Math.max(4, Math.round(base * k));
+}
+
 /* ---- the ride's element state -------------------------------------------- */
 const Trip = {
   live: [],          /* every element currently in the world */
@@ -131,14 +195,25 @@ function rollElements(){
 }
 function spawnElement(id){
   const e = ELEMENTS[id];
-  const s = e.size;
   Trip.made[id] = (Trip.made[id] || 0) + 1;
+  /* An enemy is decided AT SPAWN, not when it is tapped: what it is has to be
+     visible while it is still floating past, because deciding whether to take
+     the fight is the whole of the interaction. */
+  const unit = isEnemyKind(e.kind) ? (e.unit || pickEnemyUnit(J.line && J.line.id)) : "";
+  const row  = unit ? UNITS[unit] : null;
+  const tier = (row && row.tier) || "REGULAR";
+  /* ITS OWN COLOUR, NOT THE LINE'S. Everything else on the ride is painted in
+     the line's emotion, which is what makes the line feel like a place. An enemy
+     is the one thing that is not OF the place, and reading its type off the
+     screen before you commit is the only warning there is. */
+  const col  = row && EMOTIONS[row.emotion] ? hexRGB(EMOTIONS[row.emotion].hex) : null;
+  const s = isEnemyKind(e.kind) ? tierSize(e.size, tier) : e.size;
   /* Something FLYING BY enters from the top of the frame. Something running
      PARALLEL is already alongside when you notice it, so it starts on screen —
      entering from the top and creeping would just read as a slow fly-by. */
   const parallel = e.motion === "PARALLEL";
   Trip.live.push({
-    id, e,
+    id, e, unit, tier, col, size: s,
     x: s + Math.random() * (W - s * 2),
     y: parallel ? H * (0.18 + Math.random() * 0.55) : -s,
     lock: num(e.lock_secs, 0) > 0 ? secsToMs(e.lock_secs) : 0,   /* ms */
@@ -150,6 +225,9 @@ function spawnElement(id){
        repeated sprite rather than as debris. Half turn one way, half the other. */
     rot: Math.random() * 6.283,
     rspin: (Math.random() < 0.5 ? -1 : 1) * (0.012 + Math.random() * 0.045),
+    /* which way an enemy's silhouette turns. Two on screen turning in lockstep
+       read as one sprite drawn twice. */
+    rspinDir: Math.random() < 0.5 ? -1 : 1,
     seed: Math.random(),
     sway: 0.4 + Math.random() * 0.9,
     state: "LIVE",
@@ -236,7 +314,7 @@ function stepElementsSmooth(dt){
       el.lock -= dt;
       if(el.lock <= 0){
         Trip.live.splice(i, 1);
-        encounterOnTrack({id: el.id, station: J.to});
+        encounterOnTrack({id: el.id, station: J.to, unit: el.unit});
         continue;
       }
     }
@@ -247,7 +325,7 @@ function stepElementsSmooth(dt){
        is a safety net for something that somehow stops moving, not a timer —
        a segment that dissolves mid-screen is one the player was still reaching
        for. Enemies do expire: floating away is what they are for. */
-    const off = el.y > H + el.e.size;
+    const off = el.y > H + el.size;
     const gone = collectable(el) ? off : (off || el.age >= el.life);
     if(gone) Trip.live.splice(i, 1);
   }
@@ -290,7 +368,7 @@ const elAlpha = el => {
    white. The distortion is the point, so it is deliberately overdriven. */
 ElementFx.define("SEGMENT", {
   draw(el, col){
-    const a = elAlpha(el), h = el.e.size / 2;
+    const a = elAlpha(el), h = el.size / 2;
     const t = frame * 0.75 + el.seed * 6.3;
     const beat = 0.5 + 0.5 * Math.sin(frame * 0.9 + el.seed * 6.3);
     /* LIT, not the raw line colour. A segment painted in the line's own hue
@@ -338,7 +416,7 @@ ElementFx.define("SEGMENT", {
    prism travels at sixty. */
 ElementFx.define("CRYSTAL", {
   draw(el, col){
-    const a = elAlpha(el), h = el.e.size / 2, w = h * 0.66;
+    const a = elAlpha(el), h = el.size / 2, w = h * 0.66;
     const ang = el.spin + frame * 0.26;
     const c = Math.cos(ang), sn = Math.sin(ang);
     /* THREE VALUES, NOT TWO. A prism only reads as a solid if the faces are
@@ -381,14 +459,47 @@ ElementFx.define("CRYSTAL", {
 });
 
 /* ENEMY_PASSIVE — floats past minding its own business. Tapping it picks the
-   fight; ignoring it costs nothing (GDD 4). */
-ElementFx.define("ENEMY_PASSIVE", {
-  draw(el, col){
-    const a = elAlpha(el), s = el.e.size, h = s / 2;
-    const t = frame * 0.3 + el.seed * 6.3;
-    const white = el.flash > 0;
-    const body = white ? [255, 255, 255] : mix(col, 0.55);
-    const rim  = white ? [255, 255, 255] : col;
+   fight; ignoring it costs nothing (GDD 4).
+
+   ITS TIER IS ITS SHAPE, and the same shape it will wear in the fight: a WEAK
+   one is a triangle, a STRONG one a seven-pointed star, an ordinary one the
+   round thing this has always been. That is the entire warning system. A tap
+   here commits you to a fight you cannot leave, so what you are about to take
+   on has to be readable while it is still drifting past — from its OUTLINE at a
+   glance, and from its COLOUR, which is its own emotion and not the line's.
+
+   All three are drawn the same way: one function of angle saying how far the
+   body reaches, and a scan of the bounding box asking each pixel whether it is
+   inside. Same idea as the battle system's rings, arrived at separately — the
+   two apps share the spreadsheet, never code.                                */
+const RIDE_TAU = Math.PI * 2;
+/* 1 at a vertex, less between: the shape inscribed in a circle of radius h. */
+function ridePolyF(a, n){
+  const seg = RIDE_TAU / n, m = ((a % seg) + seg) % seg - seg / 2;
+  return Math.cos(Math.PI / n) / Math.cos(m);
+}
+function rideStarF(a, n, inner){
+  const seg = RIDE_TAU / n, m = ((a % seg) + seg) % seg;
+  return inner + (1 - inner) * Math.abs(m / seg * 2 - 1);
+}
+/* `-PI/2` puts a point at twelve o'clock, because atan2 starts at three. */
+const RIDE_UP = -Math.PI / 2;
+function tierShapeF(tier, spin){
+  if(tier === "WEAK")   return a => ridePolyF(a - spin - RIDE_UP, 3);
+  if(tier === "STRONG") return a => rideStarF(a - spin - RIDE_UP,
+                                     Math.max(3, num(RULES.enemyStarPoints, 7)),
+                                     num(RULES.enemyStarInner, 0.62));
+  return null;                          /* REGULAR keeps the round body */
+}
+function drawEnemyBody(el, col){
+  const a = elAlpha(el), s = el.size, h = s / 2;
+  const t = frame * 0.3 + el.seed * 6.3;
+  const white = el.flash > 0;
+  const body = white ? [255, 255, 255] : mix(col, 0.55);
+  const rim  = white ? [255, 255, 255] : col;
+  const f = tierShapeF(el.tier, frame * num(RULES.enemyShapeSpin, 0.018) * el.rspinDir);
+  if(!f){
+    /* the original: a disc whose edge is pushed about row by row */
     for(let dy = -h; dy <= h; dy++){
       const k = dy / h;
       const half = h * Math.sqrt(Math.max(0, 1 - k * k)) + Math.sin(dy * 0.7 + t) * 1.4;
@@ -397,19 +508,43 @@ ElementFx.define("ENEMY_PASSIVE", {
         blendPx(el.x + dx, el.y + dy, edge > 0.78 ? rim : body, a * 0.95);
       }
     }
-    /* an eye, so it reads as something looking back */
-    const eye = white ? [40, 34, 30] : [244, 239, 228];
-    const ex = Math.round(Math.sin(t * 0.7) * 1.5);
-    blendPx(el.x + ex - 1, el.y - 1, eye, a);
-    blendPx(el.x + ex,     el.y - 1, eye, a);
-    blendPx(el.x + ex - 1, el.y,     eye, a);
-    blendPx(el.x + ex,     el.y,     eye, a);
-  },
+  }else{
+    /* A POLYGON HAS TO BREATHE TOO, or it reads as a printed icon sitting on the
+       window rather than as something out there with you. The same wobble the
+       round body has, applied to the reach instead of to the row width. */
+    const R = Math.ceil(h) + 2;
+    for(let dy = -R; dy <= R; dy++)
+      for(let dx = -R; dx <= R; dx++){
+        const p = Math.hypot(dx, dy); if(p > R) continue;
+        const ang = Math.atan2(dy, dx);
+        /* the wobble is a FRACTION of the body, not a fixed number of pixels: at a
+           weak enemy's size a flat 0.8px push is a sixth of its radius and eats
+           the points it is supposed to be animating */
+        const reach = h * f(ang) + Math.sin(ang * 3 + t) * Math.max(0.35, Math.min(1.1, h * 0.09));
+        if(p > reach) continue;
+        blendPx(el.x + dx, el.y + dy, p > reach * 0.72 ? rim : body, a * 0.95);
+      }
+  }
+  /* an eye, so it reads as something looking back. Every tier keeps it: the
+     silhouette says what KIND of thing it is, the eye says it is a thing. */
+  const eye = white ? [40, 34, 30] : [244, 239, 228];
+  const ex = Math.round(Math.sin(t * 0.7) * 1.5);
+  const ey = el.tier === "WEAK" ? 1 : el.tier === "STRONG" ? -1 : 0;   /* inside the shape, not on its edge */
+  blendPx(el.x + ex - 1, el.y - 1 + ey, eye, a);
+  blendPx(el.x + ex,     el.y - 1 + ey, eye, a);
+  blendPx(el.x + ex - 1, el.y     + ey, eye, a);
+  blendPx(el.x + ex,     el.y     + ey, eye, a);
+}
+ElementFx.define("ENEMY_PASSIVE", {
+  draw(el, col){ drawEnemyBody(el, el.col || col); },
   tap(el){
     if(el.state !== "LIVE") return false;
     el.flash = 4; el.state = "SPENT";
     dropElement(el);
-    encounterOnTrack({id: el.id, station: J.to});
+    /* WHICH enemy travels with the encounter. Without it the fight would look up
+       the element row instead and every ride would be the same opponent, which
+       is what this whole pass exists to stop. */
+    encounterOnTrack({id: el.id, station: J.to, unit: el.unit});
     return true;
   }
 });
@@ -420,7 +555,8 @@ ElementFx.define("ENEMY_PASSIVE", {
 ElementFx.define("ENEMY_AGGRO", Object.assign({}, ElementFx.of("ENEMY_PASSIVE"), {
   draw(el, col){
     ElementFx.of("ENEMY_PASSIVE").draw(el, col);
-    const a = elAlpha(el), r = el.e.size / 2 + 3;
+    col = el.col || col;
+    const a = elAlpha(el), r = el.size / 2 + 3;
     const total = secsToMs(num(el.e.lock_secs, 5));   /* the lock is in ms now */
     const left = Math.max(0, el.lock) / total;
     /* the ring closes as the countdown runs out */
@@ -439,7 +575,7 @@ function dropElement(el){
 }
 
 ElementFx.define("_default", {
-  draw(el, col){ const a = elAlpha(el); disc(el.x | 0, el.y | 0, el.e.size >> 1, packRGB(col)); },
+  draw(el, col){ const a = elAlpha(el); disc(el.x | 0, el.y | 0, el.size >> 1, packRGB(col)); },
   tap(){ return false; }
 });
 
@@ -463,7 +599,7 @@ function tapElement(px, py){
   for(let i = 0; i < Trip.live.length; i++){
     const el = Trip.live[i];
     if(el.state !== "LIVE") continue;
-    const reach = Math.max(R, el.e.size * 1.35);
+    const reach = Math.max(R, el.size * 1.35);
     const d = Math.hypot(el.x - px, el.y - py);
     if(d < reach && d < bestD){ bestD = d; best = el; }
   }

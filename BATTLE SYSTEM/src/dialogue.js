@@ -6,9 +6,30 @@
 
 
 /* ================= ENEMY DIALOGUE ================= */
+/* WHO THIS ENEMY IS TODAY.
+
+   A persona is picked at random from the rows matching the enemy's emotion, so
+   the same units row is a different person every time you meet it — that is
+   where the enemy's NAME comes from, and all four of its lines.
+
+   TIER NARROWS IT. Without that, The Enforcer would speak The Commuter's lines,
+   because both are Anger — and an enemy twice the size sounding exactly like the
+   ordinary one throws away the only thing the fight had said so far. So:
+
+     rows for this emotion carrying this TIER   ->   use those
+     none                                       ->   the rows with a BLANK tier
+
+   Blank means ANY tier, not "no tier": the thirty imported personas stay
+   available to everyone, and a WEAK or STRONG enemy speaks only in its own
+   voice. Falling back rather than failing means a new tier can be added to the
+   units sheet and still have someone to speak as. */
 function pickPersona(u){
-  const rows=DIALOGUE.filter(d=>d.emotion===u.emotion && d.enabled!==false && d.line);
-  if(!rows.length) return null;
+  const all=DIALOGUE.filter(d=>d.emotion===u.emotion && d.enabled!==false && d.line);
+  if(!all.length) return null;
+  const tier=u.tier||"REGULAR";
+  let rows=all.filter(d=>(d.tier||"")===tier);
+  if(!rows.length) rows=all.filter(d=>!d.tier);
+  if(!rows.length) rows=all;
   const names=[...new Set(rows.map(d=>d.persona))];
   const name=names[Math.floor(Math.random()*names.length)];   // a different one each battle
   const lines={};

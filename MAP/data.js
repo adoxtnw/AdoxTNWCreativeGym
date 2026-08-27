@@ -8,7 +8,7 @@
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "day", "weather", "keys", "drops"]
+        "spawn_lines", "day", "weather", "keys", "drops"]
 };
 
 const DATA = {
@@ -44,6 +44,7 @@ lowHpTalkPct,0.2,Fraction of max MS below which the winning / losing lines fire.
 overloadSlotPer,0.25,Every this-much overflow (as a fraction of max MS) forces one more corrupted slot.,,,
 aiVarietyChance,0.22,Chance the AI takes a random affordable attack instead of its best one.,,,
 aiDebuffChance,0.5,Chance the AI spends a slot on a debuff the target is not already suffering.,,,
+aiGrowChance,0.45,"How often the enemy takes an ADDLAYER ability when one is worth a slot. Like the debuff branch, this exists because the AI scores on damage per slot and a layer deals none - without it Bristle, Bile and Good Vibes sit in the pool and are never once chosen.",,,
 aiChargeBias,0.55,Chance the AI prefers an ability with charge segments when it can afford one.,,,
 shuffleLayersEachRound,1,Re-order every unit's layer queue at the start of each round.,,,
 maxExtraSlots,6,Hard cap on extra slots of any kind a line may carry.,,,
@@ -114,7 +115,7 @@ ecScrollSpeed,0.0044,How fast the charge gradient drifts along the bar.,,,
 themeOpening,audio/theme-opening.wav,Theme part 1: plays once.,,,
 themeLoop,audio/theme-loop.wav,"Theme part 2: loops for ever, scheduled to start the instant part 1 ends.",,,
 musicFadeMs,900,How quickly the theme fades out when the battle ends.,,,
-musicVolume,0.3,Theme level. Lower this if the sound effects are getting buried.,,,
+musicVolume,1.6,"Theme level, and ABOVE 1 on purpose: this is a gain, not a percentage. The battle theme is mastered about 10 dB quieter than the map's two, so it needs lifting to sit level with them - measured busy RMS -20.1 dBFS against -9.2 and -10.6, all three now landing at -16.0. Its peak is -5.2 dBFS, so 1.6x leaves headroom and cannot clip. Lower this if the sound effects are getting buried.",,,
 sfxVolume,1.05,"Sound-effect level, mixed against musicVolume.",,,
 layerEase,0.16,How fast layers slide to their new slot. Higher = snappier.,,,
 layerWaveDelay,0.85,"Phase offset per slot, so breathing travels outward in waves.",,,
@@ -126,6 +127,19 @@ layerFlashMs,50,How long a struck layer flashes white before vanishing.,,,
 layerGapMs,18,Beat between the layer vanishing and it regrowing at the back.,,,
 layerRegrowMs,380,How long the regrow beat holds before resolution continues.,,,
 enemyRingBaseR,28,"Enemy: radius of the outermost ring, in logical canvas pixels.",,,
+enemyShapeWeak,TRIANGLE,Battle silhouette for a WEAK enemy: its layer rings are concentric TRIANGLES.,,,
+enemyShapeRegular,CIRCLE,"Battle silhouette for a REGULAR enemy. The original, and still the default for any tier the sheet does not name.",,,
+enemyShapeStrong,STAR,Battle silhouette for a STRONG enemy: concentric stars of enemyStarPoints points.,,,
+enemyStarPoints,7,Points on a STRONG enemy's star.,,,
+enemyStarInner,0.62,"A star's valley radius as a fraction of its point radius. LOWER = narrower, sharper points; HIGHER = a blunter, rounder star. Below about 0.45 the thin inner rings start breaking up at this canvas size.",,,
+enemyShapeFill,1.6,"Band thickness multiplier for a SHAPED enemy only (triangle or star), on top of layerFill. A shape squeezes every band's pixel thickness by how narrow it is at that angle, and at the default the thin inner rings fell under one pixel and broke into dashes. THERE IS A CEILING AS WELL AS A FLOOR: at 2.0 the gaps between bands drop under a pixel and the rings merge into one solid shape, which is a filled triangle rather than concentric ones. Circles are not affected.",,,
+enemyShapeBreathe,0.6,"How much of the usual ring breathing a SHAPED enemy does. Full amplitude closes the gap between two neighbouring bands, and with the thicker bands above that swallows one of them. Together with enemyShapeFill this is what keeps every ring continuous at every angle - see tools/check_rings.js.",,,
+enemyTriRound,0.72,"How far a WEAK enemy's triangle goes toward a TRUE triangle: 1 is sharp corners, 0 is a circle. It is not there to soften the look - a true triangle squeezes the thin inner rings under one pixel near the flat sides and they disappear.",,,
+enemyShapeSpin,0.018,Radians per frame a triangle or a star turns. A polygon that never moves reads as a logo; a slow turn reads as a creature. 0 stops it.,,,
+enemyRingScaleWeak,0.85,"Overall size of a WEAK enemy in battle, against a REGULAR one.",,,
+enemyRingScaleStrong,1.05,Overall size of a STRONG enemy in battle. Do not raise much: the canvas is 64px and the rings breathe outward past this.,,,
+rideScaleWeak,0.78,"How big a WEAK enemy is during a ride, against its element row's own size. Do not go much lower: below about nine pixels across, three points stop reading as a triangle and it is just a small blob.",,,
+rideScaleStrong,1.55,How big a STRONG enemy is during a ride. Size is the tier cue that survives being glanced at; the silhouette is the one that survives being looked at.,,,
 enemyRingSpacing,4.7,Enemy: radius step between one layer and the next in. baseR/spacing sets how many fit.,,,
 enemyRingBreathe,1.6,Enemy ring breathing amplitude.,,,
 playerRingBaseR,300,Player: radius of the outermost ring. Huge on purpose — a big circle reads as a nearly flat band.,,,
@@ -218,10 +232,17 @@ map_tripup,sine,520,880,180,0.22,0.18,A segment lands in the Emotional Trip bar.
 ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
 
 /* --- units ---
-   layers are outermost-first and rotate as they take hits. pool = usable abilities.  */
-units: `id,name,emotion,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave."`,
+   layers are outermost-first and rotate as they take hits. pool = usable abilities.
+   tier is WEAK|REGULAR|STRONG and decides the SILHOUETTE, not the stats. spawn_lines is
+   line:weight, `*` for every line - where the map may produce this enemy.  */
+units: `id,name,emotion,tier,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,spawn_lines,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,REGULAR,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,L1:1.0|*:0.6,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave. The \`*\` in spawn_lines is what stops L3, L4 and L6 being empty of enemies until they have units of their own — the Commuter rides every line, which is the joke and also the fallback."
+enemy_anger_strong,The Enforcer,ANGER,STRONG,330,0.5,ANGER|ANGER|ANGER|SADNESS,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE,-1,3,6,,L1:0.5,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Anger, turned up: one more layer than the Commuter and a third more stamina, and its pool is nearly all Anger, so an Anger-layered player is drinking most of it while anyone else is not."
+enemy_surprise,The Interruption,SURPRISE,REGULAR,240,0.4,SURPRISE|SURPRISE|ANGER,ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE,-1,3,6,,L2:1.0,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,L2's own. Slightly under the Commuter on stamina because STARTLE is worth more than it costs when it lands.
+enemy_surprise_strong,The Reversal,SURPRISE,STRONG,320,0.5,SURPRISE|SURPRISE|SURPRISE|JOY,ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE,-1,3,6,,L2:0.45,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that does NOT absorb Surprise, which is the counter to a player who came dressed for it."
+enemy_sadness_weak,The Straggler,SADNESS,WEAK,150,0.3,SADNESS|SADNESS,ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE,-1,2,4,,L2:0.15|L5:0.15,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME — the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon sight on both its lines. Raise the L5 cell to make it Line 5's regular."
+enemy_joy_weak,The Reveller,JOY,WEAK,150,0.3,JOY|JOY,ATK_JOY|GEN_JOY|DEFEND|RECHARGE,-1,2,4,,L2:0.15,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how it was asked for. Reads as Line 2 being where the wrong people end up. Add \`|L4:1.0\` to give Joy its own regular."`,
 
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
@@ -237,9 +258,13 @@ HVY_JOY,Mania,JOY,60,DAMAGE,130,3,1,SPARK,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"At
 RECHARGE,Recharge,,0,CHARGE,20,0,0,CHARGE,SELF,SINGLE,5,0,0,0,0,0,0,0,1,1,3,Buff. Trades your own {MS} for {EC}.,1,,,,0,0,,,,SELF,COMMON,,1,Gains 20 EC and costs 5 of your own MS — which also lowers your ceiling.
 GEN_DISGUST,Bile,DISGUST,15,ADDLAYER,1,0,0,ROT,SELF,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Defence. Grows a {LAYER} that *never regrows* once broken.,0,,,,0,0,,,,SELF,COMMON,,1,Grows one extra Disgust layer. Grown layers are TEMPORARY: once broken they never regrow.
 GEN_ANGER,Bristle,ANGER,15,ADDLAYER,1,0,0,ROT,SELF,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Defence. Grows a {LAYER} that *never regrows* once broken.,0,,,,0,0,,,,SELF,COMMON,,1,Grows one extra Anger layer. Grown layers are TEMPORARY: once broken they never regrow.
+GEN_JOY,Good Vibes,JOY,15,ADDLAYER,1,0,0,SPARK,SELF,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Defence. Grows a {LAYER} that *never regrows* once broken.,0,,,,0,0,,,,SELF,COMMON,,1,Grows one extra Joy layer. Grown layers are TEMPORARY: once broken they never regrow.
 ROT,Fester,DISGUST,25,DEBUFF,0,0,0,ROT,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target cannot regrow *2* {LAYERS} for *2 turns*.,0,,,NO_REGEN,0,2,,,,LOWEST_MS,COMMON,,1,For 2 turns the target cannot regrow 2 of its broken layers.
 INFLICT_SAD,Self-Harm,SADNESS,30,DEBUFF,0,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Status. Target attacks *itself* each round for *2 turns*.,0,,,SAD,0,2,,,,LOWEST_MS,COMMON,,1,"Each round end the target turns one of its own attacks on itself. NOTE: distinct from SELF_HARM, which is the Overload-forced station."
 BLIND,Blinded by Hate,ANGER,30,DEBUFF,0,0,0,EYE,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target *misses half* its attacks for *2 turns*.,0,,,BLINDED,0,2,,,,LOWEST_MS,COMMON,,1,ENEMY ability. The target misses half its attacks for 2 turns.
+ATK_SURPRISE,Sucker Punch,SURPRISE,20,DAMAGE,35,0,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,Attack. Cracks the outermost {LAYER}.,0,,,,0,0,,,,LOWEST_MS,COMMON,,1,
+HVY_SURPRISE,Whiplash,SURPRISE,45,DAMAGE,90,2,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Attack. *Charges* first, then hits for triple.",0,,,,0,0,,,,LOWEST_MS,COMMON,,1,
+STARTLE,Out of Nowhere,SURPRISE,25,DEBUFF,0,0,0,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target *misses a third* of its attacks for *2 turns*.,0,,,RATTLED,0,2,,,,LOWEST_MS,COMMON,,1,"Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it with a weaker basic economy rather than with a bigger bill."
 SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; costs you {MS}.,0,,,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
 FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; *heals* your opponent.,0,,,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
 
@@ -250,9 +275,9 @@ FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced 
 loadouts: `id,emotion,name,slot1,slot2,slot3,slot4,tier,ec_mod,passive,cost,trade_in,enabled,notes
 LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,0,,,,1,
 LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
-LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,,,1,0,,,,1,
+LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,GEN_JOY,,1,0,,,,1,
 LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
-LO_SURPRISE,SURPRISE,Surprise,,,,,1,0,,,,1,No Surprise abilities exist yet.
+LO_SURPRISE,SURPRISE,Surprise,ATK_SURPRISE,HVY_SURPRISE,STARTLE,,1,0,,,,1,
 LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.`,
 
 /* --- stations ---
@@ -395,8 +420,8 @@ L6,Línia 6,FEAR,CATALUNYA|PROVENCA|GRACIA|SANT_GERVASI|MUNTANER|LA_BONANOVA|LES
 travel_elements: `id,name,kind,motion,chance,max_on_screen,max_per_trip,life_min,life_max,size,drift,worth,payload,amount,lock_secs,unit,enabled,notes
 TRACK_SEGMENT,Track Segment,SEGMENT,FLYBY,0.55,5,0,6,9,11,1.15,1,NONE,0,0,,1,"Bridges the link. 0 in max_per_trip means UNLIMITED. Its life is longer than a crossing on purpose: a segment must stay tappable until it leaves the bottom, never fade out mid-screen."
 CRYSTAL_SHARD,Crystal Shard,CRYSTAL,FLYBY,0.10,2,0,6,9,12,1.0,0,CRYSTAL,1,0,,1,A rotating prism in the line's own colour. Rare on purpose.
-EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.14,2,4,5.0,15.0,13,0.45,0,NONE,0,0,enemy,1,Floats past. Tap to pick the fight; ignore it and it leaves.
-HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.06,1,2,8.0,14.0,14,0.3,0,NONE,0,5,enemy,1,Locks on. When the countdown runs out it forces the encounter.`,
+EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.14,2,4,5.0,15.0,13,0.45,0,NONE,0,0,,1,Floats past. Tap to pick the fight; ignore it and it leaves.
+HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.06,1,2,8.0,14.0,14,0.3,0,NONE,0,5,,1,Locks on. When the countdown runs out it forces the encounter.`,
 
 /* --- items ---
    PLACEHOLDERS. Item design is not written yet; these exist so the roll-and-lose

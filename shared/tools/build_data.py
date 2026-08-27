@@ -67,7 +67,7 @@ HEADER_COMMENTS = {
  "emotions":  "one row per emotion. `token` maps to the CSS palette variable.",
  "abilities": "kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless\n   (never matches a layer) · hits_layer = whether a hit rotates the target's queue.",
  "matchups":  "attack emotion x layer emotion. '*' is a wildcard, 'NONE' means the target has\n   no layers. Highest priority wins, so a specific pair always beats a wildcard.\n   Adding a synergy is adding a row.",
- "units":     "layers are outermost-first and rotate as they take hits. pool = usable abilities.",
+ "units":     "layers are outermost-first and rotate as they take hits. pool = usable abilities.\n   tier is WEAK|REGULAR|STRONG and decides the SILHOUETTE, not the stats. spawn_lines is\n   line:weight, `*` for every line - where the map may produce this enemy.",
  "rules":     "global tunables, read by name.",
  "sounds":    "synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.",
  "prompts":   "the cue above the attack line; one is drawn at random each turn.",
@@ -158,7 +158,7 @@ def main():
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "day", "weather", "keys", "drops"]
+        "spawn_lines", "day", "weather", "keys", "drops"]
 };
 
 const DATA = {

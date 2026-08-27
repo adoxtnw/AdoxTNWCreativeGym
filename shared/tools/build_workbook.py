@@ -174,6 +174,12 @@ ABILS = [
  ab(id="GEN_ANGER", blurb='Defence. Grows a {LAYER} that *never regrows* once broken.',   name="Bristle",emotion="ANGER",   cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="ROT",
     target="SELF", wild_target="SELF", uses=2,
     notes="Grows one extra Anger layer. Grown layers are TEMPORARY: once broken they never regrow."),
+ # Joy had exactly two abilities, both of them attacks, which left LO_JOY half
+ # empty and made "mostly its own type" impossible for a weak Joy enemy without
+ # handing it the hardest hit in the game. Same shape as Bristle and Bile.
+ ab(id="GEN_JOY", blurb='Defence. Grows a {LAYER} that *never regrows* once broken.', name="Good Vibes", emotion="JOY", cost=15, kind="ADDLAYER", power=1, hits_layer=0, icon="SPARK",
+    target="SELF", wild_target="SELF", uses=2,
+    notes="Grows one extra Joy layer. Grown layers are TEMPORARY: once broken they never regrow."),
  ab(id="ROT", blurb='Debuff. Target cannot regrow *2* {LAYERS} for *2 turns*.',         name="Fester",    emotion="DISGUST", cost=25, kind="DEBUFF",   power=0, hits_layer=0, icon="ROT",
     uses=2, status_apply="NO_REGEN", status_duration=2,
     notes="For 2 turns the target cannot regrow 2 of its broken layers."),
@@ -184,6 +190,16 @@ ABILS = [
  ab(id="BLIND", blurb='Debuff. Target *misses half* its attacks for *2 turns*.',       name="Blinded by Hate", emotion="ANGER", cost=30, kind="DEBUFF", power=0, hits_layer=0, icon="EYE",
     uses=2, status_apply="BLINDED", status_duration=2,
     notes="ENEMY ability. The target misses half its attacks for 2 turns."),
+ # SURPRISE had a Loadout and a metro line and no abilities at all, so a Surprise
+ # enemy could only fight with borrowed emotions. Same shape as the Anger and
+ # Sadness kits — a basic, a charged heavy and a debuff — so nothing about the
+ # costing or the shot counts is new; only the emotion is.
+ ab(id="ATK_SURPRISE", blurb='Attack. Cracks the outermost {LAYER}.', name="Sucker Punch", emotion="SURPRISE", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BURST"),
+ ab(uses=2, id="HVY_SURPRISE", blurb='Attack. *Charges* first, then hits for triple.', name="Whiplash", emotion="SURPRISE", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BURST"),
+ ab(id="STARTLE", blurb='Debuff. Target *misses a third* of its attacks for *2 turns*.', name="Out of Nowhere", emotion="SURPRISE", cost=25, kind="DEBUFF", power=0, hits_layer=0, icon="BURST",
+    uses=2, status_apply="RATTLED", status_duration=2,
+    notes="Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it "
+          "with a weaker basic economy rather than with a bigger bill."),
  ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Status. Forced by {OVERLOAD}; costs you {MS}.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
     target="SELF", wild_target="SELF", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed."),
@@ -228,34 +244,93 @@ sheet("matchups", MU_COLS, MU_LIVE, MUS,
          "immediately behaves differently — no code change."))
 
 # ───────────────────────────── units ─────────────────────────────
-U_COLS = ["id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir",
-          "line_cap","max_bonus_slots","loadouts","drops",
+U_COLS = ["id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","line_dir",
+          "line_cap","max_bonus_slots","loadouts","spawn_lines","drops",
           "ai_profile","init","start_shield","max_layers_override","tags","enabled","notes"]
-U_LIVE = {"id","name","emotion","max_ms","start_ec_pct","layers","pool","line_dir","line_cap","max_bonus_slots","loadouts"}
+U_LIVE = {"id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","line_dir","line_cap",
+          "max_bonus_slots","loadouts","spawn_lines","drops"}
+def en(**k):
+    """An enemy row. Everything an enemy shares with every other enemy is here, so a
+    new one is the handful of cells that actually make it that enemy."""
+    row = dict(tier="REGULAR", start_ec_pct=0.40, line_dir=-1, line_cap=3, max_bonus_slots=6,
+               loadouts="", ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0,
+               max_layers_override="", tags="ENEMY", enabled=1, notes="")
+    row.update(k); return row
 UNITS_ROWS = [
- dict(id="player", name="You", emotion="", max_ms=400, start_ec_pct=0.50,
+ dict(id="player", name="You", emotion="", tier="", spawn_lines="", max_ms=400, start_ec_pct=0.50,
       layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD", line_dir=1,
       line_cap=3, max_bonus_slots=6, loadouts="LO_ANGER|LO_SADNESS|LO_JOY",
       drops="",
       ai_profile="", init=10, start_shield=0, max_layers_override="", tags="PLAYER", enabled=1, notes=""),
- dict(id="enemy", name="The Commuter", emotion="ANGER", max_ms=250, start_ec_pct=0.40,
-      layers="ANGER|ANGER|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND", line_dir=-1,
-      line_cap=3, max_bonus_slots=6, loadouts="",
-      drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
-      ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0, max_layers_override="",
-      tags="ENEMY", enabled=1,
-      notes="AI reads the matchups sheet, so retuning it retunes the AI. `drops` is what "
-            "beating this one may leave."),
+ en(id="enemy", name="The Commuter", emotion="ANGER", tier="REGULAR", max_ms=250,
+    layers="ANGER|ANGER|SADNESS",
+    pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND",
+    spawn_lines="L1:1.0|*:0.6",
+    drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
+    notes="AI reads the matchups sheet, so retuning it retunes the AI. `drops` is what "
+          "beating this one may leave. The `*` in spawn_lines is what stops L3, L4 and L6 "
+          "being empty of enemies until they have units of their own — the Commuter rides "
+          "every line, which is the joke and also the fallback."),
+ en(id="enemy_anger_strong", name="The Enforcer", emotion="ANGER", tier="STRONG",
+    max_ms=330, start_ec_pct=0.50, line_cap=3,
+    layers="ANGER|ANGER|ANGER|SADNESS",
+    pool="ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE",
+    spawn_lines="L1:0.5",
+    drops="CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55",
+    notes="Anger, turned up: one more layer than the Commuter and a third more stamina, and "
+          "its pool is nearly all Anger, so an Anger-layered player is drinking most of it "
+          "while anyone else is not."),
+ en(id="enemy_surprise", name="The Interruption", emotion="SURPRISE", tier="REGULAR",
+    max_ms=240,
+    layers="SURPRISE|SURPRISE|ANGER",
+    pool="ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE",
+    spawn_lines="L2:1.0",
+    drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
+    notes="L2's own. Slightly under the Commuter on stamina because STARTLE is worth more "
+          "than it costs when it lands."),
+ en(id="enemy_surprise_strong", name="The Reversal", emotion="SURPRISE", tier="STRONG",
+    max_ms=320, start_ec_pct=0.50,
+    layers="SURPRISE|SURPRISE|SURPRISE|JOY",
+    pool="ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE",
+    spawn_lines="L2:0.45",
+    drops="CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55",
+    notes="Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that "
+          "does NOT absorb Surprise, which is the counter to a player who came dressed for it."),
+ en(id="enemy_sadness_weak", name="The Straggler", emotion="SADNESS", tier="WEAK",
+    max_ms=150, start_ec_pct=0.30, line_cap=2, max_bonus_slots=4,
+    layers="SADNESS|SADNESS",
+    pool="ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE",
+    spawn_lines="L2:0.15|L5:0.15",
+    drops="CRYSTAL:1:0.45|SEGMENT:2:0.40",
+    notes="No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and "
+          "INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME "
+          "— the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon "
+          "sight on both its lines. Raise the L5 cell to make it Line 5's regular."),
+ en(id="enemy_joy_weak", name="The Reveller", emotion="JOY", tier="WEAK",
+    max_ms=150, start_ec_pct=0.30, line_cap=2, max_bonus_slots=4,
+    layers="JOY|JOY",
+    pool="ATK_JOY|GEN_JOY|DEFEND|RECHARGE",
+    spawn_lines="L2:0.15",
+    drops="CRYSTAL:1:0.45|SEGMENT:2:0.40",
+    notes="L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how "
+          "it was asked for. Reads as Line 2 being where the wrong people end up. Add "
+          "`|L4:1.0` to give Joy its own regular."),
 ]
 sheet("units", U_COLS, U_LIVE, UNITS_ROWS,
-  widths={"layers":26,"pool":40,"notes":42},
+  widths={"layers":26,"pool":40,"spawn_lines":20,"notes":42},
   notes=("One row per combatant. 'layers' is outermost-first and rotates as it takes hits. "
          "'pool' is which abilities this unit may use. Add enemies by adding rows. "
          "`drops` is what BEATING this unit may leave, as kind:amount:chance - "
          "CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40 means up to two crystals three quarters "
          "of the time, up to three Track Segments just over half, and a Stamina Orb (which "
          "gives back orbMsPct of MaxMS) two times in five. Each is rolled on its own, so an "
-         "enemy can leave everything, something, or nothing. Blank means nothing ever."))
+         "enemy can leave everything, something, or nothing. Blank means nothing ever. "
+         "`tier` is WEAK / REGULAR / STRONG: it is not a stat, it is what the enemy LOOKS "
+         "like - a weak one is concentric triangles in battle and a small dart on the ride, "
+         "a strong one is a seven-pointed star and a large spined shape. "
+         "`spawn_lines` is where the map may produce it, as line:weight - L2:0.15|L5:0.15 "
+         "means an uncommon sight on either. `*` is every line, and is what keeps a line "
+         "with no units of its own from being empty."))
 
 # ───────────────────────────── layer_types (reserved) ─────────────────────────────
 LT_COLS = ["id","emotion","display_name","durability","on_break_effect","on_break_value",
@@ -295,6 +370,10 @@ SE_ROWS = [
  se(id="BLINDED",  name="Blinded", duration=2, icon="EYE", color="#e53859", miss_chance=0.5,
     blurb="{ANGER} has blotted out your aim. *Half* of your attacks miss outright.",
     notes="The victim fluffs this fraction of its attacks."),
+ se(id="RATTLED",  name="Rattled", duration=2, icon="BURST", color="#724082", miss_chance=0.35,
+    blurb="{SURPRISE} came from nowhere. *A third* of your attacks go wide.",
+    notes="Surprise's own miss status. missChance() takes the HIGHEST of everything on a "
+          "unit rather than summing, so Rattled and Blinded together are just Blinded."),
 ]
 sheet("status_effects", SE_COLS, SE_LIVE, SE_ROWS,
   widths={"notes":52},
@@ -339,6 +418,7 @@ RULES = [
  ("overloadSlotPer",0.25,"Every this-much overflow (as a fraction of max MS) forces one more corrupted slot."),
  ("aiVarietyChance",0.22,"Chance the AI takes a random affordable attack instead of its best one."),
  ("aiDebuffChance",0.5,"Chance the AI spends a slot on a debuff the target is not already suffering."),
+ ("aiGrowChance",0.45,"How often the enemy takes an ADDLAYER ability when one is worth a slot. Like the debuff branch, this exists because the AI scores on damage per slot and a layer deals none - without it Bristle, Bile and Good Vibes sit in the pool and are never once chosen."),
  ("aiChargeBias",0.55,"Chance the AI prefers an ability with charge segments when it can afford one."),
  ("shuffleLayersEachRound",1,"Re-order every unit's layer queue at the start of each round."),
  ("maxExtraSlots",6,"Hard cap on extra slots of any kind a line may carry."),
@@ -409,7 +489,7 @@ RULES = [
  ("themeOpening","audio/theme-opening.wav","Theme part 1: plays once."),
  ("themeLoop","audio/theme-loop.wav","Theme part 2: loops for ever, scheduled to start the instant part 1 ends."),
  ("musicFadeMs",900,"How quickly the theme fades out when the battle ends."),
- ("musicVolume",0.30,"Theme level. Lower this if the sound effects are getting buried."),
+ ("musicVolume",1.60,"Theme level, and ABOVE 1 on purpose: this is a gain, not a percentage. The battle theme is mastered about 10 dB quieter than the map's two, so it needs lifting to sit level with them - measured busy RMS -20.1 dBFS against -9.2 and -10.6, all three now landing at -16.0. Its peak is -5.2 dBFS, so 1.6x leaves headroom and cannot clip. Lower this if the sound effects are getting buried."),
  ("sfxVolume",1.05,"Sound-effect level, mixed against musicVolume."),
  ("layerEase",0.16,"How fast layers slide to their new slot. Higher = snappier."),
  ("layerWaveDelay",0.85,"Phase offset per slot, so breathing travels outward in waves."),
@@ -421,6 +501,20 @@ RULES = [
  ("layerGapMs",18,"Beat between the layer vanishing and it regrowing at the back."),
  ("layerRegrowMs",380,"How long the regrow beat holds before resolution continues."),
  ("enemyRingBaseR",28,"Enemy: radius of the outermost ring, in logical canvas pixels."),
+ # ---- what a TIER looks like. Nothing here is a stat; it is all silhouette. ----
+ ("enemyShapeWeak","TRIANGLE","Battle silhouette for a WEAK enemy: its layer rings are concentric TRIANGLES."),
+ ("enemyShapeRegular","CIRCLE","Battle silhouette for a REGULAR enemy. The original, and still the default for any tier the sheet does not name."),
+ ("enemyShapeStrong","STAR","Battle silhouette for a STRONG enemy: concentric stars of enemyStarPoints points."),
+ ("enemyStarPoints",7,"Points on a STRONG enemy's star."),
+ ("enemyStarInner",0.62,"A star's valley radius as a fraction of its point radius. LOWER = narrower, sharper points; HIGHER = a blunter, rounder star. Below about 0.45 the thin inner rings start breaking up at this canvas size."),
+ ("enemyShapeFill",1.6,"Band thickness multiplier for a SHAPED enemy only (triangle or star), on top of layerFill. A shape squeezes every band's pixel thickness by how narrow it is at that angle, and at the default the thin inner rings fell under one pixel and broke into dashes. THERE IS A CEILING AS WELL AS A FLOOR: at 2.0 the gaps between bands drop under a pixel and the rings merge into one solid shape, which is a filled triangle rather than concentric ones. Circles are not affected."),
+ ("enemyShapeBreathe",0.6,"How much of the usual ring breathing a SHAPED enemy does. Full amplitude closes the gap between two neighbouring bands, and with the thicker bands above that swallows one of them. Together with enemyShapeFill this is what keeps every ring continuous at every angle - see tools/check_rings.js."),
+ ("enemyTriRound",0.72,"How far a WEAK enemy's triangle goes toward a TRUE triangle: 1 is sharp corners, 0 is a circle. It is not there to soften the look - a true triangle squeezes the thin inner rings under one pixel near the flat sides and they disappear."),
+ ("enemyShapeSpin",0.018,"Radians per frame a triangle or a star turns. A polygon that never moves reads as a logo; a slow turn reads as a creature. 0 stops it."),
+ ("enemyRingScaleWeak",0.85,"Overall size of a WEAK enemy in battle, against a REGULAR one."),
+ ("enemyRingScaleStrong",1.05,"Overall size of a STRONG enemy in battle. Do not raise much: the canvas is 64px and the rings breathe outward past this."),
+ ("rideScaleWeak",0.78,"How big a WEAK enemy is during a ride, against its element row's own size. Do not go much lower: below about nine pixels across, three points stop reading as a triangle and it is just a small blob."),
+ ("rideScaleStrong",1.55,"How big a STRONG enemy is during a ride. Size is the tier cue that survives being glanced at; the silhouette is the one that survives being looked at."),
  ("enemyRingSpacing",4.7,"Enemy: radius step between one layer and the next in. baseR/spacing sets how many fit."),
  ("enemyRingBreathe",1.6,"Enemy ring breathing amplitude."),
  ("playerRingBaseR",300,"Player: radius of the outermost ring. Huge on purpose — a big circle reads as a nearly flat band."),
@@ -542,7 +636,92 @@ if os.path.exists(_dlg_src):
                          persona=r["Persona"].strip(),
                          state=r["State"].strip().upper(),
                          line=r["Dialogue Line"].strip(),
-                         enabled=1, notes=""))
+                         tier="", enabled=1, notes=""))
+
+# ---- TIER-SCOPED PERSONAS ---------------------------------------------------
+# An enemy picks a persona at random from the rows matching its EMOTION, which is
+# what makes the same fight different twice. That alone would have The Enforcer
+# speaking the Commuter's lines, though, since both are Anger — a strong enemy
+# has to sound like one. So a row may name a `tier`, and the rule is:
+#
+#     rows for this emotion AND this tier   ->   use those
+#     none                                  ->   fall back to the tier-blank rows
+#
+# The thirty imported rows stay blank and so stay available to everyone, and a
+# WEAK or STRONG enemy speaks only in its own voice. Blank is not "no tier", it
+# is "any tier".
+def dlg(emotion, persona, tier, intro, winning, losing, defeat):
+    states = [("INTRO", intro), ("WINNING", winning), ("LOSING", losing), ("DEFEAT", defeat)]
+    return [dict(emotion=emotion, persona=persona, state=s, line=l, tier=tier,
+                 enabled=1, notes="") for s, l in states]
+
+for rows in [
+ # ---- STRONG / ANGER: anger that has the upper hand, and knows it -----------
+ dlg("ANGER", "The Bailiff", "STRONG",
+     "I have the paper, I have the locks and I have all morning. OPEN IT.",
+     "Everything in here belongs to someone else now. Including you.",
+     "I'm just doing my job — I'M JUST DOING MY JOB!",
+     "There's another twelve on the list today. Someone else will come."),
+ dlg("ANGER", "The Riot Line", "STRONG",
+     "Disperse. You have been warned. YOU HAVE BEEN WARNED!",
+     "Nobody filmed this. Nobody ever films this.",
+     "Hold the line... hold the LINE...",
+     "Badge number... nobody ever asks for the badge number."),
+ dlg("ANGER", "The Developer", "STRONG",
+     "Forty families out by Friday and a rooftop pool by spring. Try and stop me.",
+     "This whole barri is already sold. You're standing in a render.",
+     "The permits — who talked to the press about the permits?!",
+     "It was going to be beautiful..."),
+ # ---- STRONG / SURPRISE: the thing that turns the day over -----------------
+ dlg("SURPRISE", "The Verdict", "STRONG",
+     "All of it. They're keeping ALL of it. I signed — I SIGNED WHAT?!",
+     "Read the small print, they said. READ IT NOW, GO ON!",
+     "There has to be an appeal. There's always an appeal...",
+     "Fourteen years. In one afternoon."),
+ dlg("SURPRISE", "The Blackout", "STRONG",
+     "Whose jacket is this? WHOSE BLOOD IS THIS? Somebody tell me what I did!",
+     "You were there! You saw it! SAY WHAT YOU SAW!",
+     "It's coming back... oh God, it's coming back...",
+     "Don't tell me. Please. Don't ever tell me."),
+ dlg("SURPRISE", "The Collapse", "STRONG",
+     "The ceiling was there this morning. IT WAS THERE THIS MORNING!",
+     "Nothing holds! Look at it! NOTHING HOLDS!",
+     "My hands won't stop. Why won't my hands stop?",
+     "Everyone kept saying it was fine."),
+ # ---- WEAK / SADNESS: too tired to be dangerous ----------------------------
+ dlg("SADNESS", "The Sleepless", "WEAK",
+     "Fourth night. The train's warm, that's all. Don't make me move.",
+     "You get used to the noise. You never get used to the light.",
+     "I only wanted to close my eyes...",
+     "Wake me at Fondo. Somebody always does."),
+ dlg("SADNESS", "The Unread Message", "WEAK",
+     "Delivered. Two blue ticks, eleven days ago. That's the whole story.",
+     "Everyone's busy. Everyone's always so busy.",
+     "Maybe she's just... maybe the phone...",
+     "I'll type it again tonight. I won't send it."),
+ dlg("SADNESS", "The Last One Out", "WEAK",
+     "Everybody left for Berlin, Lisbon, anywhere. I locked up.",
+     "You'll go too. They all go.",
+     "It's only me on this platform now...",
+     "Somebody has to stay and turn the lights off."),
+ # ---- WEAK / JOY: joy with nothing behind it -------------------------------
+ dlg("JOY", "The Last Round", "WEAK",
+     "Six in the morning and the night's still GOING! Come on, one more, ONE MORE!",
+     "This is living! THIS IS LIVING! Where's my phone?",
+     "Wait — wait, has anyone got water...",
+     "I'll be fine. I've got work at nine. I'll be fine."),
+ dlg("JOY", "The Hen Party", "WEAK",
+     "Eleven of us, matching sashes, and NOBODY is going home sad tonight!",
+     "Smile! SMILE! It's meant to be the best day of her life!",
+     "Where's Marta? Has anyone seen Marta?",
+     "She cried in the toilets for an hour. We got the photos though."),
+ dlg("JOY", "The Busker", "WEAK",
+     "Same four chords for nine years and the carriage still claps! Listen!",
+     "They're LOVING this! Look at them! They're loving it!",
+     "Two euros. Whole carriage. Two euros...",
+     "Next stop's better. Next stop's always better."),
+]:
+    _dlg.extend(rows)
 # ───────────────────────────── loadouts ─────────────────────────────
 # One Loadout per emotion. Slots are POSITIONAL — an empty cell is a real, visible
 # empty slot in the panel, not a missing entry — so they are four columns rather
@@ -562,9 +741,9 @@ def lo(i, emo, name, *slots, notes="", tier=1, ec_mod=0, passive="", cost="", tr
 LOADOUTS_ROWS = [
  lo("LO_ANGER",   "ANGER",   "Anger",   "ATK_ANGER","HVY_ANGER","GEN_ANGER"),
  lo("LO_SADNESS", "SADNESS", "Sadness", "ATK_SADNESS","HVY_SADNESS","INFLICT_SAD"),
- lo("LO_JOY",     "JOY",     "Joy",     "ATK_JOY","HVY_JOY"),
+ lo("LO_JOY",     "JOY",     "Joy",     "ATK_JOY","HVY_JOY","GEN_JOY"),
  lo("LO_DISGUST", "DISGUST", "Disgust", "GEN_DISGUST","ROT"),
- lo("LO_SURPRISE","SURPRISE","Surprise", notes="No Surprise abilities exist yet."),
+ lo("LO_SURPRISE","SURPRISE","Surprise","ATK_SURPRISE","HVY_SURPRISE","STARTLE"),
  lo("LO_FEAR",    "FEAR",    "Fear",     notes="No Fear abilities exist yet."),
 ]
 sheet("loadouts", LO_COLS, LO_LIVE, LOADOUTS_ROWS,
@@ -635,14 +814,15 @@ sheet("moments", MOM_COLS, MOM_LIVE, MOMENTS,
          "or * for any. Hours are Barcelona local, to_hour exclusive; a band may wrap "
          "past midnight. Highest priority wins, ties are random."))
 
-sheet("dialogue", ["emotion","persona","state","line","enabled","notes"],
-  {"emotion","persona","state","line"}, _dlg,
-  widths={"line":92,"persona":20,"notes":20},
+sheet("dialogue", ["emotion","persona","state","line","tier","enabled","notes"],
+  {"emotion","persona","state","line","tier"}, _dlg,
+  widths={"line":92,"persona":20,"tier":10,"notes":20},
   notes=("What each enemy says. states: INTRO (battle start) - WINNING (player drops below 20% MS) - "
          "LOSING (this enemy drops below 20% MS) - DEFEAT (this enemy dies). A battle picks one persona "
          "at random from the rows matching the enemy's emotion, so the same enemy type speaks differently "
-         "each run. NOTE: this sheet uses Anger/Disgust/Sadness/Fear/Joy/Surprise, which is NOT the same "
-         "six as the emotions sheet - only Anger, Sadness and Joy line up. See the README."))
+         "each run. `tier` narrows that: a WEAK or STRONG enemy uses only the rows carrying its own tier, "
+         "and everything else uses the rows where tier is BLANK. Blank means ANY tier, not 'no tier'. "
+         "Give a new persona all four states or it will fall silent at the moment it is missing."))
 
 # ───────────────────────────── checks ─────────────────────────────
 ck = WB.create_sheet("checks")
@@ -655,7 +835,7 @@ CHECKS = [
  ("Abilities with an emotion not in 'emotions'", 0,
   '=SUMPRODUCT((abilities!C5:C200<>"")*(COUNTIF(emotions!A5:A200,abilities!C5:C200)=0))'),
  ("Abilities missing an id", 0, '=SUMPRODUCT((abilities!B5:B200<>"")*(abilities!A5:A200=""))'),
- ("Units with a blank pool", 0, '=SUMPRODUCT((units!A5:A200<>"")*(units!G5:G200=""))'),
+ ("Units with a blank pool", 0, '=SUMPRODUCT((units!A5:A200<>"")*(units!H5:H200=""))'),
  ("Matchup rows with no label", 0, '=SUMPRODUCT((matchups!A5:A200<>"")*(matchups!F5:F200=""))'),
  ("Matchup attack emotions unknown (blank/*/NONE allowed)", 0,
   '=SUMPRODUCT((matchups!A5:A200<>"")*(matchups!A5:A200<>"*")*(matchups!A5:A200<>"NONE")*(COUNTIF(emotions!A5:A200,matchups!A5:A200)=0))'),
@@ -665,8 +845,12 @@ CHECKS = [
   '=SUMPRODUCT((abilities!A5:A200<>"")*(COUNTIF(abilities!A5:A200,abilities!A5:A200&"")>1))'),
  ("Duplicate emotion ids", 0,
   '=SUMPRODUCT((emotions!A5:A200<>"")*(COUNTIF(emotions!A5:A200,emotions!A5:A200&"")>1))'),
- ("Enabled emotions", 6, '=SUMPRODUCT((emotions!A5:A200<>"")*(emotions!G5:G200=1))'),
- ("Enabled abilities", 10, '=SUMPRODUCT((abilities!A5:A200<>"")*(abilities!AF5:AF200=1))'),
+ ("Unit emotions not in 'emotions' (player is blank)", 0,
+  '=SUMPRODUCT((units!C5:C200<>"")*(COUNTIF(emotions!A5:A200,units!C5:C200)=0))'),
+ ("Unit tiers that are not WEAK/REGULAR/STRONG (blank allowed)", 0,
+  '=SUMPRODUCT((units!D5:D200<>"")*(units!D5:D200<>"WEAK")*(units!D5:D200<>"REGULAR")*(units!D5:D200<>"STRONG"))'),
+ ("Statuses an ability applies that do not exist", 0,
+  '=SUMPRODUCT((abilities!AA5:AA200<>"")*(COUNTIF(status_effects!A5:A200,abilities!AA5:AA200)=0))'),
 ]
 for r,(label,exp,formula) in enumerate(CHECKS, 4):
     ck.cell(row=r, column=1, value=label).font = BODY
@@ -755,14 +939,17 @@ TE_COLS, TE_ROWS = _seed("travel_elements")
 if TE_COLS:
     sheet("travel_elements", TE_COLS,
           {"id","name","kind","motion","chance","max_on_screen","max_per_trip","life_min",
-           "life_max","size","drift","worth","payload","amount","lock_secs","enabled"}, TE_ROWS,
+           "life_max","size","drift","worth","payload","amount","lock_secs","unit","enabled"}, TE_ROWS,
           widths={"id":20,"name":18,"notes":46},
           notes="What can appear around the train during a ride. `chance` is rolled per element "
                 "every travelRollSecs; max_on_screen caps how many exist at once, max_per_trip "
                 "how many one ride may ever produce. life_min/life_max in seconds. `drift` is "
                 "speed relative to the track (>1 reads as nearer the camera). These are BASES: "
                 "the target station's `spawn` column scales them, and so will weather and time "
-                "of day when those exist.")
+                "of day when those exist. `unit` FORCES which units row an enemy element fights "
+                "as; LEAVE IT BLANK and the map rolls one from the units that name the line "
+                "being ridden in their `spawn_lines`, which is what makes Line 2 feel unlike "
+                "Line 5. Fill it in only to pin one element to one enemy.")
 
 CS_COLS, CS_ROWS = _seed("city_status")
 if not CS_COLS:
@@ -797,6 +984,74 @@ if ML_COLS:
           notes="One row per line, `stations` in running order (| separated). Colour is NOT stored: "
                 "it comes from the emotion, so the map cannot drift out of step with battle.")
 
+
+# ───────────────────────────── the checks a FORMULA cannot make ─────────────────────────────
+# Every cross-reference in this workbook that is a PIPE LIST — a unit's pool, its
+# loadouts, its spawn_lines, a Loadout's four slots — is invisible to the `checks`
+# sheet, because a spreadsheet cannot look inside "ATK_ANGER|HVY_ANGER|BLIND". They
+# are exactly the references most likely to be wrong, since they are the ones typed
+# by hand. So they are checked HERE, at build time, and a bad one stops the build.
+#
+# A dangling id does not crash anything at runtime: `pool.map(a=>ABILITIES[a]).filter(Boolean)`
+# quietly drops it, and the enemy simply fights with one fewer ability than it was
+# designed with. That is the worst kind of bug — a balance change nobody made.
+def _validate():
+    ab_ids  = {r["id"] for r in ABILS}
+    emo_ids = {e[0] for e in EMO}
+    st_ids  = {r["id"] for r in SE_ROWS}
+    lo_ids  = {r["id"] for r in LOADOUTS_ROWS}
+    line_ids = {r["id"] for r in ML_ROWS} if ML_COLS else set()
+    bad = []
+    def pipes(v): return [s.strip() for s in str(v or "").split("|") if s.strip()]
+    for u in UNITS_ROWS:
+        for a in pipes(u.get("pool")):
+            if a not in ab_ids: bad.append(f"units.{u['id']}.pool -> no ability '{a}'")
+        for l in pipes(u.get("loadouts")):
+            if l not in lo_ids: bad.append(f"units.{u['id']}.loadouts -> no loadout '{l}'")
+        for e in pipes(u.get("layers")):
+            if e not in emo_ids: bad.append(f"units.{u['id']}.layers -> no emotion '{e}'")
+        if u.get("emotion") and u["emotion"] not in emo_ids:
+            bad.append(f"units.{u['id']}.emotion -> no emotion '{u['emotion']}'")
+        if u.get("tier") not in ("", "WEAK", "REGULAR", "STRONG"):
+            bad.append(f"units.{u['id']}.tier -> '{u['tier']}' is not WEAK/REGULAR/STRONG")
+        for s in pipes(u.get("spawn_lines")):
+            name = s.split(":")[0].strip()
+            if name != "*" and line_ids and name not in line_ids:
+                bad.append(f"units.{u['id']}.spawn_lines -> no line '{name}'")
+            try: float(s.split(":")[1])
+            except (IndexError, ValueError):
+                bad.append(f"units.{u['id']}.spawn_lines -> '{s}' has no weight after the colon")
+    for a in ABILS:
+        if a.get("status_apply") and a["status_apply"] not in st_ids:
+            bad.append(f"abilities.{a['id']}.status_apply -> no status '{a['status_apply']}'")
+    for l in LOADOUTS_ROWS:
+        for n in range(1, 5):
+            v = l.get("slot%d" % n)
+            if v and v not in ab_ids:
+                bad.append(f"loadouts.{l['id']}.slot{n} -> no ability '{v}'")
+    # Every persona has to be able to say all four things, or an enemy goes silent
+    # at the one moment the fight was about to be interesting.
+    seen = {}
+    for r in _dlg:
+        seen.setdefault((r["emotion"], r["persona"], r["tier"]), set()).add(r["state"])
+    for (emo, per, tier), states in sorted(seen.items()):
+        missing = {"INTRO", "WINNING", "LOSING", "DEFEAT"} - states
+        if missing:
+            bad.append(f"dialogue '{per}' ({emo}{'/'+tier if tier else ''}) has no "
+                       + ", ".join(sorted(missing)))
+    # An enemy whose emotion+tier finds no persona at all would fight nameless.
+    for u in UNITS_ROWS:
+        if u.get("tags") != "ENEMY": continue
+        emo, tier = u.get("emotion"), u.get("tier") or ""
+        pool = [k for k in seen if k[0] == emo and k[2] == tier]
+        if not pool: pool = [k for k in seen if k[0] == emo and k[2] == ""]
+        if not pool:
+            bad.append(f"units.{u['id']} ({emo}/{tier}) has no persona to speak as")
+    if bad:
+        raise SystemExit("! workbook has broken references:\n  " + "\n  ".join(bad))
+    print("  references OK — %d abilities, %d units, %d dialogue rows" %
+          (len(ABILS), len(UNITS_ROWS), len(_dlg)))
+_validate()
 
 WB._sheets.sort(key=lambda s: ["README","emotions","abilities","loadouts","matchups","units","dialogue","prompts","moments",
   "layer_types","status_effects","synergies","rules","sounds","stations","metro_lines","travel_elements","items","armor","world_bands","city_status","checks"].index(s.title))

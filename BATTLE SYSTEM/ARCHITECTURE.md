@@ -109,6 +109,25 @@ src/
 
 ## The two extension points
 
+### Adding an enemy
+Add a row to the **units** sheet with `tags` = `ENEMY`. Three columns do the work
+that used to need code:
+
+- **`tier`** — `WEAK` / `REGULAR` / `STRONG`. **It is not a stat.** Nothing reads it
+  as one; it picks the silhouette (see *A tier is a shape*) and narrows which
+  personas can speak. Blank or unknown behaves as REGULAR.
+- **`spawn_lines`** — where the map may produce it, as `line:weight`. `L2:0.15|L5:0.15`
+  is an uncommon sight on either. `*` is every line, and a named line **beats** the
+  wildcard rather than adding to it. Leave a line out and it never appears there.
+- **`pool`** — its abilities. Keep it mostly its own emotion, or the emotion means
+  nothing.
+
+If you want it to sound like itself rather than like everything else of its emotion,
+give it personas in `dialogue` carrying its tier, all four states each.
+
+Nothing else is needed. `build_workbook.py` refuses to build if any of those
+references is dangling.
+
 ### Adding an ability
 Add a row to the **abilities** sheet. If its `kind` already exists, you are done
 — no code. Point a unit's `pool` at its id.
@@ -235,6 +254,48 @@ runs, and the entire animation loop silently dies.
 Bar geometry is ported from `sources/Bars_Reference_001.svg`. Its measurements are
 recorded at the top of `src/gauge.js`; every derived constant is a rule in the
 spreadsheet, not a literal in the renderer.
+
+## A tier is a shape, and the shape is one function
+
+An enemy's tier is drawn, not printed: WEAK wears concentric **triangles**, STRONG
+concentric **seven-pointed stars**, REGULAR the original circles. That is the whole
+of the warning the player gets, on the ride and in the fight both.
+
+`paint()` already decided which band a pixel was in by asking how far it was from
+the centre. A shape is simply a different answer to that question:
+
+```
+distance = hypot(dx, dy) / f(angle),      f in (0,1]
+```
+
+`f` is 1 where the shape reaches furthest — a vertex, a star's point — and less
+everywhere else, so **every shape is inscribed in the circle the rings were already
+tuned for**. Layer geometry, breathing and spacing know nothing about any of it, and
+the player's rings pass no shape at all and are exactly the circles they always were.
+
+**The trap, and it is not obvious.** Bands are constant in *shape* space, so their
+thickness in PIXELS is multiplied by `f`. A true triangle has `f = 0.5` along its
+flats, which puts the 1.8px inner rings under one pixel there — they break into
+dashes and then vanish, and the sprite still looks like a sprite. Three rules in the
+sheet exist only to hold that line: `enemyTriRound`, `enemyShapeFill`,
+`enemyShapeBreathe`.
+
+**`enemyShapeFill` has a ceiling as well as a floor.** Raise it until the rings stop
+breaking and keep going, and the gaps between bands drop under a pixel: the rings
+merge into one solid shape, which is a filled triangle rather than concentric ones.
+
+Run `node shared/tools/check_rings.js` after touching any of it. It reads the real
+`rings.js` and the real `data.js` and measures the widest gap in every ring of every
+enemy, in pixels of arc, through a full breath. An unbroken ring scores about 1; the
+circle enemies are the calibration.
+
+## `refreshEnemyShape()` — the rings are sized per FIGHT, not per frame
+
+`E_CFG` is built once, because rebuilding it sixty times a second to read three
+unchanged rules would be wasteful. That makes it stale the moment `S.enemy` is
+replaced — which is exactly what arriving from the map does. Anything that swaps the
+enemy must call `refreshEnemyShape()`, or a strong enemy is drawn at the size of
+whatever this page happened to boot with.
 
 ## Two output buses, and why
 

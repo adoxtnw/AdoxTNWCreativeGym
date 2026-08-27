@@ -36,12 +36,20 @@ def newest():
     return best or time.time()
 
 def version():
-    try:
-        txt = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
-        passes = [int(n) for n in re.findall(r"^## Pass (\d+)", txt, re.M)]
-        if passes: return "0.%d" % max(passes)
-    except Exception:
-        pass
+    """The newest "## Pass NN" heading there is.
+
+    IT LOOKS IN CHANGELOG.md FIRST. The pass history used to live in README.md and
+    was split out of it, and this went on reading the README — which no longer has
+    a single Pass heading in it, so the title screen quietly froze at the last
+    version the README happened to mention. A version stamp that stops moving is
+    worse than none: it says the build is old when it is not."""
+    for name in ("CHANGELOG.md", "README.md"):
+        try:
+            txt = open(os.path.join(ROOT, name), encoding="utf-8").read()
+            passes = [int(n) for n in re.findall(r"^## Pass (\d+)", txt, re.M)]
+            if passes: return "0.%d" % max(passes)
+        except Exception:
+            pass
     return "0.0"
 
 def main():

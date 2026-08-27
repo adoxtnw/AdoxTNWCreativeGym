@@ -94,9 +94,21 @@ function sfx(id, mult){
    before a gesture, so the first tap anywhere starts whatever should be
    playing — see `armMusic()`.                                                */
 
+/* GAINS ARE MEASURED, NOT CHOSEN. Every song in the game is levelled to the
+   same loudness — busy-half RMS, which is what the ear compares, rather than a
+   plain average that a track with long quiet passages would fail:
+
+     rise         -9.2 dBFS  x 0.46  ->  -16.0
+     ride        -10.6 dBFS  x 0.54  ->  -16.0
+     battle      -20.1 dBFS  x 1.60  ->  -16.0   (see musicVolume in the sheet)
+
+   -16.0 rather than the -14.4 these two used to sit at: the battle theme peaks
+   at -5.2 dBFS, so matching the old level would have needed a gain that clipped
+   it. Bringing these down 1.5 dB is inaudible; leaving that one 19 dB down was
+   not. Re-measure and re-derive if a track is ever replaced. */
 const TRACKS = {
-  MAP : {src: "audio/rise.m4a", gain: 0.55, loop: true},
-  RIDE: {src: "audio/ride.m4a", gain: 0.60, loop: true}
+  MAP : {src: "audio/rise.m4a", gain: 0.46, loop: true},
+  RIDE: {src: "audio/ride.m4a", gain: 0.54, loop: true}
 };
 const FADE_OUT_MS = 380;          /* quick: a cut, not a dissolve */
 /* EXCEPT WHEN LEAVING A STATION. Every other change of music is a cut, because

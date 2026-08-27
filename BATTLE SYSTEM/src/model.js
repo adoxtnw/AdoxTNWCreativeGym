@@ -44,7 +44,12 @@ function poolFrom(loadoutIds){
 
 function makeUnit(id){
   const r=UNITS[id];
-  return {id, name:r.name, emotion:r.emotion, maxMs:r.max_ms, ms:r.max_ms,
+  return {id, name:r.name, emotion:r.emotion,
+    /* WEAK / REGULAR / STRONG. Not a stat and nothing reads it as one: it picks
+       the silhouette in rings.js and narrows which personas can speak in
+       dialogue.js. A blank or unknown tier behaves as REGULAR. */
+    tier:r.tier || "REGULAR",
+    maxMs:r.max_ms, ms:r.max_ms,
     ec:Math.round(r.max_ms*r.start_ec_pct), shield:0,
     layers:r.layers.slice(0,RULES.maxLayers).map((e,i)=>({e,pos:i,flash:0})),
     loadouts:(r.loadouts||[]).slice(0, RULES.equippedSlots),

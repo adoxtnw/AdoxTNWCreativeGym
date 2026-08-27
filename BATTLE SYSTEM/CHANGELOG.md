@@ -8,6 +8,179 @@ record of how it got that way.
 
 ---
 
+## Pass 40 — five more enemies, and a tier you can see
+
+There was **one** enemy in the game. There are six, and which one you meet depends on
+which line you are riding.
+
+| id | name | tier | emotion | MS | layers | line slots | where the map produces it |
+|---|---|---|---|---|---|---|---|
+| `enemy` | The Commuter | REGULAR | Anger | 250 | 3 | 3 | `L1:1.0` and `*:0.6` — every line |
+| `enemy_anger_strong` | The Enforcer | **STRONG** | Anger | 330 | **4** | 3 | `L1:0.5` |
+| `enemy_surprise` | The Interruption | REGULAR | Surprise | 240 | 3 | 3 | `L2:1.0` |
+| `enemy_surprise_strong` | The Reversal | **STRONG** | Surprise | 320 | **4** | 3 | `L2:0.45` |
+| `enemy_sadness_weak` | The Straggler | **WEAK** | Sadness | 150 | **2** | **2** | `L2:0.15` · `L5:0.15` |
+| `enemy_joy_weak` | The Reveller | **WEAK** | Joy | 150 | **2** | **2** | `L2:0.15` |
+
+Measured over 20,000 draws per line, against the sheet:
+
+```
+L1  Commuter 66.8%   Enforcer 33.2%
+L2  Interruption 42.4%  Commuter 25.6%  Reversal 19.2%  Straggler 6.5%  Reveller 6.3%
+L5  Commuter 80.1%   Straggler 19.9%
+L3 / L4 / L6  Commuter 100%
+```
+
+**The `*` in `spawn_lines` is load-bearing.** Three lines have no units of their own yet,
+and without a wildcard they would produce no enemies at all. The Commuter rides
+everywhere, which is both the joke and the fallback. A named line beats the wildcard
+rather than adding to it, so `L1:1.0|*:0.6` means *1.0 at home, 0.6 elsewhere*.
+
+### Surprise had a line, a Loadout and no abilities
+
+`LO_SURPRISE` was empty and the sheet said so. A Surprise enemy could only have fought
+with borrowed emotions, so Surprise got the same three-piece kit Anger and Sadness have:
+**Sucker Punch** (20/35), **Whiplash** (45/90, charges), and **Out of Nowhere**, which
+applies a new status — **RATTLED**, a third of attacks going wide, softer and cheaper
+than Anger's BLINDED. `missChance()` takes the highest of everything on a unit rather
+than summing, so Rattled and Blinded together are just Blinded.
+
+Joy had two abilities, both attacks, which made "mostly its own type" impossible for a
+weak Joy enemy without handing it the hardest hit in the game. It gets **Good Vibes**,
+the Bristle/Bile shape. `LO_JOY` and `LO_SURPRISE` are now both full.
+
+**No enemy is single-typed and none is a grab-bag.** Of the abilities that have a type
+at all: The Enforcer 4/5 Anger, The Reversal 3/5 Surprise, The Straggler 2/2 Sadness,
+The Reveller 2/2 Joy. The Commuter stays the generalist it always was.
+
+### A tier is a silhouette
+
+Not a stat. Nothing reads `tier` as one — it picks the shape and narrows the dialogue.
+
+- **WEAK** — concentric **triangles**, point up, and smaller.
+- **REGULAR** — the concentric circles, unchanged.
+- **STRONG** — concentric **seven-pointed stars**, and larger.
+
+`paint()` already decided which band a pixel was in by asking how far it was from the
+centre. A shape is a different answer to that question — `distance = hypot / f(angle)`,
+where `f` is 1 where the shape reaches furthest — so every shape is inscribed in the
+circle the rings were already tuned for, and the player's rings, which pass no shape at
+all, are exactly the circles they have always been.
+
+**Which broke every ring, and it took three tries to measure why.**
+
+Bands are constant in shape space, so their thickness in PIXELS gets multiplied by `f`.
+A true triangle has `f = 0.5` along its flats, which put the 1.8px inner rings under one
+pixel there: they broke into dashes and then vanished. Three rules fix it, all in the
+sheet — `enemyTriRound` (pull the triangle back toward a circle until its rings survive),
+`enemyShapeFill` (thicker bands), `enemyShapeBreathe` (less breathing, so neighbouring
+bands stop closing on each other).
+
+`shared/tools/check_rings.js` is what settled it, and **its first two versions were both
+wrong, in the same direction — they accused the plain circle enemies, which have looked
+correct since the day they were drawn.** A ray from the centre rounds to integer pixels
+and steps past bands that are drawn. Fixed angular sectors cannot work across ring sizes:
+the innermost ring is twenty-five pixels round in total, so most of seventy-two
+five-degree sectors are empty by geometry. What reads as a broken ring is a **gap** — so
+it measures the widest angular gap between consecutive pixels of a band, in pixels of arc
+at that band's own radius. An unbroken ring scores about 1.
+
+```
+enemy                   REGULAR/CIRCLE    [1.2 1.4 1.2 1.1 1.1 1.1]
+enemy_anger_strong      STRONG/STAR       [1.4 1.8 1.8 1.6 1.6 1.4]
+enemy_sadness_weak      WEAK/TRIANGLE     [1.3 1.7 1.3 1.3 1.3 1.5]
+```
+
+With the tuning off (`fill 1.0`, `breathe 1.0`) the same enemies score **5.7** and
+**11.1**. It earns its place.
+
+**`enemyShapeFill` has a ceiling as well as a floor.** At 2.0 every ring passed and the
+sprite was wrong anyway: the gaps between bands dropped under a pixel and the rings
+merged into one solid shape — a filled triangle rather than concentric ones. It sits at
+1.6, which is the only value that survives both.
+
+### On the ride, before you commit to anything
+
+Tapping an enemy starts a fight you cannot leave, so what you are taking on is decided at
+**spawn**, not at tap, and it is readable while it is still drifting past:
+
+- **its own colour, not the line's.** Everything else on a ride is painted in the line's
+  emotion, which is what makes a line feel like a place. An enemy is the one thing that
+  is not *of* the place.
+- **the same silhouette it will wear in the fight** — triangle, round, or star.
+- **size**: 10 / 13 / 20 pixels for weak / regular / strong.
+
+Verified on a real L2 ride: `enemy_surprise` (114,64,130) at 13, `enemy_surprise_strong`
+at 20, and `enemy` (229,56,89) at 13 — three different colours and two different sizes on
+one line. Both encounter paths carry the chosen unit through: tapping one, and a Hunter's
+countdown expiring. The forced one landed on The Interruption, drew a circle, and painted
+the backdrop, the name and the bubble in Surprise purple.
+
+### Enemies that sound like themselves
+
+A persona is picked at random from the rows matching the enemy's emotion — that is where
+its name and all four of its lines come from. Without more than that, The Enforcer would
+have spoken The Commuter's lines, because both are Anger, and an enemy twice the size
+sounding exactly like the ordinary one throws away everything the sprite just said.
+
+So `dialogue` has a `tier` column, and **blank means ANY tier, not "no tier"**: an enemy
+uses the rows carrying its own tier, and falls back to the blank ones if there are none.
+The thirty imported personas stay available to everyone. Twelve new ones, all four states
+each — The Bailiff, The Riot Line and The Developer for strong Anger; The Verdict, The
+Blackout and The Collapse for strong Surprise; The Sleepless, The Unread Message and The
+Last One Out for weak Sadness; The Last Round, The Hen Party and The Busker for weak Joy.
+
+### The AI had never once used a layer-grower
+
+Building forty lines for each new enemy and listing which abilities ever appeared turned
+up a nine-month-old hole: **`ADDLAYER` had no branch in `buildEnemyLine`.** The scoring is
+damage per slot, a grown layer deals none, so Bristle and Bile were in pools and never
+chosen — and it does not read as a bug, it reads as an enemy that happens to do the same
+two things every round. The Reveller made it visible because `GEN_JOY` was half its typed
+pool: **one distinct line, forty times out of forty.**
+
+It gets a branch beside the debuff one, on `aiGrowChance` (0.45), gated on having a layer
+slot free and preferring an emotion the player is **not** carrying — like does not break
+like, so a layer the player can absorb buys nothing. After: The Reveller uses `GEN_JOY`,
+The Enforcer uses `GEN_ANGER`, and The Reversal actually does the thing its design note
+claimed it did.
+
+### Things that were already broken
+
+- **`stamp.py` was reading the wrong file.** The pass history moved to `CHANGELOG.md` and
+  this went on reading `README.md`, which no longer has a single Pass heading — so the
+  title screen's version quietly froze. A stamp that stops moving is worse than none.
+- **Two `checks` formulas had rotted.** One counted "enabled abilities" against a
+  hard-coded 10 when there were 15, and read the wrong column for `enabled` besides;
+  another validated `units` column G for a blank pool, which stopped being `pool` the
+  moment the sheet grew a column. Both replaced with structural checks that cannot go red
+  just because the game grew.
+- **Pipe lists were never validated at all.** A unit's pool, its loadouts, its
+  spawn_lines, a Loadout's slots — a spreadsheet cannot look inside
+  `"ATK_ANGER|HVY_ANGER"`, and those are the references most likely to be wrong because
+  they are the ones typed by hand. A dangling id does not crash anything: the pool is
+  built with `.filter(Boolean)`, so the enemy just fights with one fewer ability than it
+  was designed with. **A balance change nobody made.** `build_workbook.py` now refuses to
+  build on one, and checks that every persona can say all four things.
+
+### `?enemy=<units row id>`
+
+A look, not a fight. The title screen leads to the map and a fight only ever starts by
+tapping something on a ride, which left no way to see a new enemy without riding until one
+turned up. This loads the sprite, the backdrop and the persona for any units row, runs the
+real opening, and stops there. Without the parameter nothing in that block runs.
+
+**It hides the title screen; it does not remove it, and that distinction took two goes.**
+`handoff.js` removes it, so this copied that — and `#title` turns out to be where a great
+deal else lives. `#confrontBtn` and `#howtoBtn` are inside it, so main.js threw on the
+next line and **stopped halfway through, silently**, with every statement below it never
+running; the opening's own canvases are in there too, so `intro()` reached into null as
+well. Both failures looked identical from outside: a black screen. `display:none` takes it
+off the screen and out of the tab order and leaves everything where the rest of the file
+expects it.
+
+---
+
 ## Pass 39.3 — the critical beat
 
 A critical is now a moment rather than a flicker. When one lands:

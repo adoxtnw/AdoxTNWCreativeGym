@@ -182,6 +182,25 @@ function buildEnemyLine(){
     const d=debuffs[Math.floor(Math.random()*debuffs.length)];
     if(placeEntries(e,d)) ec-=d.cost;
   }
+  /* ADDLAYER needs its own branch for exactly the same reason, and did not have
+     one — so Bristle, Bile and Good Vibes sat in every pool that held them,
+     never once chosen, and an enemy carrying nothing else non-damaging did the
+     same two things every round for the whole fight.
+
+     WHEN IT IS WORTH A SLOT: only while there is a layer slot free to grow into,
+     and preferably while the enemy is already stripped, because a grown layer is
+     temporary and spending one from behind a full stack wastes it. Growing a
+     layer of an emotion the player is NOT carrying is the point of the ability —
+     like does not break like, so a layer the player can absorb is a layer that
+     buys nothing. */
+  const grows=e.pool.filter(a=>a.kind==="ADDLAYER" && affordable(a)
+                            && e.layers.length<RULES.maxLayers);
+  if(grows.length && e.layers.length<RULES.maxLayers-1
+     && Math.random()<(RULES.aiGrowChance==null||RULES.aiGrowChance===""?0.45:+RULES.aiGrowChance)){
+    const off=grows.filter(a=>a.emotion!==(layers[0]||null));
+    const g=(off.length?off:grows)[Math.floor(Math.random()*(off.length?off.length:grows.length))];
+    if(placeEntries(e,g)) ec-=g.cost;
+  }
 
   let guard=0;
   while(emptySlots(e)>0 && guard++<40){

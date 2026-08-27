@@ -6,10 +6,13 @@ The day, the network, the encounters, and what carries between them.
 leg by leg through emotional space, and at every platform decide whether to bank what you
 are carrying or push the wager further.
 
-**The battle system is deliberately not connected.** Every encounter opens a debug screen
-reading `BATTLE OCCURRED` with WIN / LOSS / FLED — but it builds a real §13 descriptor and
-returns through the real `applyEncounterResult`, so the contract is exercised and hooking
-the two apps together later is a change to one function in `src/encounter.js`.
+**The battle system is connected.** An encounter mounts the real fight in a frame, hands it
+a real §13 descriptor and takes the result back through the real `applyEncounterResult`.
+The debug screen that used to read `BATTLE OCCURRED` with WIN / LOSS / FLED is gone: with a
+real fight to hand off to, it was a second and drifting definition of what a result is.
+
+**Which enemy you meet depends on which line you are riding.** Six enemies, three tiers,
+each a row in the `units` sheet — see *Enemies on the ride* below.
 
 ## The run
 
@@ -53,6 +56,30 @@ Bands stack rather than one winning, so a stormy Saturday night is worse than ei
 agrees without a server; `WorldState.weather()` is the seam a real API replaces.
 
 ---
+
+## Enemies on the ride
+
+An element row in `travel_elements` says an enemy *may* appear. **It does not say who** —
+that comes from the `units` sheet, off each enemy's own `spawn_lines`, and it is rolled the
+moment the element spawns rather than when it is tapped.
+
+It has to be that early because it has to be *visible* that early. Tapping an enemy commits
+you to a fight you cannot leave, so what you are taking on is readable while it is still
+drifting past:
+
+| | |
+|---|---|
+| **Its colour** | its own emotion, **not the line's**. Everything else on a ride is painted in the line's colour, which is what makes a line feel like a place; an enemy is the one thing that is not *of* the place |
+| **Its shape** | the same silhouette it will wear in the fight — a triangle if it is weak, the round body if ordinary, a seven-pointed star if strong |
+| **Its size** | roughly 10 / 13 / 20 pixels for weak / regular / strong |
+
+`spawn_lines` is `line:weight`, pipe-separated. `L2:0.15|L5:0.15` is an uncommon sight on
+either line. **`*` means every line, and a named line beats it rather than adding to it** —
+`L1:1.0|*:0.6` is "1.0 at home, 0.6 elsewhere". The wildcard is not decoration: three lines
+have no enemies of their own yet, and without it they would produce none at all.
+
+`travel_elements.unit` still overrides the roll outright, for pinning one element to one
+enemy. Blank means roll, and both enemy rows are blank.
 
 ## Saving, on a host with no server
 
@@ -380,6 +407,37 @@ gesture, so the first press anywhere unlocks it and starts whatever the phase wa
 **Every button in the app gets its voice from one delegated listener** (`uiSoundFor()` in
 `mapview.js`). Adding a sound to a new control is a line there, not a line in whatever wired
 that control — and nothing can double up by both delegating and handling its own noise.
+
+#### Levelling
+
+**Every song in the game is levelled to the same measured loudness**, not to a number
+someone liked. The measure is busy-half RMS — the file split into blocks, the loudest half
+averaged — because a plain average makes a track with long quiet passages read soft when its
+busy parts are as loud as anything else, and the busy parts are what the ear compares.
+
+| | file | gain | played |
+|---|---|---|---|
+| rise (map) | −9.2 dBFS | ×0.46 | −15.9 |
+| ride | −10.6 dBFS | ×0.54 | −16.0 |
+| battle | −20.1 dBFS | ×1.60 | −16.0 |
+
+A 19.3 dB spread, now 0.1 dB.
+
+Two things were wrong at once. The battle theme is **mastered about 10 dB quieter** than the
+map's two, and it was also being attenuated twice — `musicVolume` 0.30 through a `cleanBus`
+of 0.7, so the sheet said 0.30 and the theme played at 0.21. Nothing but music goes through
+that bus, so it is unity now and `musicVolume` means what it says.
+
+`musicVolume` is **above 1 on purpose**: it is a gain, not a percentage. The battle file
+peaks at −5.2 dBFS, so ×1.6 still lands at −1.1 and cannot clip.
+
+The target is −16.0 rather than the −14.4 the map's tracks used to sit at, because matching
+that would have needed a battle gain that clipped. Losing 1.5 dB on two tracks is inaudible;
+leaving the third 19 dB down was not.
+
+**If a track is replaced, re-measure and re-derive** — the gains are only correct for these
+files. The battle's opening lands 1.5 dB under its own loop, which is how it was mastered
+and is left alone.
 
 #### The audio files
 

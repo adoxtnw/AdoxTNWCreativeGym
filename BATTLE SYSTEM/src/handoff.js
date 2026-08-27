@@ -89,6 +89,8 @@ const Handoff = {
     const who = (d.enemies && d.enemies[0] && d.enemies[0].unit) || "enemy";
     if(UNITS[who]) S.enemy = makeUnit(who);
     this.enemyId = UNITS[who] ? who : "enemy";
+    /* The rings are sized per fight, not per frame — tell them the enemy changed. */
+    refreshEnemyShape();
 
     /* everything downstream reads S, so it only has to be rebuilt once */
     applyPersona(); buildPanel(); applyOverload(S.player); buildEnemyLine(); render();

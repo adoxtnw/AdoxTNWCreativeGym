@@ -5,3 +5,4 @@ NO_REGEN,Rotting,2,ROT,#56a36a,*2* of your broken {LAYERS} are being held down. 
 SAD,Sad,2,DROP,#3d66c1,At the end of every round one of your own attacks is turned *on yourself*.,0,0,1,0,1,1,1,0,0,0,REFRESH,1,1,Each round end the victim turns one of its OWN attacks on itself.
 OVERLOAD,Overload,0,WARN,#e53859,Your {EC} is over your {MS}. Your line is being invaded until you burn it down.,0,0,0,0,1,1,1,0,0,0,REFRESH,1,1,"DERIVED, not timed: it lasts while ec > ms, so it is never stored in unit.statuses."
 BLINDED,Blinded,2,EYE,#e53859,{ANGER} has blotted out your aim. *Half* of your attacks miss outright.,0,0.5,0,0,1,1,1,0,0,0,REFRESH,1,1,The victim fluffs this fraction of its attacks.
+RATTLED,Rattled,2,BURST,#724082,{SURPRISE} came from nowhere. *A third* of your attacks go wide.,0,0.35,0,0,1,1,1,0,0,0,REFRESH,1,1,"Surprise's own miss status. missChance() takes the HIGHEST of everything on a unit rather than summing, so Rattled and Blinded together are just Blinded."

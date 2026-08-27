@@ -47,6 +47,32 @@ python3 stamp.py --app "BATTLE SYSTEM"               # version + modified stamp
 The tooling and the spreadsheet are **shared with MAP** and live in `AVUI/shared/`.
 The emotions table is the spine of both systems, so it exists exactly once.
 
+## Looking at one enemy without riding for it
+
+The title screen leads to the **map**, and a fight only ever starts by tapping something on
+a ride — so there is no way to see a new enemy without riding until one turns up.
+
+```
+index.html?enemy=enemy_surprise_strong
+```
+
+loads that units row's sprite, backdrop and persona and stops there. **A look, not a
+fight.** An id the sheet does not have is ignored rather than being an error.
+
+## Checking the enemy silhouettes
+
+```bash
+node ../shared/tools/check_rings.js
+```
+
+An enemy's tier is drawn as a shape — weak is concentric triangles, strong concentric
+seven-pointed stars — and a shape squeezes the pixel thickness of every ring it bends. Thin
+rings break into dashes and then vanish, and the sprite still looks like a sprite. This
+measures the widest gap in every ring of every enemy, through a full breath; an unbroken
+ring scores about **1**, and the circle enemies are the calibration. Run it after touching
+`enemyTriRound`, `enemyShapeFill`, `enemyShapeBreathe`, `enemyStarInner` or the ring
+geometry.
+
 ## Where to look
 
 | You want | Read |

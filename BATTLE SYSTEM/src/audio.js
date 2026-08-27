@@ -36,7 +36,12 @@ function initAudio(){
      high-frequency energy by 5.6 as aliasing, and then the lowpass removed half
      of what was genuinely up there. Same gain as `master`, so the level is
      unchanged — only the damage is gone. */
-  cleanBus=actx.createGain(); cleanBus.gain.value=0.7;
+  /* UNITY, so `musicVolume` is the only thing setting the music's level.
+     Nothing but the theme goes through here, so this 0.7 was a second, hidden
+     attenuation on top of the sheet's number — the theme was playing at
+     0.30 x 0.7 = 0.21 while the sheet said 0.30, which is most of why it sat
+     nine decibels under the map's. One gain, one place, one number. */
+  cleanBus=actx.createGain(); cleanBus.gain.value=1.0;
   cleanBus.connect(actx.destination);
   const len=actx.sampleRate*1.2;
   noiseBuf=actx.createBuffer(1,len,actx.sampleRate);
@@ -119,7 +124,8 @@ function loadMusic(){
 /* file:// fallback — audible seam at the handoff, but it plays. */
 function startMusicEls(){
   const a=new Audio(RULES.themeOpening), b=new Audio(RULES.themeLoop);
-  a.volume=b.volume=RULES.musicVolume; b.loop=true; b.preload="auto";
+  /* Element volume is restricted to 0..1; the Web Audio gain may exceed 1. */
+  a.volume=b.volume=Math.max(0,Math.min(1,RULES.musicVolume)); b.loop=true; b.preload="auto";
   a.addEventListener("ended",()=>{ if(musicOn) b.play().catch(()=>{}); });
   a.play().catch(()=>{});
   musicEls=[a,b];
@@ -159,6 +165,9 @@ async function startMusic(){
    the theme starts on the tap rather than after it. The context begins
    suspended, which is exactly what browsers require before a gesture. */
 initAudio();
+/* Decode the theme while the handoff frame is loading. `startMusic()` still owns
+   playback; this only removes network/decoder latency from the opening. */
+if(actx && /(?:\?|&)handoff=1(?:&|$)/.test(location.search)) loadMusic();
 window.addEventListener("pointerdown",initAudio,{once:true});
 /* A CONTEXT THAT WAS REFUSED CAN BE WOKEN LATER, and the music does not have to
    be restarted to hear it: while a context is suspended its clock does not

@@ -5,8 +5,8 @@ the battle prototype, rather than rediscovering them.
 
 **What is built:** the network view (Barcelona L1–L6) and the navigation loop on top of
 it — routing, multi-leg runs, the Traveler's Dilemma, world state, and the vault.
-**What is not:** the battle system, deliberately; encounters open a debug screen. See
-`README.md` for the loop.
+**What is not:** nothing structural — the battle system is connected and an encounter
+mounts the real fight. See `README.md` for the loop.
 
 ## How the picture is made
 
@@ -364,6 +364,34 @@ Rates are resolved as a **product** — sheet base × target station × temporar
 so weather and time of day can be added later by pushing into `TravelMods` without
 touching the spawner.
 
+### What an enemy IS is decided at spawn, not at tap
+
+An element row says an enemy may appear. It does not say who: that comes from the units
+sheet, off each enemy's `spawn_lines`, rolled the moment the element is created.
+
+**It has to be decided that early, because it has to be visible that early.** Tapping an
+enemy commits you to a fight you cannot leave, so what you are taking on has to be
+readable while it is still drifting past — from its silhouette (the same triangle, circle
+or star it will wear in the fight), its size, and its colour.
+
+**Its colour is its own emotion, not the line's.** Everything else on a ride is painted in
+the line's emotion, which is what makes a line feel like a place. An enemy is the one
+thing that is not *of* the place, and that is the only reason it is allowed to break the
+palette.
+
+The chosen unit then travels with the encounter — `{id, station, unit}` — through **both**
+paths that can start a fight: a tap on a passive one, and a Hunter's countdown running
+out. Miss either and the fight looks the unit up off the element row instead, and every
+ride is the same opponent. `travel_elements.unit` is still there as a hard override for
+pinning one element to one enemy; blank means roll.
+
+### `*` in `spawn_lines` is a fallback, not decoration
+
+Three of the six lines have no units of their own. Without a wildcard entry they would
+produce no enemies at all — the roll would come up empty and the ride would be silent.
+The Commuter carries `L1:1.0|*:0.6`, so it rides every line. A named line **beats** the
+wildcard rather than adding to it, or being at home would mean 1.6.
+
 ### The interface is the battle system's, rebuilt not re-imported
 
 The menu wears battle's shapes — `.pxr` cut corners, `--bevel`, hard offset shadows, the
@@ -489,12 +517,16 @@ The same distinction that settles most arguments in `../BATTLE SYSTEM/`:
 `src/battle-bridge.js` is the entire interface, and every field in it comes from
 `../GDDs + Spreadsheets/AVUI_COMBAT_GDD.md` §13 — nothing there is invented.
 
-`src/encounter.js` is the ONLY file that references a battle. It shows a debug screen
-(`BATTLE OCCURRED`, WIN / LOSS / FLED) but builds a real descriptor and returns through
-the real `applyEncounterResult`, so the contract is exercised on every encounter and MS/EC
-persist exactly as they will when a battle is doing the arithmetic. **The map is never
-blocked on the battle system and cannot break it**; connecting them is a change to one
-function in that file.
+`src/encounter.js` is the ONLY file that references a battle. It builds a real descriptor,
+mounts the real fight, and returns through the real `applyEncounterResult`, so MS and EC
+persist exactly as §13 says they do. It also carries **which enemy** — the unit the element
+chose when it spawned — and both paths that can start a fight have to pass it: a tap on a
+passive enemy, and a Hunter's countdown running out. Miss either and the fight looks the
+unit up off the element row instead, and every ride is the same opponent.
+
+The debug screen that used to stand in for the fight (`BATTLE OCCURRED`, WIN / LOSS / FLED)
+is gone: with a real fight to hand off to it was a second and drifting definition of what a
+result is.
 
 The one rule that shapes the whole layer is §13.1: **MS and EC persist between
 encounters.** Overflow is derived from them, so it persists implicitly. That is why the

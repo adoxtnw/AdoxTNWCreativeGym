@@ -12,8 +12,14 @@ const DARK_RING=[34,34,44], DARK_RING_HI=[66,64,90];   // empty slots breathe be
 const outerR=(pos,cfg)=>Math.max(0, cfg.baseR - pos*cfg.spacing);
 function slotGeom(pos,cfg,mult){
   const o=outerR(pos,cfg), oIn=outerR(pos+1,cfg), gap=o-oIn;
+  /* `cfg.fill` lets one unit run thicker bands than the sheet's default. It
+     exists for the shaped enemies: a triangle or a star squeezes every band's
+     PIXEL thickness by its own narrowness, and the thin inner rings went under
+     one pixel and broke into dashes. Measured, not guessed — see the ring
+     continuity check in the README. Circles pass nothing and are unchanged. */
+  const fill=(cfg.fill==null?RULES.layerFill:cfg.fill);
   // never let a band swallow the slot inside it, however it is tuned
-  const band=Math.min(gap*RULES.layerFill*mult, gap*0.92, o);
+  const band=Math.min(gap*fill*mult, gap*0.92, o);
   return {outer:o, inner:Math.max(0,o-band)};
 }
 function rotateLayers(u){
@@ -55,10 +61,73 @@ function ringsOf(u,t,cfg,which){
   return rings.sort((a,b)=>b.outer-a.outer);
 }
 const shade=(c,f)=>c.map(v=>Math.max(0,Math.min(255,Math.round(v*f))));
-function paint(ctx,W,H,cx,cy,rings){
+
+/* ================= SILHOUETTES =================
+   An enemy's TIER is not a stat, it is a shape: a weak one wears concentric
+   triangles and a strong one concentric seven-pointed stars, so what you are
+   walking into is legible from the sprite before a single number is shown.
+
+   ONE FUNCTION CHANGES, NOT THE RENDERER. `paint` already decides which band a
+   pixel is in by asking how far it is from the centre; every shape here is
+   just a different answer to that question. A ring at radius 28 is still a ring
+   at radius 28 — it is the DISTANCE that is stretched, by a factor that depends
+   only on the angle:
+
+       distance = hypot(dx,dy) / f(angle),      f in (0,1]
+
+   f is 1 where the shape reaches furthest (a vertex, a star's point) and less
+   than 1 everywhere else, so every shape is INSCRIBED in the circle the rings
+   were tuned for. Nothing about layer geometry, breathing or spacing has to
+   know any of this, and the player's rings, which pass no shape at all, are
+   exactly the circles they have always been.
+
+   WHY THE TRIANGLE IS ROUNDED. Bands are constant in shape space, so their
+   thickness in PIXELS is multiplied by f. A true triangle has f = 0.5 along the
+   flats, which puts the thin inner rings (about 1.8px) under one pixel there —
+   they break into dashes and then vanish. `enemyTriRound` pulls f up toward the
+   circle until they survive. It is legibility, not taste. */
+const TAU=Math.PI*2;
+/* A rules cell, with a fallback. Deliberately NOT called `num`: view.js already
+   uses that name for a local, and a global with the same name is a trap. */
+const rv=(v,d)=>(v===""||v==null||isNaN(+v))?d:+v;
+function polyF(a,n,round){
+  const seg=TAU/n, m=((a%seg)+seg)%seg - seg/2;
+  const f=Math.cos(Math.PI/n)/Math.cos(m);              // 1 at a vertex
+  return 1-(1-f)*round;                                  // ...pulled back toward a circle
+}
+function starF(a,n,inner){
+  const seg=TAU/n, m=((a%seg)+seg)%seg;
+  /* a triangle wave: 1 at the point, `inner` at the valley between two points */
+  const k=Math.abs(m/seg*2-1);
+  return inner+(1-inner)*k;
+}
+/* Returns null for a circle, so the common case costs nothing at all.
+   `-PI/2` puts a vertex at twelve o'clock: atan2 measures from the +x axis, so
+   without it the triangle sits on a corner pointing right, which reads as an
+   arrow aimed off-screen rather than as something facing you. */
+const SHAPE_UP=-Math.PI/2;
+function shapeF(kind,spin){
+  spin=(spin||0)+SHAPE_UP;
+  if(kind===RULES.enemyShapeWeak && kind==="TRIANGLE")
+    return a=>polyF(a-spin,3,rv(RULES.enemyTriRound,0.72));
+  if(kind===RULES.enemyShapeStrong && kind==="STAR")
+    return a=>starF(a-spin,Math.max(3,rv(RULES.enemyStarPoints,7)),rv(RULES.enemyStarInner,0.62));
+  return null;
+}
+/* WEAK / REGULAR / STRONG -> what that tier is drawn as, and how big. Both come
+   off the rules sheet, and an unknown tier falls through to the circle rather
+   than throwing — a units row with a typo in it should look ordinary, not crash
+   the fight. */
+const tierShape = u => ({WEAK:RULES.enemyShapeWeak, STRONG:RULES.enemyShapeStrong})[u.tier]
+                       || RULES.enemyShapeRegular;
+const tierScale = u => u.tier==="WEAK"   ? rv(RULES.enemyRingScaleWeak,0.85)
+                     : u.tier==="STRONG" ? rv(RULES.enemyRingScaleStrong,1.05) : 1;
+
+function paint(ctx,W,H,cx,cy,rings,shape){
   const mask=new Int16Array(W*H).fill(-1), edge=new Int8Array(W*H);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    const d=Math.hypot(x-cx,y-cy);
+    const dx=x-cx, dy=y-cy;
+    const d=shape ? Math.hypot(dx,dy)/shape(Math.atan2(dy,dx)) : Math.hypot(dx,dy);
     for(let k=0;k<rings.length;k++){
       const r=rings[k];
       if(d<=r.outer&&d>=r.inner){
@@ -91,7 +160,22 @@ const CV={
 const EW=64, PW=RULES.playerCanvasW, PH=RULES.playerCanvasH;
 ["sprIn","sprOut"].forEach(id=>{$(id).width=$(id).height=EW;});
 ["pRingsIn","pRingsOut"].forEach(id=>{$(id).width=PW; $(id).height=PH;});
-const E_CFG={baseR:RULES.enemyRingBaseR,  spacing:RULES.enemyRingSpacing,  breathe:RULES.enemyRingBreathe};
+/* The enemy's ring geometry is REBUILT PER FIGHT, because a weak one is smaller
+   and a strong one bigger. Spacing scales with the radius, or a strong enemy
+   would simply have wider bands rather than being a larger creature. */
+const enemyCfg = u => {
+  const k=tierScale(u), shaped=tierShape(u)!==RULES.enemyShapeRegular;
+  return {baseR:  RULES.enemyRingBaseR   * k,
+          spacing:RULES.enemyRingSpacing * k,
+          breathe:RULES.enemyRingBreathe * (shaped ? rv(RULES.enemyShapeBreathe,0.5) : 1),
+          /* Only a shaped enemy thickens its bands, and only because it has to. */
+          fill:   RULES.layerFill * (shaped ? rv(RULES.enemyShapeFill,1.6) : 1)};
+};
+let E_CFG=enemyCfg(S.enemy);
+/* CALL THIS WHENEVER `S.enemy` IS REPLACED. The geometry is built once per fight
+   rather than once per frame, so a new enemy arriving from the map would
+   otherwise be drawn at the size of the one this page booted with. */
+function refreshEnemyShape(){ E_CFG=enemyCfg(S.enemy); glowCache={}; }
 const P_CFG={baseR:RULES.playerRingBaseR, spacing:RULES.playerRingSpacing, breathe:RULES.playerRingBreathe};
 let t=0, frozen=false, timer=null, glowCache={};
 let stepMs=1000/12, acc=0, lastTs=0, rafId=0, lastTickAt=0, watchdog=null;
@@ -122,8 +206,12 @@ function tick(){
   if(S.player.hurtFlash>0) S.player.hurtFlash--;
   redrawGauges();                       // canvas bars repaint every frame
   const ec=EW/2, pcx=PW/2, pcy=RULES.playerRingCy;
-  paint(CV.eIn ,EW,EW,ec ,ec ,ringsOf(S.enemy ,t,E_CFG,"inner"));
-  paint(CV.eOut,EW,EW,ec ,ec ,ringsOf(S.enemy ,t,E_CFG,"outer"));
+  /* The silhouette turns slowly. A polygon that never moves reads as a logo;
+     the same polygon drifting a fraction of a degree a frame reads as a
+     creature holding still. Circles pass null and are unaffected. */
+  const eShape=shapeF(tierShape(S.enemy), t*rv(RULES.enemyShapeSpin,0.018));
+  paint(CV.eIn ,EW,EW,ec ,ec ,ringsOf(S.enemy ,t,E_CFG,"inner"),eShape);
+  paint(CV.eOut,EW,EW,ec ,ec ,ringsOf(S.enemy ,t,E_CFG,"outer"),eShape);
   paint(CV.pIn ,PW,PH,pcx,pcy,ringsOf(S.player,t,P_CFG,"inner"));
   paint(CV.pOut,PW,PH,pcx,pcy,ringsOf(S.player,t,P_CFG,"outer"));
   applyGlow($("sprOut"),S.enemy,4);

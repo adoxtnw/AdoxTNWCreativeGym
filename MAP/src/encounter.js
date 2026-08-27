@@ -41,11 +41,16 @@ const Encounter = {
       canFlee: kind !== "BOSS"          /* 13.1.4 — you cannot run from a Line's end */
     });
     sfx("map_entity");
-    /* WHICH ROW THIS THING FIGHTS AS. It comes off the element's own
-       `travel_elements` line, so a second enemy is a row in a sheet rather
-       than a branch in here. */
+    /* WHICH ROW THIS THING FIGHTS AS.
+
+       The element ALREADY DECIDED, back when it spawned — an enemy has to look
+       like what it is while it is still drifting past, so its units row is
+       chosen there and carried here. `travel_elements.unit` is the override
+       behind it, for pinning one element to one enemy, and "enemy" is the last
+       resort so a malformed descriptor still starts a fight rather than
+       throwing on the way in. */
     const row = ELEMENTS[this.enemy.id];
-    this.unit = (row && row.unit) || "enemy";
+    this.unit = this.enemy.unit || (row && row.unit) || "enemy";
     const em = (UNITS[this.unit] || {}).emotion;
     this.washCol = EMOTIONS[em] ? hexRGB(EMOTIONS[em].hex) : null;
 
