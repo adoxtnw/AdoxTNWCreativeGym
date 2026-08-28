@@ -112,6 +112,28 @@ returned on a flag that said the music was already playing. `audioAwake()` resum
 context instead of restarting the music, which works because a suspended context's clock is
 stopped: sources already scheduled begin from their first note when it wakes.
 
+### A weighted draw is only correct while the weights fit
+
+The element roll walked cumulative slices and compared them against
+`Math.random()` — fine while the weights summed under 1, where the remainder is the chance
+of nothing. Adding two kinds took the total to 1.20, and everything past 1.0 became
+unreachable: the Energy Triangle fired on 5% of rolls instead of its stated 25%, and a
+seventh kind would never have appeared at all. Silently, with a perfectly correct-looking
+row in the sheet.
+
+Drawing across `max(1, total)` leaves the under-1 case identical and makes an over-1 table
+mean what it says. The general shape: a normalisation that is implicit is a normalisation
+that breaks the moment someone adds a row.
+
+### The bar must not draw past its own bracket
+
+Overcharge is allowed to spill past the stamina ceiling — that is the point of showing it —
+but it was drawing the WHOLE bar out there: mint silhouette top and bottom, dark interior
+between. The bracket stopped reading as the end of the bar and the wave appeared to burst
+out of it. Only the charge band belongs past the ceiling; without the outline and the unlit
+fill, the bracket stays the end of the stamina and the overload reads as something escaping
+it.
+
 ### A lookup table tested in order can hold two contradictory answers
 
 `musicForPhase()` reads as a list of rules, but it is a sequence of early

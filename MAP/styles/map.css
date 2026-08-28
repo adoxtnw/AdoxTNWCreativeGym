@@ -961,3 +961,33 @@ button{text-transform:inherit; letter-spacing:inherit}
    canvas is up and carrying that black itself. */
 #battleFlash.blackout{display:block; opacity:1; background:#000; transition:none}
 #battleFlash.out{opacity:0; transition:opacity var(--battleFade,.62s) steps(8)}
+
+/* =====================================================================
+   THE RIDE'S OWN MS / EC BAR
+   The same renderer as the profile card, on the screen where the
+   decision it informs is being made: is there enough left to take this
+   enemy, or is it worth catching one more orb first.
+   ===================================================================== */
+.ridestats{position:absolute; left:0; right:0;
+  bottom:calc(4px + env(safe-area-inset-bottom,0px));
+  z-index:4; display:none; padding:0 10px 2px; pointer-events:none}
+.ridestats.show{display:block}
+/* the ground behind it, so the bar reads over a moving track */
+.ridestats::before{content:""; position:absolute; inset:-6px 0 -10px;
+  background:linear-gradient(180deg,rgba(9,8,14,0) 0%,rgba(9,8,14,.72) 38%,rgba(9,8,14,.9) 100%)}
+.ridestats > *{position:relative}
+.ridestats .gwrap{height:40px; margin:0}
+.ridestats .gaugecv{height:38px}
+#rGauge{filter:drop-shadow(0 0 4px rgba(176,255,225,.5))
+                drop-shadow(0 0 13px rgba(176,255,225,.26))}
+.ridestats .tagrow{display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-top:-2px}
+.ridestats .tagrow .tag{position:static; font-size:14px;
+  animation:floaty 3.4s steps(41) infinite alternate}
+.ridestats .tagrow .tag.ec{animation-delay:-1.7s}
+
+/* THE TWO RIDE CONTROLS MOVE UP OFF IT. They used to sit on the bottom edge,
+   which is now the bar's. Raised by exactly the strip's height rather than a
+   guessed number, so the two cannot overlap at any screen size. */
+.ridestats.show ~ .endbtn{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.ridestats.show ~ .bagbtn{bottom:calc(86px + env(safe-area-inset-bottom,0px))}

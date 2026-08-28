@@ -113,11 +113,25 @@ const Player = {
      who they are. An unnamed profile is the signal that creation is owed. */
   seedProfile(){
     if(!this.armor) this.armor = RULES.startArmor || Object.keys(ARMOR)[0] || "";
-    if(!this.sets.length)
-      this.sets = String(RULES.startSets || "").split("|").map(x => x.trim()).filter(Boolean);
+    const kitSets  = String(RULES.startSets || "").split("|").map(x => x.trim()).filter(Boolean);
+    const kitArmor = String(RULES.startArmorOwned || "").split("|").map(x => x.trim()).filter(Boolean);
+    if(!this.sets.length) this.sets = kitSets.slice();
+    /* EQUIPPED is a subset of OWNED, and only `equippedSlots` of them. */
     this.sets = this.sets.slice(0, RULES.equippedSlots || 3);
     if(!this.ownedArmor.length) this.ownedArmor = this.armor ? [this.armor] : [];
     if(!this.ownedSets.length)  this.ownedSets  = this.sets.slice();
+
+    /* TOP UP, DO NOT REPLACE. The starting kit is a floor, not a snapshot: a
+       profile saved before a Move Set existed would otherwise never be able to
+       reach it, because ownership is only ever written at creation. Adding to
+       the sheet therefore adds to every existing save, while anything earned
+       or equipped since is left exactly as it is. */
+    const own = (list, want) => {
+      want.forEach(id => { if(id && list.indexOf(id) < 0) list.push(id); });
+    };
+    own(this.ownedSets,  kitSets.filter(id => LOADOUTS[id]));
+    own(this.ownedArmor, kitArmor.filter(id => ARMOR[id]));
+    own(this.ownedArmor, [this.armor].filter(id => id && ARMOR[id]));
   },
   /* ---- ARRIVING AS SOMEBODY -------------------------------------------
      The title screen asks the question now, so by the time the map loads the

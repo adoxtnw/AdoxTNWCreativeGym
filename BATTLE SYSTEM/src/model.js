@@ -192,6 +192,19 @@ function critBonus(u){
   for(const k in u.statuses) if(u.statuses[k] > 0 && STATUSES[k]) m += (STATUSES[k].crit_mult || 0);
   return m;
 }
+/* WHAT A UNIT'S MOVE SETS GIVE IT BESIDES ABILITIES.
+
+   Passives have been a column on `loadouts` and `armor` since those sheets
+   existed, and until now nothing read them — every blurb said "pending design".
+   This is the seam they plug into. Only the SETS are consulted here: the map
+   sends the loadouts it is carrying, and armor's passive is not part of the
+   descriptor, so claiming to honour it would be a lie. */
+function unitPassives(u){
+  return (u.loadouts || []).map(id => LOADOUTS[id] && LOADOUTS[id].passive)
+                           .filter(Boolean);
+}
+const hasPassive = (u, id) => unitPassives(u).indexOf(id) >= 0;
+
 /* Fraction of this unit's attacks that miss outright. */
 function missChance(u){
   let m = 0;

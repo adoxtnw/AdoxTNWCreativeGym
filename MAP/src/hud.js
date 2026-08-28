@@ -355,3 +355,47 @@ function stagger(root){
     el.classList.add("rise");
   });
 }
+
+/* ---- THE RIDE'S MS / EC BAR ------------------------------------------------
+   The same `drawGauge` the profile card uses, and for the same reason it was
+   ported in the first place: the number you carry into a fight should be drawn
+   by the code that will draw it during one.
+
+   It exists on the ride screen because that is where the decision is. Stamina
+   only moves during a ride, orbs and triangles only appear during a ride, and
+   the choice they create — take this enemy now, or catch one more first — is
+   unanswerable without seeing both numbers. Everywhere else this bar would be
+   decoration; here it is the instrument. */
+const RideGauge = {
+  ctx: null, dctx: null,
+  attach(){
+    const live = $("rGauge"), dead = $("rGaugeDead");
+    if(!live || !dead){ this.ctx = null; return; }
+    if(live.width !== RULES.gaugeW){
+      live.width = dead.width = RULES.gaugeW;
+      live.height = dead.height = RULES.gaugeH;
+    }
+    this.ctx = live.getContext("2d");
+    this.dctx = dead.getContext("2d");
+  },
+  draw(){
+    if(!this.ctx) this.attach();
+    if(!this.ctx) return;
+    const u = Player.gaugeUnit();
+    drawGauge(this.ctx, this.dctx, u, {accent: GAUGE.mint});
+    const ms = $("rTagMs"), ec = $("rTagEc");
+    if(ms) ms.textContent = u.shownMs + " MS";
+    if(ec){
+      ec.textContent = u.shownEc + " EC";
+      ec.classList.toggle("overcharged", u.shownEc > u.shownMs);
+    }
+  },
+  /* On the game clock, and only while it is on screen — a canvas repainted
+     behind a hidden strip is pure waste, the same rule MenuGauge follows. */
+  step(){
+    const el = $("rideStats");
+    if(!el || !el.classList.contains("show")) return;
+    gaugePhase++;
+    this.draw();
+  }
+};

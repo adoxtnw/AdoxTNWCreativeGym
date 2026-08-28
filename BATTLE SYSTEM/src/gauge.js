@@ -138,8 +138,21 @@ function drawGauge(ctx, dctx, u, o){
 
       if(y < top - 1 || y > bot + 1) continue;
 
+      /* PAST THE CEILING THERE IS NO BAR, ONLY SPILL.
+
+         Overcharge is allowed to draw beyond the stamina bracket — that is the
+         whole point of showing it. But it was drawing the WHOLE bar out there:
+         the mint silhouette top and bottom, and the dark stamina interior
+         between them. The bracket stopped reading as the end of the bar and
+         the wave appeared to burst straight out of it.
+
+         Only the charge band belongs past the ceiling. Without the outline and
+         the unlit fill, the bracket stays the end of the stamina and the
+         overload reads as something escaping it. */
+      const beyondCeiling = overcharged && x > msX;
+
       /* ---- the mint silhouette stroke ---- */
-      if(y <= top + 0.6 || y >= bot - 0.6){ put(x, y, accent); continue; }
+      if(!beyondCeiling && (y <= top + 0.6 || y >= bot - 0.6)){ put(x, y, accent); continue; }
 
       /* ---- interior ---- */
       const dy = Math.abs(y - (cy + ecW));
@@ -157,6 +170,8 @@ function drawGauge(ctx, dctx, u, o){
         }   // fixed to the bar and revealed by the fill, but always drifting
         continue;
       }
+      /* there is no unlit STAMINA past the stamina ceiling — see above */
+      if(beyondCeiling) continue;
       /* unlit stamina: dark, with the arc texture only readable here */
       put(x, y, [10, 9, 8]);
       if(x > ecX && x < msX){

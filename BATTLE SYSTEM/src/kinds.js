@@ -61,6 +61,21 @@ Kinds.define("DAMAGE", {
        gambled would show the player a number the game then contradicts. */
     if(Math.random() < missChance(actor)){
       bigTag("MISS", "off"); sfx("block");
+      /* THE SET OF JOLT: a miss is not nothing. Surprise pays you for the swing
+         that went wrong, which is the whole idea of the set — it carries one
+         attack, so the thing that makes it worth carrying has to be what
+         happens when that attack fails. Charge is capped at the unit's own
+         ceiling like any other gain. */
+      if(hasPassive(actor, "PAS_JOLT")){
+        /* `num()` is a MAP helper and does not exist in this app — a plain
+           fallback is the local idiom (see RULES.critChance above). */
+        const gain = Math.min(RULES.joltEc || 20, Math.max(0, actor.maxMs - actor.ec));
+        if(gain > 0){
+          actor.ec += gain;
+          queueDelta(actor, "EC", gain);
+          bigTag("+" + gain + " EC", "ec");
+        }
+      }
       renderStats(); await sleep(420); return;
     }
 

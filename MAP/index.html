@@ -41,6 +41,20 @@
      <div class="menu" id="menu"></div>
 
      <!-- the only controls that exist while the train is running -->
+     <!-- WHAT YOU ARE CARRYING INTO THE NEXT FIGHT. The same gauge the profile
+          card draws, on the one screen where the decision it informs is
+          actually being made: farm another orb, or take the enemy now. -->
+     <div class="ridestats" id="rideStats">
+       <div class="gwrap">
+         <canvas class="gaugecv dead" id="rGaugeDead"></canvas>
+         <canvas class="gaugecv" id="rGauge"></canvas>
+       </div>
+       <div class="tagrow">
+         <span class="tag ms pxr" id="rTagMs"></span>
+         <span class="tag ec ramp pxr" id="rTagEc"></span>
+       </div>
+     </div>
+
      <button class="endbtn bigbtn pxr hudbtn" id="endRide">END</button>
      <button class="bagbtn bigbtn pxr hudbtn" id="bagBtn">BAGGAGE</button>
      <div class="baggage" id="baggage"></div>

@@ -196,6 +196,11 @@ ABILS = [
  # costing or the shot counts is new; only the emotion is.
  ab(id="ATK_SURPRISE", blurb='Attack. Cracks the outermost {LAYER}.', name="Sucker Punch", emotion="SURPRISE", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BURST"),
  ab(uses=2, id="HVY_SURPRISE", blurb='Attack. *Charges* first, then hits for triple.', name="Whiplash", emotion="SURPRISE", cost=45, kind="DAMAGE", power=90, charge=2, hits_layer=1, icon="BURST"),
+ ab(uses=2, id="MID_SURPRISE", blurb='Attack. *Charges* once, then hits hard.',
+    name="Double Take", emotion="SURPRISE", cost=30, kind="DAMAGE", power=60, charge=1,
+    hits_layer=1, icon="BURST",
+    notes="Between ATK_SURPRISE and HVY_SURPRISE in every respect: one charging station "
+          "rather than none or two, and power to match. The Set of Jolt is built around it."),
  ab(id="STARTLE", blurb='Debuff. Target *misses a third* of its attacks for *2 turns*.', name="Out of Nowhere", emotion="SURPRISE", cost=25, kind="DEBUFF", power=0, hits_layer=0, icon="BURST",
     uses=2, status_apply="RATTLED", status_duration=2,
     notes="Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it "
@@ -265,7 +270,7 @@ UNITS_ROWS = [
  en(id="enemy", name="The Commuter", emotion="ANGER", tier="REGULAR", max_ms=250,
     layers="ANGER|ANGER|SADNESS",
     pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND",
-    spawn_lines="L1:1.0|*:0.6",
+    spawn_lines="L1:1.2|*:0.75",
     drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
     notes="AI reads the matchups sheet, so retuning it retunes the AI. `drops` is what "
           "beating this one may leave. The `*` in spawn_lines is what stops L3, L4 and L6 "
@@ -275,7 +280,7 @@ UNITS_ROWS = [
     max_ms=330, start_ec_pct=0.50, line_cap=3,
     layers="ANGER|ANGER|ANGER|SADNESS",
     pool="ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE",
-    spawn_lines="L1:0.5",
+    spawn_lines="L1:0.14",
     drops="CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55",
     notes="Anger, turned up: one more layer than the Commuter and a third more stamina, and "
           "its pool is nearly all Anger, so an Anger-layered player is drinking most of it "
@@ -284,7 +289,7 @@ UNITS_ROWS = [
     max_ms=240,
     layers="SURPRISE|SURPRISE|ANGER",
     pool="ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE",
-    spawn_lines="L2:1.0",
+    spawn_lines="L2:1.2",
     drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
     notes="L2's own. Slightly under the Commuter on stamina because STARTLE is worth more "
           "than it costs when it lands."),
@@ -292,7 +297,7 @@ UNITS_ROWS = [
     max_ms=320, start_ec_pct=0.50,
     layers="SURPRISE|SURPRISE|SURPRISE|JOY",
     pool="ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE",
-    spawn_lines="L2:0.45",
+    spawn_lines="L2:0.12",
     drops="CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55",
     notes="Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that "
           "does NOT absorb Surprise, which is the counter to a player who came dressed for it."),
@@ -300,7 +305,7 @@ UNITS_ROWS = [
     max_ms=150, start_ec_pct=0.30, line_cap=2, max_bonus_slots=4,
     layers="SADNESS|SADNESS",
     pool="ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE",
-    spawn_lines="L2:0.15|L5:0.15",
+    spawn_lines="L2:0.6|L5:0.7",
     drops="CRYSTAL:1:0.45|SEGMENT:2:0.40",
     notes="No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and "
           "INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME "
@@ -310,7 +315,7 @@ UNITS_ROWS = [
     max_ms=150, start_ec_pct=0.30, line_cap=2, max_bonus_slots=4,
     layers="JOY|JOY",
     pool="ATK_JOY|GEN_JOY|DEFEND|RECHARGE",
-    spawn_lines="L2:0.15",
+    spawn_lines="L2:0.6",
     drops="CRYSTAL:1:0.45|SEGMENT:2:0.40",
     notes="L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how "
           "it was asked for. Reads as Line 2 being where the wrong people end up. Add "
@@ -558,7 +563,9 @@ RULES = [
  ("affinitySlots",2,"How many Emotional Affinities a player picks at creation."),
  ("armorSlots",1,"Emotional Armor pieces worn at once."),
  ("startArmor","ARM_SCARS","The armor a new profile begins in."),
- ("startSets","LO_ANGER|LO_SADNESS|LO_JOY","The Move Sets a new profile begins with."),
+ ("startSets","LO_ANGER|LO_SADNESS|LO_JOY|LO_DISGUST|LO_SURPRISE","The Move Sets a profile OWNS. `equippedSlots` of them can be carried at once, so this is the shelf to pick from rather than the loadout itself."),
+ ("startArmorOwned","ARM_SCARS|ARM_STATIC","Armor a profile OWNS, beyond the one it is wearing. Same idea as startSets."),
+ ("joltEc",20,"Emotional Charge the Set of Jolt's passive returns each time one of your attacks misses."),
 ]
 sheet("rules", ["key","value","description"], {"key","value"},
   [dict(key=k, value=v, description=d) for k,v,d in RULES],
@@ -743,7 +750,14 @@ LOADOUTS_ROWS = [
  lo("LO_SADNESS", "SADNESS", "Sadness", "ATK_SADNESS","HVY_SADNESS","INFLICT_SAD"),
  lo("LO_JOY",     "JOY",     "Joy",     "ATK_JOY","HVY_JOY","GEN_JOY"),
  lo("LO_DISGUST", "DISGUST", "Disgust", "GEN_DISGUST","ROT"),
- lo("LO_SURPRISE","SURPRISE","Surprise","ATK_SURPRISE","HVY_SURPRISE","STARTLE"),
+ # REDEFINED, not added alongside. This row existed but nothing owned it and
+ # nothing referenced it — three generic attacks with no idea of its own. The
+ # design asked for something else entirely: one mid-strong attack, and a
+ # passive that pays you for missing.
+ lo("LO_SURPRISE","SURPRISE","Jolt", "MID_SURPRISE", passive="PAS_JOLT",
+    notes="One attack and one passive, deliberately. Surprise is not about volume of "
+          "swings - it is about what happens when one goes wrong, which is what PAS_JOLT "
+          "turns into charge."),
  lo("LO_FEAR",    "FEAR",    "Fear",     notes="No Fear abilities exist yet."),
 ]
 sheet("loadouts", LO_COLS, LO_LIVE, LOADOUTS_ROWS,

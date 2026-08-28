@@ -43,6 +43,7 @@ INFLICT_SAD,Self-Harm,SADNESS,30,DEBUFF,0,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,
 BLIND,Blinded by Hate,ANGER,30,DEBUFF,0,0,0,EYE,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target *misses half* its attacks for *2 turns*.,0,,,BLINDED,0,2,,,,LOWEST_MS,COMMON,,1,ENEMY ability. The target misses half its attacks for 2 turns.
 ATK_SURPRISE,Sucker Punch,SURPRISE,20,DAMAGE,35,0,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,Attack. Cracks the outermost {LAYER}.,0,,,,0,0,,,,LOWEST_MS,COMMON,,1,
 HVY_SURPRISE,Whiplash,SURPRISE,45,DAMAGE,90,2,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Attack. *Charges* first, then hits for triple.",0,,,,0,0,,,,LOWEST_MS,COMMON,,1,
+MID_SURPRISE,Double Take,SURPRISE,30,DAMAGE,60,1,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Attack. *Charges* once, then hits hard.",0,,,,0,0,,,,LOWEST_MS,COMMON,,1,"Between ATK_SURPRISE and HVY_SURPRISE in every respect: one charging station rather than none or two, and power to match. The Set of Jolt is built around it."
 STARTLE,Out of Nowhere,SURPRISE,25,DEBUFF,0,0,0,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target *misses a third* of its attacks for *2 turns*.,0,,,RATTLED,0,2,,,,LOWEST_MS,COMMON,,1,"Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it with a weaker basic economy rather than with a bigger bill."
 SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; costs you {MS}.,0,,,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
 FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; *heals* your opponent.,0,,,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
@@ -67,12 +68,12 @@ FEAR,FEAR,10,0.5,1,ABSORBED!,absorb,absorb,,0,,1,Same emotion: the layer drinks 
    line:weight, `*` for every line - where the map may produce this enemy.  */
 units: `id,name,emotion,tier,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,spawn_lines,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
 player,You,,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,REGULAR,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,L1:1.0|*:0.6,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave. The \`*\` in spawn_lines is what stops L3, L4 and L6 being empty of enemies until they have units of their own — the Commuter rides every line, which is the joke and also the fallback."
-enemy_anger_strong,The Enforcer,ANGER,STRONG,330,0.5,ANGER|ANGER|ANGER|SADNESS,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE,-1,3,6,,L1:0.5,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Anger, turned up: one more layer than the Commuter and a third more stamina, and its pool is nearly all Anger, so an Anger-layered player is drinking most of it while anyone else is not."
-enemy_surprise,The Interruption,SURPRISE,REGULAR,240,0.4,SURPRISE|SURPRISE|ANGER,ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE,-1,3,6,,L2:1.0,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,L2's own. Slightly under the Commuter on stamina because STARTLE is worth more than it costs when it lands.
-enemy_surprise_strong,The Reversal,SURPRISE,STRONG,320,0.5,SURPRISE|SURPRISE|SURPRISE|JOY,ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE,-1,3,6,,L2:0.45,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that does NOT absorb Surprise, which is the counter to a player who came dressed for it."
-enemy_sadness_weak,The Straggler,SADNESS,WEAK,150,0.3,SADNESS|SADNESS,ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE,-1,2,4,,L2:0.15|L5:0.15,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME — the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon sight on both its lines. Raise the L5 cell to make it Line 5's regular."
-enemy_joy_weak,The Reveller,JOY,WEAK,150,0.3,JOY|JOY,ATK_JOY|GEN_JOY|DEFEND|RECHARGE,-1,2,4,,L2:0.15,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how it was asked for. Reads as Line 2 being where the wrong people end up. Add \`|L4:1.0\` to give Joy its own regular."`,
+enemy,The Commuter,ANGER,REGULAR,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,L1:1.2|*:0.75,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave. The \`*\` in spawn_lines is what stops L3, L4 and L6 being empty of enemies until they have units of their own — the Commuter rides every line, which is the joke and also the fallback."
+enemy_anger_strong,The Enforcer,ANGER,STRONG,330,0.5,ANGER|ANGER|ANGER|SADNESS,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE,-1,3,6,,L1:0.14,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Anger, turned up: one more layer than the Commuter and a third more stamina, and its pool is nearly all Anger, so an Anger-layered player is drinking most of it while anyone else is not."
+enemy_surprise,The Interruption,SURPRISE,REGULAR,240,0.4,SURPRISE|SURPRISE|ANGER,ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE,-1,3,6,,L2:1.2,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,L2's own. Slightly under the Commuter on stamina because STARTLE is worth more than it costs when it lands.
+enemy_surprise_strong,The Reversal,SURPRISE,STRONG,320,0.5,SURPRISE|SURPRISE|SURPRISE|JOY,ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE,-1,3,6,,L2:0.12,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that does NOT absorb Surprise, which is the counter to a player who came dressed for it."
+enemy_sadness_weak,The Straggler,SADNESS,WEAK,150,0.3,SADNESS|SADNESS,ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE,-1,2,4,,L2:0.6|L5:0.7,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME — the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon sight on both its lines. Raise the L5 cell to make it Line 5's regular."
+enemy_joy_weak,The Reveller,JOY,WEAK,150,0.3,JOY|JOY,ATK_JOY|GEN_JOY|DEFEND|RECHARGE,-1,2,4,,L2:0.6,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how it was asked for. Reads as Line 2 being where the wrong people end up. Add \`|L4:1.0\` to give Joy its own regular."`,
 
 /* --- dialogue ---
    what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one
@@ -402,7 +403,9 @@ startLineKeys,L1|L2,Line Keys the player begins with.,,,
 affinitySlots,2,How many Emotional Affinities a player picks at creation.,,,
 armorSlots,1,Emotional Armor pieces worn at once.,,,
 startArmor,ARM_SCARS,The armor a new profile begins in.,,,
-startSets,LO_ANGER|LO_SADNESS|LO_JOY,The Move Sets a new profile begins with.,,,`,
+startSets,LO_ANGER|LO_SADNESS|LO_JOY|LO_DISGUST|LO_SURPRISE,"The Move Sets a profile OWNS. \`equippedSlots\` of them can be carried at once, so this is the shelf to pick from rather than the loadout itself.",,,
+startArmorOwned,ARM_SCARS|ARM_STATIC,"Armor a profile OWNS, beyond the one it is wearing. Same idea as startSets.",,,
+joltEc,20,Emotional Charge the Set of Jolt's passive returns each time one of your attacks misses.,,,`,
 
 /* --- sounds ---
    synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.  */
@@ -508,7 +511,7 @@ LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,0,,,,1,
 LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
 LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,GEN_JOY,,1,0,,,,1,
 LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
-LO_SURPRISE,SURPRISE,Surprise,ATK_SURPRISE,HVY_SURPRISE,STARTLE,,1,0,,,,1,
+LO_SURPRISE,SURPRISE,Jolt,MID_SURPRISE,,,,1,0,PAS_JOLT,,,1,"One attack and one passive, deliberately. Surprise is not about volume of swings - it is about what happens when one goes wrong, which is what PAS_JOLT turns into charge."
 LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.`,
 
 /* --- prompts ---

@@ -457,6 +457,10 @@ function syncHud(){
   const off = (id, yes) => { const e = $(id); if(e) e.classList.toggle("hide", !!yes); };
   on("endRide",  J.phase === "RIDING");          /* debug escape from a ride */
   on("bagBtn",   catching());                    /* what this ride has got you */
+  /* the same phases the BAGGAGE button lives in, plus the fight itself, so the
+     numbers do not vanish at the moment they matter most */
+  on("rideStats", catching() || J.phase === "ENCOUNTER" || J.phase === "ENCOUNTER_IN");
+  RideGauge.draw();
   if(!catching()) Baggage.hide();
   Baggage.render();
   /* Progression GDD 5: loadouts cannot change mid-journey, and GDD 2: the game

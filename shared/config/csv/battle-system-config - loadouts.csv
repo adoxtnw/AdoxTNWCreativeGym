@@ -5,5 +5,5 @@ LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,0,,,,1,
 LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
 LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,GEN_JOY,,1,0,,,,1,
 LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
-LO_SURPRISE,SURPRISE,Surprise,ATK_SURPRISE,HVY_SURPRISE,STARTLE,,1,0,,,,1,
+LO_SURPRISE,SURPRISE,Jolt,MID_SURPRISE,,,,1,0,PAS_JOLT,,,1,"One attack and one passive, deliberately. Surprise is not about volume of swings - it is about what happens when one goes wrong, which is what PAS_JOLT turns into charge."
 LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.

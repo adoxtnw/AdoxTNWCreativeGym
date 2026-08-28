@@ -307,6 +307,31 @@ crossing the screen at 12 fps jumps eight pixels between frames, so what is unde
 when you press is not what was there when you decided to press. Hit boxes are also much
 bigger than the art — `travelTapR` is only the floor.
 
+#### Stamina Orbs and Energy Triangles
+
+Two pickups that give rather than count.
+
+| | kind | weight | gives |
+|---|---|---|---|
+| **Stamina Orb** | `ORB` | 0.10 | `amount`% of **MaxMS** |
+| **Energy Triangle** | `ENERGY` | 0.25 | `amount` **EC**, flat |
+
+The orb's amount is a **percentage**, not a flat number: armor moves the ceiling, and an orb
+worth a tenth of a small bar has to be worth a tenth of a large one or the pickup gets
+weaker the better you are equipped. It is drawn in `GAUGE.mint` — the very colour the
+stamina bar is made of — because nothing on the ride screen shows MS, so the only way it can
+say what it does is by being made of the same stuff. It pulses rather than spins: a turning
+thing reads as something to catch, a breathing one as something restorative.
+
+The triangle runs the **whole emotion ring** through `rampAt()`, the same function the charge
+bar uses, because Emotional Charge is the sum of all six and not any one of them. It falls
+fast — `drift` 1.75 against a segment's 1.15 — so it is the one pickup you have to reach for.
+
+Its charge is capped **twice**, and both matter: never past MaxMS, because that is what the
+bar is measured against; and never past **current MS**, because charge above stamina is an
+overload and a thing picked up on a train has no business inflicting one. On the map the two
+are the same number. Mid-ride, after a bad fight, the second is the one that binds.
+
 #### One roll, at most one thing, often nothing
 
 The roll comes round every 1–3 seconds (`rollMinSecs`/`rollMaxSecs`, squeezed toward the
@@ -467,6 +492,45 @@ files. **The music does not go through that graph at all** — it is plain `<aud
 with their own `volume`. Routing a recording through the bit-crusher would only cost it a
 few bits and replace its top end with aliasing, and routing it through Web Audio at all
 carries a nastier risk: see below.
+
+## The bar on the ride screen
+
+The same `drawGauge` the profile card uses, pinned to the bottom edge during a ride, with the
+same MS and EC tags. It is there because **that is where the decision is**: stamina only
+moves during a ride, orbs and triangles only appear during a ride, and the question they
+create — take this enemy now, or catch one more first — cannot be answered without seeing
+both numbers. Anywhere else this bar would be decoration; here it is the instrument.
+
+END and BAGGAGE are raised clear of it, and it repaints only while it is on screen — the
+same rule the card's gauge follows.
+
+## Passives that do something
+
+`passive` has been a column on `loadouts` and `armor` since those sheets existed, and until
+now nothing read it — every blurb said "pending design". **The Set of Jolt is the first one
+that does.**
+
+| | |
+|---|---|
+| **Set of Jolt** (`LO_SURPRISE`) | one attack, `MID_SURPRISE` — mid-strong, one charging station |
+| its passive | `PAS_JOLT` — **+`joltEc` (20) charge every time one of your attacks misses** |
+
+That pairing is the design: the set carries a single attack, so the thing that makes it
+worth carrying is what happens when that attack *fails*. Surprise pays you for the swing
+that went wrong.
+
+`unitPassives()` reads them off the Move Sets a unit is carrying. Only the sets — the map's
+descriptor sends loadouts and layers but not the armor id, so honouring armor's passive here
+would be a claim the data does not support.
+
+**Armor can carry three layers now.** The sheet had `layer1`/`layer2` until a piece needed a
+third; `layer3` is a column, `layersOf()` reads it, and the ceiling is `maxLayers` (6) rather
+than however many columns happen to exist. Adding a fourth is a column and nothing else.
+
+**The starting kit is a floor, not a snapshot.** `seedProfile()` tops up owned sets and armor
+from the rules rather than only writing them at creation — otherwise a profile saved before a
+Move Set existed could never reach it, because ownership is only ever written once. Anything
+earned or equipped since is left exactly as it is.
 
 ## The rules about MS and EC
 
@@ -664,15 +728,47 @@ python3 ../shared/tools/serve.py --app MAP
 
 ## Rebuilding content
 
-```bash
-cd ../shared/tools
-python3 export_csv.py
-python3 build_data.py ../config/csv --app MAP
+**Yes — you can change the numbers yourself, and no, it is not automatic.** Edit
+`GDDs + Spreadsheets/battle-system-config.xlsx`, save it, **double-click `AVUI/REBUILD.command`**,
+reload the game. That is the whole loop, and it takes about a second.
+
+### Why a step is needed at all
+
+The game does not read the spreadsheet — it reads `data.js`, which is generated from it. A
+browser cannot open an `.xlsx`, and reading the CSVs at runtime would break the prototype
+opening straight off the disk, because `file://` forbids the fetch. So the workbook is
+compiled, and `REBUILD.command` is the compiler. It only ever goes one way:
+
+```
+battle-system-config.xlsx  ->  shared/config/csv/*.csv  ->  MAP/data.js
+                                                        ->  BATTLE SYSTEM/data.js
 ```
 
-The spreadsheet and tooling are **shared with BATTLE SYSTEM** and live in `AVUI/shared/`.
-Map content becomes new sheets in that one workbook — the emotions table is the spine of
-both systems and must exist exactly once.
+Nothing in that chain writes back to the workbook, so running it can never clobber an edit.
+
+### The one thing not to run
+
+**`tools/build_workbook.py` regenerates the workbook itself** from defaults written in
+Python — it is how the file was first created — and it will overwrite anything typed into it
+by hand. `REBUILD.command` does not call it, and there is no reason to unless a whole new
+SHEET is being added. If that day comes, add the rows to the seed in that script *as well*,
+which is what the five enemies do.
+
+### What is safe to change by hand
+
+Every sheet: `travel_elements` (what appears on a ride and how often), `units` (enemies,
+their stats, their `spawn_lines` weights and `drops`), `dialogue` (personas and their
+lines), `rules` (every tunable in both apps), `stations`, `metro_lines`, `city_status`,
+`armor`, `loadouts`, `abilities`, `sounds`, `emotions`.
+
+Two things to keep in mind, both of which the build will tell you about if you get them
+wrong:
+
+- **`enabled` is a real switch.** A `0` there removes a row from the game without deleting
+  it, which is the safe way to try turning something off.
+- **Weights are relative, not percentages.** In `travel_elements.chance` and
+  `units.spawn_lines`, a roll picks one thing weighted by these; if they add up to less than
+  1 the remainder is the chance of nothing happening, and above 1 there is no such gap.
 
 ## The seam with battle
 

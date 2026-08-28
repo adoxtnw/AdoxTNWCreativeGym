@@ -188,7 +188,20 @@ function rollElements(){
     total += p;
     slices.push({id, upto: total});
   });
-  const r = Math.random();
+  /* DRAW ACROSS THE WHOLE WEIGHT, NOT ACROSS ONE.
+
+     The remainder above the slices is the chance of nothing — but only while
+     the slices add up to less than 1. Once they pass it, a fixed 0..1 draw can
+     never reach the last of them: adding two kinds took the total to 1.20 and
+     the Energy Triangle, sitting at the end, fired on 5% of rolls instead of
+     its stated 25%. Anything added after it would never have appeared at all,
+     silently, with its row in the sheet looking perfectly correct.
+
+     Spanning `max(1, total)` leaves the under-1 case exactly as it was, and
+     makes an over-1 table mean what it plainly says: shares of every roll, with
+     no quiet gap, because the kinds between them asked for more than all of it. */
+  const span = Math.max(1, total);
+  const r = Math.random() * span;
   for(let i = 0; i < slices.length; i++)
     if(r < slices[i].upto){ spawnElement(slices[i].id); return true; }
   return false;
@@ -301,7 +314,8 @@ function stepElementsSmooth(dt){
           Trip.collected += worth;
           Trip.flash = num(RULES.tripFlashMs, 260);
           sfx("map_tripup");
-        }else sfx("map_collect");
+        }else sfx("map_collect", el.e.kind === "ENERGY" ? 1.35
+                                : el.e.kind === "ORB" ? 0.8 : 1);
         payOut(el);
         Trip.live.splice(i, 1);
         /* filling the bar is what actually ends the ride */
@@ -330,7 +344,8 @@ function stepElementsSmooth(dt){
     if(gone) Trip.live.splice(i, 1);
   }
 }
-const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL";
+const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL" ||
+                          el.e.kind === "ORB" || el.e.kind === "ENERGY";
 
 /* What a collected element leaves in the vault. Crystals take the emotion of
    the LINE being ridden — what you bring back from a stretch of track is
@@ -343,6 +358,27 @@ const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL";
 function payOut(el){
   const pay = el.e.payload, n = el.e.amount || 1;
   if(pay === "CRYSTAL" && Run.active) Run.addCrystal(J.line.emotion, n);
+
+  /* STAMINA. `amount` is a PERCENTAGE of MaxMS, not a flat number: armor moves
+     the ceiling, and an orb worth a tenth of a small bar has to be worth a
+     tenth of a large one or the pickup gets weaker the better you are equipped.
+     It only means anything mid-ride — MS is restored in full on the map — which
+     is exactly what makes it a decision about whether THIS ride continues. */
+  else if(pay === "MS"){
+    const max = Player.maxMs;
+    Player.ms = Math.min(max, Player.ms + max * (n / 100));
+  }
+
+  /* CHARGE, flat. Capped twice over, and both caps are the point:
+       - never past MaxMS, because that is what the bar is measured against
+       - never past CURRENT MS, because charge above stamina is an OVERLOAD and
+         a thing picked up on a train has no business inflicting one
+     On the map the two are the same number; mid-ride, after a bad fight, the
+     second is the one that binds. */
+  else if(pay === "EC"){
+    const ceiling = Math.min(Player.maxMs, Player.ms);
+    Player.ec = Math.min(ceiling, Player.ec + n);
+  }
 }
 
 /* ---- what each kind looks like, and what a tap does ---------------------- */
@@ -454,6 +490,81 @@ ElementFx.define("CRYSTAL", {
     if(el.state !== "LIVE") return false;
     el.state = "FLY"; el.fly = 0; el.fx = el.x; el.fy = el.y;
     sfx("map_pick");
+    return true;
+  }
+});
+
+/* STAMINA ORB — the colour of the bar it refills. That is the whole design:
+   nothing on the ride screen shows Mental Stamina, so the only way a pickup can
+   say what it does is by being made of the same mint the gauge is made of. The
+   same `GAUGE.mint` the ported gauge uses, so the two cannot drift apart.
+
+   It breathes rather than spins. A rotating thing reads as something to catch;
+   a pulsing one reads as something restorative, and this is the only pickup on
+   the track that gives rather than counts. */
+ElementFx.define("ORB", {
+  draw(el, col){
+    const a = elAlpha(el), r = el.e.size / 2;
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.5 + el.seed * 6.3);
+    const skin = GAUGE.mint;
+    const lit  = [lerp(skin[0], 255, pulse * 0.55),
+                  lerp(skin[1], 255, pulse * 0.55),
+                  lerp(skin[2], 255, pulse * 0.55)];
+    const white = el.flash > 0;
+    for(let dy = -r; dy <= r; dy++){
+      const k = dy / r;
+      const half = r * Math.sqrt(Math.max(0, 1 - k * k));
+      for(let dx = -half; dx <= half; dx++){
+        const d = Math.sqrt(dx * dx + dy * dy) / (r + 0.001);
+        /* a bright core inside a rim, so it reads as a sphere and not a disc */
+        const c = white ? [255, 255, 255]
+                : d > 0.78 ? lit
+                : [lerp(lit[0], 255, 1 - d), lerp(lit[1], 255, 1 - d), lerp(lit[2], 255, 1 - d)];
+        blendPx(el.x + dx, el.y + dy, c, a * (d > 0.78 ? 1 : 0.92));
+      }
+    }
+    /* the glint, off-centre, so the sphere has a light source */
+    if(!white) blendPx(el.x - r * 0.35, el.y - r * 0.4, [255, 255, 255], a);
+  },
+  tap(el){
+    if(el.state !== "LIVE") return false;
+    el.state = "FLY"; el.fly = 0; el.fx = el.x; el.fy = el.y;
+    sfx("map_pick", 0.8);
+    return true;
+  }
+});
+
+/* ENERGY TRIANGLE — every emotion in turn, because it is not any one of them.
+   Emotional Charge is the sum of all six, which is why the gauge draws it as
+   the scrolling ramp; this is that same ramp on a falling object, through the
+   very same `rampAt()` the bar uses. Nothing new was invented for it.
+
+   It falls FAST — `drift` 1.75 in the sheet against a segment's 1.15 — so it is
+   the one pickup you have to actually reach for. */
+ElementFx.define("ENERGY", {
+  draw(el, col){
+    const a = elAlpha(el), h = el.e.size / 2;
+    /* around the emotion ring roughly twice a second, offset per element so two
+       on screen are never the same colour at the same moment */
+    const c = el.flash > 0 ? [255, 255, 255]
+                           : rampAt(frame * 0.055 + el.seed);
+    for(let dy = -h; dy <= h; dy++){
+      /* apex at the top, base at the bottom: half-width grows down the shape */
+      const half = ((dy + h) / (2 * h)) * h * 1.15;
+      if(half < 0.4) continue;
+      for(let dx = -half; dx <= half; dx++){
+        const edge = Math.abs(dx) / (half + 0.001);
+        /* a hard white rim on the two slopes and the base, so the triangle
+           holds its shape against a field of its own colours */
+        const rim = edge > 0.74 || dy > h - 1.2;
+        blendPx(el.x + dx, el.y + dy, rim ? [255, 255, 255] : c, a * (rim ? 1 : 0.9));
+      }
+    }
+  },
+  tap(el){
+    if(el.state !== "LIVE") return false;
+    el.state = "FLY"; el.fly = 0; el.fx = el.x; el.fy = el.y;
+    sfx("map_pick", 1.35);
     return true;
   }
 });

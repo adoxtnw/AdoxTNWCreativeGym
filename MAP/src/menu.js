@@ -421,7 +421,7 @@ function layers6(list){
 }
 function armorCard(a, pickable){
   const fx = ArmorFx.of(a.passive);
-  const ls = [a.layer1, a.layer2].filter(l => l && EMOTIONS[l]);
+  const ls = [a.layer1, a.layer2, a.layer3].filter(l => l && EMOTIONS[l]);
   const col = ls.length ? EMOTIONS[ls[0]].hex : "var(--mint)";
   const fd = ((a.id.length * 7) % 20) / 10;
   return '<button class="card pxr' + (pickable ? '' : ' on') + '" data-armor="' + a.id + '"' +

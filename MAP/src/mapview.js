@@ -790,6 +790,7 @@ function pump(now){
        nothing; CityBar.render() itself no-ops unless something changed. */
     if((frame % 60) === 0) CityBar.render();
     MenuGauge.step();                   /* the card's bar, only while it is up */
+    RideGauge.step();                   /* and the ride's, only while riding */
     journeyStep();                        /* the whole ride runs on this clock */
     if(liveStates || cityLive() || J.phase === "IDLE") dirty = true;
   }

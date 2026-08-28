@@ -3,5 +3,6 @@ id,name,kind,motion,chance,max_on_screen,max_per_trip,life_min,life_max,size,dri
 LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
 TRACK_SEGMENT,Track Segment,SEGMENT,FLYBY,0.55,5,0,6,9,11,1.15,1,NONE,0,0,,1,"Bridges the link. 0 in max_per_trip means UNLIMITED. Its life is longer than a crossing on purpose: a segment must stay tappable until it leaves the bottom, never fade out mid-screen."
 CRYSTAL_SHARD,Crystal Shard,CRYSTAL,FLYBY,0.10,2,0,6,9,12,1.0,0,CRYSTAL,1,0,,1,A rotating prism in the line's own colour. Rare on purpose.
-EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.14,2,4,5.0,15.0,13,0.45,0,NONE,0,0,,1,Floats past. Tap to pick the fight; ignore it and it leaves.
-HUNTER,Hunter,ENEMY_AGGRO,PARALLEL,0.06,1,2,8.0,14.0,14,0.3,0,NONE,0,5,,1,Locks on. When the countdown runs out it forces the encounter.
+EMOTIONAL_ENTITY,Emotional Entity,ENEMY_PASSIVE,PARALLEL,0.40,2,4,5.0,15.0,13,0.45,0,NONE,0,0,,1,Floats past. Tap to pick the fight; ignore it and it leaves. Carries the whole enemy share of a roll now that nothing forces a fight on the track.
+STAMINA_ORB,Stamina Orb,ORB,FLYBY,0.1,2,0,6,9,12,1.0,0,MS,10,0,,1,"Gives back `amount` PERCENT of MaxMS. Only meaningful mid-ride, which is the only time MS moves - on the map it is restored in full anyway."
+ENERGY_TRIANGLE,Energy Triangle,ENERGY,FLYBY,0.25,3,0,5,8,12,1.75,0,EC,20,0,,1,"Gives back `amount` EC flat. Falls FAST (high drift) and flashes through every emotion, because it is not any one of them. Capped so a ride can never overload the player."
