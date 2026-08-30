@@ -53,6 +53,13 @@ const Player = {
   crystals: {},          /* {ANGER: n, ...} — banked, safe */
   items: [],             /* banked, safe */
   keys: [],              /* Line Keys held */
+  /* WHICH PROGRESSION OBJECTIVES ARE DONE, by id. A list rather than a count,
+     because objectives are not a sequence: they are three places on a network
+     and the player may reach them in any order. This is the ONLY progression
+     state the profile stores — everything else about an objective (where it is,
+     what it wants, what it pays) is in the sheet, so a row can be retuned
+     between sessions without a save migration. */
+  objectives: [],
   statuses: {}, overloaded: false,
 
   /* Set only while a run is in the air. Its presence at boot means the browser
@@ -181,6 +188,7 @@ const Player = {
     this.crystals = this.emptyCrystals();
     this.items = [];
     this.keys = (RULES.startLineKeys || "L1|L2").split("|").map(s => s.trim()).filter(Boolean);
+    this.objectives = [];
     this.statuses = {}; this.overloaded = false; this.inTrip = null;
     this.save();
   },
@@ -212,6 +220,27 @@ const Player = {
 
   hasKey(lineId){ return this.keys.indexOf(lineId) >= 0; },
   grantKey(lineId){ if(!this.hasKey(lineId)) this.keys.push(lineId); this.save(); },
+
+  /* ---- what an objective leaves behind ---------------------------------
+     OWNED, NOT WORN. Both of these add to the shelf and change nothing about
+     what the player is currently carrying: turning up in new armor because you
+     won a fight would undo whatever build the player had deliberately chosen,
+     at the one moment they are least expecting the game to touch it. The
+     loadout tab is where it goes on, and the reward panel says so. */
+  didObjective(id){ return this.objectives.indexOf(id) >= 0; },
+  completeObjective(id){
+    if(id && !this.didObjective(id)) this.objectives.push(id);
+  },
+  grantArmor(id){
+    if(!ARMOR[id]) return false;
+    if(this.ownedArmor.indexOf(id) < 0) this.ownedArmor.push(id);
+    return true;
+  },
+  grantSet(id){
+    if(!LOADOUTS[id]) return false;
+    if(this.ownedSets.indexOf(id) < 0) this.ownedSets.push(id);
+    return true;
+  },
   /* 13.1.3 — the player has to be able to see they are in no state for a fight */
 
   addCrystals(c){ Object.keys(c).forEach(k => { this.crystals[k] = (this.crystals[k] || 0) + c[k]; }); },
@@ -230,6 +259,7 @@ const Player = {
       ownedArmor: this.ownedArmor, ownedSets: this.ownedSets,
       at: this.at, ms: this.ms, ec: this.ec,
       crystals: this.crystals, items: this.items, keys: this.keys,
+      objectives: this.objectives,
       inTrip: this.inTrip
     };
   },
@@ -241,6 +271,7 @@ const Player = {
   fromJSON(d){
     this.crystals = this.emptyCrystals();
     this.keys = (RULES.startLineKeys || "L1|L2").split("|").map(s => s.trim()).filter(Boolean);
+    this.objectives = [];
     if(!d || (d.v !== 1 && d.v !== 2)){ this.seedProfile(); this.fromSheet(); return null; }
 
     if(typeof d.code === "string") this.code = sanitiseCode(d.code);
@@ -258,6 +289,15 @@ const Player = {
     if(Array.isArray(d.items)) this.items = d.items.filter(x => ITEMS[x]);
     if(Array.isArray(d.keys) && d.keys.length)
       this.keys = d.keys.filter(k => LINES.some(l => l.id === k));
+    /* NOT filtered against the sheet, unlike everything else here. A cleared
+       objective is a fact about what this player DID, and it stays true even
+       while its row is disabled or renamed — dropping it would silently re-open
+       a fight they have already won, and hand them its reward a second time.
+       Strings only, and the same length cap the rest of the save is read
+       under, because this arrives from storage like any other field. */
+    if(Array.isArray(d.objectives))
+      this.objectives = d.objectives.filter(x => typeof x === "string" && x)
+                                    .slice(0, 200);
     const interrupted = d.inTrip || null;
     this.inTrip = null;
     this.seedProfile();                  /* fills whatever the save did not carry */
@@ -309,6 +349,7 @@ const Player = {
     this.armor = ""; this.sets = []; this.ownedArmor = []; this.ownedSets = [];
     this.crystals = this.emptyCrystals(); this.items = [];
     this.keys = (RULES.startLineKeys || "L1|L2").split("|").map(s => s.trim()).filter(Boolean);
+    this.objectives = [];
     this.at = "CLOT"; this.inTrip = null;
     this.ensureCode();
     this.seedProfile();

@@ -196,7 +196,26 @@ function battleWipeReveal(ms){
    Orb is a decision about whether THIS ride can continue, not a permanent gain.
    That is the same reason MS is the only thing that ends a run.             */
 function applyRewards(result){
-  if(!result || !result.rewards || !result.rewards.length) return [];
+  if(!result) return [];
+  /* ---- WHAT RUNNING AWAY COSTS -------------------------------------------
+     Not stamina, and not crystals — Track Segments, which is the one currency
+     the ride is actually spending. Losing five of them is losing ground on the
+     trip you are in the middle of, so an escape is paid for in the same units
+     as the journey it interrupted, and a player who runs from everything simply
+     never arrives.
+
+     Never below zero: an escape early in a leg would otherwise put the bar into
+     debt, and a negative bar is a bug the player has to interpret. */
+  if(result.outcome === "FLED"){
+    const cost = num(RULES.fleeSegmentCost, 5);
+    if(cost > 0 && Trip.collected > 0){
+      Trip.from = Trip.shown; Trip.tw = 0;
+      Trip.collected = Math.max(0, Trip.collected - cost);
+      Trip.flash = num(RULES.tripFlashMs, 260);
+      sfx("map_screech");
+    }
+  }
+  if(!result.rewards || !result.rewards.length) return [];
   const got = [];
   result.rewards.forEach(r => {
     const n = Math.max(0, r.n | 0); if(!n) return;

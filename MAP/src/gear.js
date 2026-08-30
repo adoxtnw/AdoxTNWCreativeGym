@@ -61,11 +61,12 @@ const setOf   = id => LOADOUTS[id] || null;
    GDD allows (0 to 2), not an error. */
 function layersOf(armorId){
   const a = armorOf(armorId); if(!a) return [];
-  /* THREE, not two. Armor grants Emotional Layers and the sheet had room for
-     exactly two of them until a piece needed three — so `layer3` is a column
-     now, and the ceiling is `maxLayers` (6) rather than however many columns
-     happen to exist. Adding a fourth is a column and nothing else. */
-  return [a.layer1, a.layer2, a.layer3].filter(l => l && EMOTIONS[l]);
+  /* FOUR, now. The sheet had room for exactly two until a piece needed three,
+     and then four, so the columns have grown twice — and the promise made the
+     first time held both times: adding one was a column here and a column in the
+     sheet, and nothing else anywhere. The ceiling is still `maxLayers` (6), not
+     however many columns happen to exist. */
+  return [a.layer1, a.layer2, a.layer3, a.layer4].filter(l => l && EMOTIONS[l]);
 }
 /* The abilities three equipped sets add up to, in slot order and de-duplicated —
    two sets of the same emotion should not offer the same ability twice. */

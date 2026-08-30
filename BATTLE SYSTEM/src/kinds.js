@@ -108,11 +108,37 @@ Kinds.define("DAMAGE", {
     await Hooks.emit("damage:dealt", {attacker:actor, defender:target, ability:ab, amount:dealt, matchup:m});
     await impact(onEnemy);
 
+    /* A LINE MANAGER REFUSES TO FALL at bossPhaseAt, and this is the moment she
+       would otherwise be dead — a heavy hit steps straight past 20% and out the
+       far side, so a gate that waited for the bar to LAND there would simply
+       never fire. It takes over the rest of this attack when it runs: the layer
+       break and the status below belong to a fight that no longer exists in the
+       shape they were queued for. */
+    if(await bossPhaseGate()){ renderStats(); return; }
     if(target.ms <= 0){ await settleAll(); await clashSequence(target === S.player); return; }
     /* A layer of the SAME emotion shrugs the hit off: it still costs stamina, but
        the layer survives. Tested on the emotions directly rather than through the
        matchup label, because that is the rule as stated — like does not break like. */
     if(ab.hits_layer && !resisted) await breakLayer(target);
+
+    /* AN ATTACK MAY ALSO LEAVE SOMETHING BEHIND. Until Drug Hit every status in
+       the game came from a DEBUFF row, which made "hit them" and "afflict them"
+       two different kinds of turn — and meant a basic attack that staggers could
+       not be written as data at all. It is read here the way DEBUFF reads it, so
+       any DAMAGE row that fills in status_apply / status_duration now carries a
+       status, and nothing about Drug Hit is a special case.
+
+       AFTER the swing, and only if they are still standing: a status hung on a
+       corpse is bookkeeping nobody sees, and this runs after the ms<=0 return
+       above for exactly that reason. */
+    if(ab.status_apply){
+      const st = applyStatus(target, ab.status_apply, ab.status_duration, ab.name);
+      if(st){
+        AbilityFx.play("apply", {ab, actor, target, st});
+        renderStats();
+        await sleep(RULES.statusFxMs);
+      }
+    }
   }
 });
 

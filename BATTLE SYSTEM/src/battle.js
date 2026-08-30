@@ -126,6 +126,18 @@ async function resolveLine(actor,target,laneId,trackId,onEnemy){
 }
 
 async function clashSequence(playerDied){
+  /* A LINE MANAGER DOES NOT POP. No particle burst and no clash wave: the music
+     stops, she gets two parting lines rather than one, and then she shakes her
+     way off the bottom of the screen over seven seconds. Branching at the top
+     rather than inside means none of the standard sequence has to learn about
+     her — the two endings are simply different endings. */
+  if(!playerDied && isLineManager(S.enemy)){
+    setFps(12);
+    $("eGauge").classList.add("clash");
+    await lineManagerFall();
+    $("eGauge").classList.remove("clash");
+    return;
+  }
   const screen=$("screen"), gauge=playerDied?$("pGauge"):$("eGauge");
   const sr=screen.getBoundingClientRect(), gr=gauge.getBoundingClientRect();
   const cx=gr.left-sr.left+4, cy=gr.top-sr.top+gr.height/2;
@@ -262,14 +274,20 @@ function finish(kind){
      the enemy finishes falling — a fight that is over while its music is still
      playing reads as the game not having noticed. `stopMusic` already took a
      duration; this just asks for a short one. */
-  S.phase="OVER"; setFps(12); stopMusic(RULES.musicCutMs||120); sfx(kind);
+  S.phase="OVER"; setFps(12); stopMusic(RULES.musicCutMs||120);
+  sfx(kind === "flee" ? "flee_go" : kind);
+  /* Whatever was firing around this enemy stops with it. These run on their own
+     timers, outside the turn loop, so nothing else would ever switch them off —
+     and the results panel is the last place a camera flash belongs. */
+  stopFlourish();
   $("pPanel").classList.remove("overloaded");   // the fight is over; stop the alarm
   $("ePanel").classList.remove("overloaded");
   /* CAME FROM THE MAP? Then the map decides what happens next, and this app
      does not get to offer RUN AGAIN — there is a ride waiting. */
   if(Handoff.on){ Handoff.finish(kind); return; }
   const o=document.createElement("div"); o.className="over "+kind;
-  o.innerHTML=`<h1 class="hard">${kind==="win"?"LINE CLEAR":"BREAKDOWN"}</h1>
+  const HEAD={win:"LINE CLEAR", lose:"BREAKDOWN", flee:"YOU RAN"};
+  o.innerHTML=`<h1 class="hard">${HEAD[kind]||"BREAKDOWN"}</h1>
     <button class="depart pxr pxr-sh" style="width:auto;padding:13px 28px" onclick="location.reload()">RUN AGAIN</button>`;
   $("screen").appendChild(o);
 }
@@ -282,6 +300,11 @@ async function depart(){
   renderLines(); renderStats();
   await resolveLine(S.player,S.enemy,"pLane","pTrack",true);
   await settleAll();                       // the enemy's bar takes the hits now
+  /* Belt as well as braces: the gate in Kinds.DAMAGE catches the hit that would
+     have killed her, and this catches everything else that can move a bar —
+     a self-hit, a status tick, anything added later. It is idempotent, so being
+     asked twice about the same crossing costs nothing. */
+  await bossPhaseGate();
   if(endCheck()){S.busy=false;return;}
   await sleep(300);
   await resolveLine(S.enemy,S.player,"eLane","eTrack",false);

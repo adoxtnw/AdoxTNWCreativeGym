@@ -44,8 +44,17 @@ const Handoff = {
        of them alike, and which one unlocks audio is not something to be clever
        about — listening to all four costs nothing and `startMusic()` is a
        no-op once the music is genuinely running. */
+    /* ...but not before we know WHO is being fought. `startMusic()` reads the
+       enemy's own theme columns, and marks the music as playing whichever theme
+       it started — so a stray touch in the half-second between READY and START
+       would lock the ordinary theme in over a boss who has one of her own.
+       `started` is set the moment the descriptor lands, which is well before any
+       of this matters. */
     ["pointerdown", "touchstart", "click", "keydown"].forEach(t =>
-      addEventListener(t, () => { try{ audioAwake(); startMusic(); }catch(e){} }));
+      addEventListener(t, () => {
+        if(!this.started) return;
+        try{ audioAwake(); startMusic(); }catch(e){}
+      }));
     /* Tell the map we exist. It waits for this before sending the descriptor,
        so a slow frame cannot miss the only message that matters. */
     this.post("AVUI_READY", {});
@@ -107,8 +116,12 @@ const Handoff = {
      described since before there was anything to fill it in. */
   finish(kind){
     const rewards = kind === "win" ? rollDrops(this.enemyId || "enemy") : [];
+    /* THREE ENDINGS NOW, not two. Running away is not a loss: nothing about the
+       player's state is worse than it was, and the ride is not over — what it
+       costs is Track Segments, and the map is the only side that knows what a
+       Track Segment is, so it is told what happened and charges for it. */
     const result = {
-      outcome: kind === "win" ? "WIN" : "LOSS",
+      outcome: kind === "win" ? "WIN" : kind === "flee" ? "FLED" : "LOSS",
       ms: Math.max(0, Math.round(S.player.ms)),
       ec: Math.max(0, Math.round(S.player.ec)),
       rounds: S.round,
@@ -162,18 +175,37 @@ const DROP_LABEL = {
   SEGMENT: "TRACK SEGMENT",
   ORB    : "STAMINA ORB"
 };
+/* An 8x8 from the same alphabet everything else in this app is drawn in, and a
+   colour that says what KIND of thing it is: a crystal takes the emotion that
+   was just beaten, a segment the interface's own ink, an orb the stamina mint
+   the bar is drawn in. Three rows of identical grey boxes was a receipt. */
+const DROP_ICON  = {CRYSTAL: "GLASS", SEGMENT: "CHARGE", ORB: "DROP"};
+const DROP_COLOR = {SEGMENT: "#f0ece0", ORB: "#b0ffe1"};   /* on a dark chip; see .rsym */
+
 async function showResults(result, done){
   const el = document.createElement("div");
   el.className = "results";
+  const hex = emoHex(S.enemy.emotion);
   const rows = result.rewards.length
-    ? result.rewards.map(r =>
-        '<div class="rline pxr"><span class="rn">+' + r.n + '</span>' +
-        '<span class="rk">' + (DROP_LABEL[r.kind] || r.kind) + '</span></div>').join("")
-    : '<div class="rline pxr empty"><span class="rk">NOTHING LEFT BEHIND</span></div>';
+    ? result.rewards.map(r => {
+        const col = DROP_COLOR[r.kind] || hex;
+        return '<div class="rline pxr drawin" style="--rc:' + col + '">' +
+          '<i class="rsym"><svg viewBox="0 0 8 8" shape-rendering="crispEdges">' +
+            iconSVG(DROP_ICON[r.kind] || "SPARK") + '</svg></i>' +
+          '<span class="rn">+' + r.n + '</span>' +
+          '<span class="rk">' + (DROP_LABEL[r.kind] || r.kind) + '</span></div>';
+      }).join("")
+    : '<div class="rline pxr empty drawin"><span class="rk">NOTHING LEFT BEHIND</span></div>';
+  /* THE TITLE IS THE SIZE OF THE THING THAT JUST HAPPENED, and it is in the
+     colour of the emotion that was beaten — so winning against Joy and winning
+     against Anger are not the same screen. `--emo` drives the fill and the
+     glow together; the glow is what stops a large flat word reading as a
+     placeholder. */
+  el.style.setProperty("--emo", hex);
   el.innerHTML =
-    '<h1 class="hard">LINE CLEAR</h1>' +
+    '<h1 class="conquered hard drawin">EMOTION<br>CONQUERED!</h1>' +
     '<div class="rlines">' + rows + '</div>' +
-    '<button class="depart pxr pxr-sh rgo">BACK TO THE TRAIN</button>';
+    '<button class="depart pxr pxr-sh rgo drawin">BACK TO THE TRAIN</button>';
   $("screen").appendChild(el);
 
   /* WIRED BEFORE IT IS ANIMATED. Attaching this after the sequence meant the
@@ -188,8 +220,12 @@ async function showResults(result, done){
     done();
   }, {once: true});
 
-  /* the heading, then each reward in turn, then the way out — one after
-     another, so the eye is led down the list rather than handed all of it */
+  /* EVERY ITEM STARTS HIDDEN — that is what `.drawin` is for, and leaving it off
+     was a real bug rather than a nicety. `unsheath()` animates one element at a
+     time down the list, so without it the whole panel was fully visible from the
+     moment it was appended and then each row played its arrival on top of
+     itself: you saw the reward, and then you watched it arrive. `unsheath()`
+     removes the class as it takes over. */
   const items = [el.querySelector("h1")]
     .concat([].slice.call(el.querySelectorAll(".rline")))
     .concat([go]);

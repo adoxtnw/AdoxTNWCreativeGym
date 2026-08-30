@@ -150,6 +150,123 @@ const Baggage = {
    part of the world state that is not ambient, so they get the treatment an
    ability gets — tap one and it tells you what it is doing to you.
    -------------------------------------------------------------------------- */
+/* ---- WHO IS WAITING ON THE PLATFORM ----------------------------------------
+   The Station Guardian is the fight you cannot refuse — the thing between you
+   and actually getting off at your destination — and it used to simply happen:
+   the banner screen was up, and then a colour flooded the screen and you were in
+   a fight. Three seconds of warning is the difference between an ambush and an
+   arrival.
+
+   IT ANNOUNCES ITSELF AND THEN STARTS ON ITS OWN. There is no button, because
+   there is no choice — offering one would be a lie about what a Guardian is.
+   What the three seconds buy is the moment to read the room.
+
+   A LINE MANAGER GETS A DIFFERENT ONE, and the difference is not just the words:
+   hers shakes. A Guardian manifests, which is a thing arriving; she APPEARS,
+   which is a thing that was always going to be there deciding to be seen. */
+const GuardianBanner = {
+  show(unitId){
+    return new Promise(res => {
+      const el = $("guardian");
+      const u = UNITS[unitId] || {};
+      const boss = u.role === "LINE_MANAGER";
+      const hex = EMOTIONS[u.emotion] ? EMOTIONS[u.emotion].hex : "#f4efe4";
+      const ms = num(RULES.guardianWarnMs, 3000);
+      if(!el){ setTimeout(res, ms); return; }
+      el.style.setProperty("--emo", hex);
+      el.style.setProperty("--gbrule", ms + "ms");
+      el.classList.toggle("manager", boss);
+      el.innerHTML =
+        '<div class="gbwrap">' +
+          '<i class="gbsym">' + glyphSVG("WARN") + '</i>' +
+          '<b class="gbtext">' +
+            (boss ? "LINE MANAGER<br>HAS APPEARED" : "GUARDIAN ENTITY<br>MANIFESTING") +
+          '</b>' +
+          '<span class="gbrule"></span>' +
+        '</div>';
+      el.classList.add("show");
+      sfx(boss ? "map_screech" : "map_flash");
+      /* the platform itself is thrown, so the announcement is felt as well as
+         read — and harder for her, because she is the harder thing */
+      mapShake(ms * 0.5, num(RULES.mapShakeAmp, 7) * (boss ? 1.4 : 0.8));
+      setTimeout(() => {
+        el.classList.remove("show");
+        el.classList.add("going");
+        setTimeout(() => { el.classList.remove("going"); el.innerHTML = ""; }, 300);
+        res();
+      }, ms);
+    });
+  }
+};
+
+/* ---- WHAT AN OBJECTIVE PAID OUT --------------------------------------------
+   The one panel in the map that nothing else can raise: it appears only when a
+   progression objective has been cleared, which is at most three times in a
+   whole save. That rarity is the design — a card that comes up after every
+   fight is a receipt, and a card that comes up three times is a moment.
+
+   IT IS QUEUED, NOT SHOWN. The reward is granted the instant the boss falls,
+   and at that instant the screen is a wipe travelling back to the map; a panel
+   raised into that is a panel raised behind an animation. `queue` takes it,
+   `flush` shows it once the map has settled into IDLE (journey.js).
+
+   IT SAYS WHERE IT WENT, because nothing is equipped automatically — armor and
+   Move Sets go onto the shelf and the player decides what they wear. A reward
+   that changed your build for you, at the one moment you were not looking, is
+   the kind of help nobody asked for. A Line Key is the exception and needs no
+   instruction: it is not worn, it simply opens a line.                       */
+const RewardPanel = {
+  pending: null,
+
+  queue(stationId, got){
+    if(!got || !got.length) return;
+    /* Two objectives cleared before either was shown is not a case that can
+       happen today — one station, one boss — but merging rather than replacing
+       means it would show both rather than losing the first silently. */
+    if(this.pending && this.pending.station === stationId)
+      this.pending.got = this.pending.got.concat(got);
+    else this.pending = {station: stationId, got: got.slice()};
+  },
+  flush(){
+    const p = this.pending; this.pending = null;
+    if(p) this.show(p.station, p.got);
+  },
+  show(stationId, got){
+    const el = $("reward"); if(!el) return;
+    const st = STATIONS[stationId];
+    const rows = got.map(g =>
+      '<div class="rwline pxr">' +
+        '<i class="sym">' + glyphSVG(g.kind === "KEY" ? "KEY" :
+                                     g.kind === "SET" ? "DISC" : "SHIELD") + '</i>' +
+        '<span class="rwtxt"><b>' + esc(g.label) + '</b>' +
+          '<small>' + esc(g.what) + '</small></span>' +
+      '</div>').join("");
+    const worn = got.some(g => g.kind === "ARMOR" || g.kind === "SET");
+    el.innerHTML =
+      '<h3>SOMETHING WAS LEFT BEHIND</h3>' +
+      '<p class="rwwhere">' + esc(st ? st.name : stationId) + '</p>' +
+      '<div class="rwlines">' + rows + '</div>' +
+      (worn ? '<p class="rwnote">It is yours. Put it on in the loadout tab &mdash; ' +
+              'nothing was changed for you.</p>' : '') +
+      '<button class="rwgo bigbtn pxr hudbtn" id="rwGo">GOOD</button>';
+    el.classList.add("show");
+    /* NOT `stagger()`: that one addresses the menu's own children by selector
+       (`.mbody > section` and friends) and would silently do nothing here. The
+       arrival is a CSS animation on `.reward.show` instead, and each line
+       carries its own index so they land one after another. */
+    el.querySelectorAll(".rwline").forEach((n, i) =>
+      n.style.setProperty("--si", Math.min(i, 5)));
+    sfx("map_arrive");
+    $("rwGo").addEventListener("click", () => {
+      sfx("tap");
+      el.classList.remove("show");
+      el.innerHTML = "";
+      dirty = true;
+    }, {once: true});
+    dirty = true;
+  }
+};
+
 const CityBar = {
   _key: "",
   render(){

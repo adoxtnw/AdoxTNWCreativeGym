@@ -109,23 +109,66 @@ function playNote(tr,when,dur,n,v){
    fetch() is blocked on file://, so when decoding fails we fall back to plain
    <audio> elements. Those cannot be gapless, but the prototype still has music
    when opened straight from disk. */
-let musicBufs=null, musicLoad=null, musicSrcs=[], musicEls=[];
+let musicBufs=null, musicLoad=null, musicKey=null, musicSrcs=[], musicEls=[];
 
-function loadMusic(){
-  if(musicLoad) return musicLoad;
-  const get = url => fetch(url).then(r=>{ if(!r.ok) throw new Error(url); return r.arrayBuffer(); })
+/* WHICH THEME THIS FIGHT HAS. Nearly every one has the same two files, named in
+   the rules sheet; a unit may override them on its own row, and a boss with a
+   theme of her own is the reason the columns exist. Read at the moment the music
+   starts rather than at load, because at load nobody knows yet who is being
+   fought — the map has not sent the descriptor.
+
+   `S` is declared in model.js, which is parsed AFTER this file. Every caller
+   runs long after both, so the reference is safe; the pre-warm at the bottom of
+   this file deliberately does not go through here for exactly that reason. */
+function themeNow(){
+  const u = S && S.enemy;
+  /* A SECOND PHASE IS A SECOND FIGHT and gets its own music. Checked before the
+     unit's ordinary theme rather than after, because the phase-2 track is the
+     more specific answer to the same question. */
+  if(u && u.phase2 && u.theme2Loop) return {opening:"", loop:u.theme2Loop};
+  /* THE PAIR IS CHOSEN TOGETHER, never a column at a time. Falling back
+     per-column meant a unit that supplied only a loop — which is what a track
+     handed over as one piece looks like — inherited the DEFAULT theme's opening
+     and played thirty seconds of the ordinary battle music before its own
+     started. A row that names a loop owns both halves of the answer, and a
+     blank opening there is the answer "there isn't one". */
+  if(u && u.themeLoop) return {opening:u.themeOpening || "", loop:u.themeLoop};
+  return {opening:RULES.themeOpening, loop:RULES.themeLoop};
+}
+
+/* CACHED BY WHAT IT LOADED, not merely "already loaded once". The cache used to
+   be a single promise, which was right while there was one theme and quietly
+   wrong the moment there were two: a boss fight would have been handed the
+   ordinary theme because something had already decoded it. */
+function loadMusic(pair){
+  const key = pair.opening + "|" + pair.loop;
+  if(musicLoad && musicKey === key) return musicLoad;
+  musicKey = key;
+  /* encodeURI, because a theme file is named by a person and people put spaces
+     in names — "Line Manager Battle - loop.wav" is a path, not a query. */
+  const get = url => fetch(encodeURI(url)).then(r=>{ if(!r.ok) throw new Error(url); return r.arrayBuffer(); })
                                .then(b=>actx.decodeAudioData(b));
-  musicLoad = Promise.all([get(RULES.themeOpening), get(RULES.themeLoop)])
+  /* A BLANK OPENING IS A REAL ANSWER, not a missing file. The original theme is
+     two pieces — a run-up that plays once and a body that loops under it — and
+     that is a property of THAT recording, not of what a theme is. A track handed
+     over as one piece simply loops from the first sample. Demanding both would
+     have meant either faking an opening or cutting every future song in half. */
+  musicLoad = Promise.all([pair.opening ? get(pair.opening) : Promise.resolve(null),
+                           get(pair.loop)])
     .then(([opening, loop]) => (musicBufs = {opening, loop}))
     .catch(() => null);
   return musicLoad;
 }
 
 /* file:// fallback — audible seam at the handoff, but it plays. */
-function startMusicEls(){
-  const a=new Audio(RULES.themeOpening), b=new Audio(RULES.themeLoop);
+function startMusicEls(pair){
+  const b=new Audio(pair.loop);
   /* Element volume is restricted to 0..1; the Web Audio gain may exceed 1. */
-  a.volume=b.volume=Math.max(0,Math.min(1,RULES.musicVolume)); b.loop=true; b.preload="auto";
+  const vol=Math.max(0,Math.min(1,RULES.musicVolume));
+  b.volume=vol; b.loop=true; b.preload="auto";
+  if(!pair.opening){ b.play().catch(()=>{}); musicEls=[b]; return; }
+  const a=new Audio(pair.opening);
+  a.volume=vol;
   a.addEventListener("ended",()=>{ if(musicOn) b.play().catch(()=>{}); });
   a.play().catch(()=>{});
   musicEls=[a,b];
@@ -148,14 +191,16 @@ async function startMusic(){
   musicBus=actx.createGain(); musicBus.gain.value=RULES.musicVolume;
   musicBus.connect(cleanBus);          // recorded audio bypasses the crusher
   musicOn=true;
-  const bufs=await loadMusic();
+  const pair=themeNow();
+  const bufs=await loadMusic(pair);
   if(!musicOn) return;                       // stopped while it was still decoding
-  if(!bufs){ startMusicEls(); return; }
+  if(!bufs){ startMusicEls(pair); return; }
   const t0=actx.currentTime + 0.08;
-  const open=actx.createBufferSource();
-  open.buffer=bufs.opening; open.connect(musicBus); open.start(t0);
   const loop=actx.createBufferSource();
   loop.buffer=bufs.loop; loop.loop=true; loop.connect(musicBus);
+  if(!bufs.opening){ loop.start(t0); musicSrcs=[loop]; return; }
+  const open=actx.createBufferSource();
+  open.buffer=bufs.opening; open.connect(musicBus); open.start(t0);
   loop.start(t0 + bufs.opening.duration);    // the seam, placed on the audio clock
   musicSrcs=[open, loop];
 }
@@ -167,7 +212,8 @@ async function startMusic(){
 initAudio();
 /* Decode the theme while the handoff frame is loading. `startMusic()` still owns
    playback; this only removes network/decoder latency from the opening. */
-if(actx && /(?:\?|&)handoff=1(?:&|$)/.test(location.search)) loadMusic();
+if(actx && /(?:\?|&)handoff=1(?:&|$)/.test(location.search))
+  loadMusic({opening:RULES.themeOpening, loop:RULES.themeLoop});
 window.addEventListener("pointerdown",initAudio,{once:true});
 /* A CONTEXT THAT WAS REFUSED CAN BE WOKEN LATER, and the music does not have to
    be restarted to hear it: while a context is suspended its clock does not

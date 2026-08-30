@@ -291,7 +291,12 @@ function drawStops(g){
   const minor = cam.z >= DOT_Z;
   Object.keys(STATIONS).forEach(id => {
     const s = STATIONS[id], hub = isInterchange(id);
-    if(!hub && !minor) return;
+    /* A STATION WITH SOMETHING OWING IS NEVER DECLUTTERED AWAY. Minor stops
+       vanish when you pull out far enough, which is what keeps the map legible
+       — but a progression marker exists to be SPOTTED from a distance, and
+       Fondo and Sant Antoni are both ordinary single-line stops. So an
+       objective keeps its station on screen at every zoom, and the ? with it. */
+    if(!hub && !minor && !Objectives.anyAt(id)) return;
     const x = bx(s.x) | 0, y = by(s.y) | 0, r = hub ? g.ri : g.r;
     if(x < -MX - r - 6 || y < -MY - r - 6 || x > W + MX + r + 6 || y > H + MY + r + 6) return;
 
@@ -321,6 +326,10 @@ function drawStops(g){
       disc(x, y, r - 1, core ? packRGB(core) : (rim ? packRGB(rim) : ink));
     }
     if(fx && fx.over) fx.over(s, b);
+    /* LAST, AND OVER EVERYTHING. A progression marker is an annotation on a
+       station, not part of it — it floats clear above the dot, so it is painted
+       after the dot, its state and the city's effect have all had their turn. */
+    paintObjectives(s, b);
   });
 }
 /* A line badge at each terminus, pushed along the direction the line was
@@ -792,7 +801,7 @@ function pump(now){
     MenuGauge.step();                   /* the card's bar, only while it is up */
     RideGauge.step();                   /* and the ride's, only while riding */
     journeyStep();                        /* the whole ride runs on this clock */
-    if(liveStates || cityLive() || J.phase === "IDLE") dirty = true;
+    if(liveStates || cityLive() || objectivesLive() || J.phase === "IDLE") dirty = true;
   }
   if(dirty){ dirty = false; draw(); }
 }
@@ -812,6 +821,41 @@ function pump(now){
    longer line up, so map taps are refused while the lean is on; the panel
    holding the decision has the only controls that matter anyway. */
 const Lean = {on: false, side: 1, t: 0, k: 0, deg: 0, zoom: 1, last: 0};
+
+/* ---- THE SCREEN THROWN ------------------------------------------------------
+   A fight starting is the one moment on the ride that is violent, and it needed
+   to be felt rather than announced. The canvas is thrown a few pixels and the
+   throw DECAYS — a shake of constant amplitude reads as a broken transform,
+   while one that falls away reads as an impact.
+
+   It is applied where the lean is applied and nowhere else. Two things writing
+   `cv.style.transform` is two things fighting over it, and the loser is
+   whichever ran first; `applyCanvasTransform()` is the single writer, and both
+   the lean and the shake only ever set numbers for it to compose. */
+const Shake = {until: 0, ms: 1, amp: 0, x: 0, y: 0};
+function mapShake(ms, amp){
+  Shake.ms = Math.max(1, ms || num(RULES.mapShakeMs, 420));
+  Shake.amp = amp || num(RULES.mapShakeAmp, 7);
+  Shake.until = performance.now() + Shake.ms;
+}
+const shakeLive = () => performance.now() < Shake.until;
+function shakeStep(){
+  if(!shakeLive()){ Shake.x = Shake.y = 0; return false; }
+  const k = (Shake.until - performance.now()) / Shake.ms;   /* 1 -> 0 */
+  const a = Shake.amp * k * k;                              /* falls away fast */
+  Shake.x = (Math.random() * 2 - 1) * a;
+  Shake.y = (Math.random() * 2 - 1) * a;
+  return true;
+}
+/* THE ONLY PLACE `cv.style.transform` IS WRITTEN. */
+function applyCanvasTransform(){
+  if(!cv) return;
+  const sx = Shake.x, sy = Shake.y;
+  let t = "translate(calc(-50% + " + sx.toFixed(1) + "px), calc(-50% + " + sy.toFixed(1) + "px))";
+  if(Lean.k > 0)
+    t += " rotate(" + Lean.deg.toFixed(2) + "deg) scale(" + Lean.zoom.toFixed(3) + ")";
+  cv.style.transform = t;
+}
 function leanTo(side){
   /* keep `t` running across a re-target: the drift should carry on rather than
      snap back to the top of its cycle when the player picks another station */
@@ -837,7 +881,15 @@ function leanStep(){
   Lean.last = now;
   const rate = dt / Math.max(60, num(RULES.leanEaseMs, 520));
   const kWant = Lean.on ? 1 : 0;
-  if(Lean.k === kWant && !Lean.on) return;      /* settled, and nothing to draw */
+  /* A LIVE SHAKE KEEPS THIS RUNNING even when the lean has nothing to say. The
+     early return is an optimisation against writing the transform sixty times a
+     second for no reason, and it used to also mean the shake could never be
+     drawn — the lean is settled almost all of the time. */
+  const shaking = shakeStep();
+  if(Lean.k === kWant && !Lean.on){
+    if(shaking || Shake.x || Shake.y) applyCanvasTransform();
+    return;
+  }
   Lean.k = Lean.on ? Math.min(1, Lean.k + rate) : Math.max(0, Lean.k - rate);
   const e = ease(Lean.k);                       /* smoothstep, both directions */
 
@@ -846,9 +898,7 @@ function leanStep(){
   const sway = Math.sin(Lean.t * 0.055) * 3.4 + Math.sin(Lean.t * 0.021) * 1.6;
   Lean.deg  = Lean.side * (num(RULES.leanDeg, 20) + sway) * e;
   Lean.zoom = 1 + (0.06 + Math.sin(Lean.t * 0.037) * 0.035) * e;
-  if(Lean.k <= 0){ cv.style.transform = "translate(-50%,-50%)"; return; }
-  cv.style.transform = "translate(-50%,-50%) rotate(" + Lean.deg.toFixed(2) +
-                       "deg) scale(" + Lean.zoom.toFixed(3) + ")";
+  applyCanvasTransform();
 }
 
 let rampX = 0;

@@ -49,6 +49,23 @@ function makeUnit(id){
        the silhouette in rings.js and narrows which personas can speak in
        dialogue.js. A blank or unknown tier behaves as REGULAR. */
     tier:r.tier || "REGULAR",
+    /* WHAT THIS FIGHT LOOKS AND SOUNDS LIKE, carried through from the row rather
+       than looked up later. None of it is a stat either: `persona` PINS the
+       character instead of drawing one at random (a boss has to be the same
+       person every time), `bg_bright` multiplies how hard the emotion lights the
+       backdrop, `fx` names a flourish the fight runs around this enemy, and the
+       two theme columns swap the music out for this fight alone. Blank
+       everywhere is the ordinary encounter, which is nearly every row. */
+    persona_id:r.persona || "", bgBright:Number(r.bg_bright) > 0 ? Number(r.bg_bright) : 1,
+    fx:r.fx || "",
+    /* `role` is the one column that changes how the FIGHT runs rather than how
+       it looks: LINE_MANAGER is the second wind, the two parting lines and the
+       long sink. It is on the unit so all six of them inherit the behaviour
+       from one cell each, rather than from a list of ids somewhere in here. */
+    role:r.role || "", scale:Number(r.scale) > 0 ? Number(r.scale) : 1,
+    phase2:false, phaseBusy:false,
+    themeOpening:r.theme_opening || "", themeLoop:r.theme_loop || "",
+    theme2Loop:r.theme2_loop || "",
     maxMs:r.max_ms, ms:r.max_ms,
     ec:Math.round(r.max_ms*r.start_ec_pct), shield:0,
     layers:r.layers.slice(0,RULES.maxLayers).map((e,i)=>({e,pos:i,flash:0})),

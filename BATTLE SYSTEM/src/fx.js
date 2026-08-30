@@ -412,11 +412,23 @@ async function criticalSequence(attacker, target, emotion){
   const tag = criticalTag(target, emotion);
   flashColour(col);
   await sleep(RULES.critHoldMs);
-  /* granted now, and marked fresh so the end-of-round sweep keeps it for the
-     line the player actually gets to build */
-  addExtra(attacker, "CRIT", 1);
+  /* HOW MANY SLOTS A CRITICAL IS WORTH is a rule, not a constant. It was a
+     hard-coded 1, which meant the Set of Rush — whose whole idea is that a
+     critical is worth three — had nowhere to say so. `critSlots` is the number
+     for everybody; PAS_RUSH swaps it for `rushCritSlots`.
+
+     `addExtra` stops at `maxExtraSlots` on its own, so three may land as fewer
+     on a line that is already carrying Overload — which is correct: the ceiling
+     on a line is a ceiling. Only the slots that were actually granted fly in. */
+  const want = hasPassive(attacker, "PAS_RUSH")
+    ? (RULES.rushCritSlots || 3) : (RULES.critSlots || 1);
+  const before = attacker.extra.length;
+  addExtra(attacker, "CRIT", want);
+  const got = attacker.extra.length - before;
   attacker.critFresh = true;
-  await flySlotToLine(tag, attacker, col);
+  /* One flight each, in turn — three slots arriving at once is a flicker, and
+     the whole point of the animation is that you can count them. */
+  for(let i = 0; i < got; i++) await flySlotToLine(tag, attacker, col);
   tag.remove();
 }
 

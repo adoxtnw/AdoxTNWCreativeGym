@@ -8,7 +8,7 @@
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "spawn_lines", "day", "weather", "keys", "drops"]
+        "spawn_lines", "day", "weather", "keys", "drops", "reward"]
 };
 
 const DATA = {
@@ -180,7 +180,26 @@ armorSlots,1,Emotional Armor pieces worn at once.,,,
 startArmor,ARM_SCARS,The armor a new profile begins in.,,,
 startSets,LO_ANGER|LO_SADNESS|LO_JOY|LO_DISGUST|LO_SURPRISE,"The Move Sets a profile OWNS. \`equippedSlots\` of them can be carried at once, so this is the shelf to pick from rather than the loadout itself.",,,
 startArmorOwned,ARM_SCARS|ARM_STATIC,"Armor a profile OWNS, beyond the one it is wearing. Same idea as startSets.",,,
-joltEc,20,Emotional Charge the Set of Jolt's passive returns each time one of your attacks misses.,,,`,
+joltEc,20,Emotional Charge the Set of Jolt's passive returns each time one of your attacks misses.,,,
+critSlots,1,"Extra line slots a critical earns, for anyone without a passive that says otherwise. The slot is good for exactly one line.",,,
+rushCritSlots,3,"What PAS_RUSH (the Set of Rush) turns that into. Raising it raises the ceiling of the whole set, which is the one number worth balancing it on.",,,
+objectiveWobble,0.9,"How far an objective's marker swings, in map pixels. It is a wobble, not an orbit: the ? never leaves the top of its station.",,,
+objectiveBeatMs,760,"Period of the white circle's beat, in ms. One breath per station, so a screen of them does not pulse in lockstep - each is offset by a hash of its own id.",,,
+aggroChance,0.25,"Fraction of the enemies that appear on a ride which LOCK ON and count down to forcing the fight. Multiplied by the target station's own aggro, so a hostile stretch of network really is more hostile. 0 turns the whole behaviour off.",,,
+aggroTiers,WEAK|REGULAR,"Which tiers may lock on. A STRONG enemy is deliberately not on this list: a hard fight you did not choose is a punishment, and the one thing that makes a strong enemy fair is that taking it on is a decision.",,,
+aggroRingThick,2,"Thickness, in art pixels, of the countdown ring drawn around a locked-on enemy.",,,
+aggroWarnHz,4.5,How many times a second the warning sign above a locked-on enemy flashes.,,,
+mapShakeMs,420,How long the ride screen shakes when a fight starts.,,,
+mapShakeAmp,7,"How far the ride screen is thrown, in CSS pixels, at the start of that shake. It decays to nothing over mapShakeMs.",,,
+guardianWarnMs,3000,How long the banner announcing the station's Guardian Entity holds before the fight begins on its own.,,,
+fleeHoldMs,3000,How long a press has to be held on the battle arena before the ring closes and the fight is abandoned.,,,
+fleeSegmentCost,5,"Track Segments forfeited every time a fight is run from. Taken off the current ride's progress, never below zero.",,,
+bossPhaseAt,0.2,Fraction of MaxMS at which a LINE MANAGER refuses to fall and takes her second wind. She cannot be killed below this until it has happened.,,,
+bossPhaseTo,0.5,What she recovers to.,,,
+bossRechargeMs,5000,How long that recovery takes. Deliberately long: it is the fight being taken away from you and handed back.,,,
+bossFlashes,4,"White flashes before the recovery, and again when it completes.",,,
+bossSinkMs,7000,"How long a beaten LINE MANAGER takes to shake, sink and fade off the bottom of the screen.",,,
+bossHushMs,520,How quickly the music and the interface go when she refuses to fall.,,,`,
 
 /* --- sounds ---
    synthesised at runtime, no audio files. wave: square|sawtooth|triangle|sine|noise.  */
@@ -230,6 +249,11 @@ ui_close,square,1180,520,110,0.2,0.22,MAP: a panel goes away.
 ui_page,square,760,1010,60,0.18,0.16,MAP: moving between tabs.
 ui_equip,square,640,1560,170,0.26,0.32,MAP: something is put on.
 ui_deny,sawtooth,340,180,150,0.24,0.2,"MAP: refused - not owned, no route, no key."
+map_screech,sawtooth,3200,240,520,0.5,0.55,"MAP: a fight starts. Violent, and the same sound whether the enemy forced it or you did - what it marks is the moment the ride stops being a ride."
+boss_charge,sawtooth,90,1500,4600,0.34,0.3,"BATTLE: a Line Manager pulling her stamina back up. Long and rising, the length of the recovery itself."
+boss_roar,sawtooth,1400,120,900,0.52,0.6,BATTLE: a Line Manager refusing to fall.
+flee_hold,square,300,1300,3000,0.16,0.22,BATTLE: the escape ring closing under a held finger. Quiet and rising - it has to be audible under three seconds of nothing happening without becoming the loudest thing in the fight.
+flee_go,noise,1800,200,420,0.4,0.5,BATTLE: the ring closes and the fight is abandoned.
 map_tripup,sine,520,880,180,0.22,0.18,A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click.
 ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
 
@@ -237,14 +261,17 @@ ui_station,triangle,680,1180,140,0.24,0.34,MAP: a station panel opens.`,
    layers are outermost-first and rotate as they take hits. pool = usable abilities.
    tier is WEAK|REGULAR|STRONG and decides the SILHOUETTE, not the stats. spawn_lines is
    line:weight, `*` for every line - where the map may produce this enemy.  */
-units: `id,name,emotion,tier,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,spawn_lines,drops,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
-player,You,,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,,10,0,,PLAYER,1,
-enemy,The Commuter,ANGER,REGULAR,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,L1:1.2|*:0.75,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave. The \`*\` in spawn_lines is what stops L3, L4 and L6 being empty of enemies until they have units of their own — the Commuter rides every line, which is the joke and also the fallback."
-enemy_anger_strong,The Enforcer,ANGER,STRONG,330,0.5,ANGER|ANGER|ANGER|SADNESS,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE,-1,3,6,,L1:0.14,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Anger, turned up: one more layer than the Commuter and a third more stamina, and its pool is nearly all Anger, so an Anger-layered player is drinking most of it while anyone else is not."
-enemy_surprise,The Interruption,SURPRISE,REGULAR,240,0.4,SURPRISE|SURPRISE|ANGER,ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE,-1,3,6,,L2:1.2,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,L2's own. Slightly under the Commuter on stamina because STARTLE is worth more than it costs when it lands.
-enemy_surprise_strong,The Reversal,SURPRISE,STRONG,320,0.5,SURPRISE|SURPRISE|SURPRISE|JOY,ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE,-1,3,6,,L2:0.12,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that does NOT absorb Surprise, which is the counter to a player who came dressed for it."
-enemy_sadness_weak,The Straggler,SADNESS,WEAK,150,0.3,SADNESS|SADNESS,ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE,-1,2,4,,L2:0.6|L5:0.7,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME — the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon sight on both its lines. Raise the L5 cell to make it Line 5's regular."
-enemy_joy_weak,The Reveller,JOY,WEAK,150,0.3,JOY|JOY,ATK_JOY|GEN_JOY|DEFEND|RECHARGE,-1,2,4,,L2:0.6,CRYSTAL:1:0.45|SEGMENT:2:0.40,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how it was asked for. Reads as Line 2 being where the wrong people end up. Add \`|L4:1.0\` to give Joy its own regular."`,
+units: `id,name,emotion,tier,max_ms,start_ec_pct,layers,pool,line_dir,line_cap,max_bonus_slots,loadouts,spawn_lines,drops,persona,role,scale,bg_bright,fx,theme_opening,theme_loop,theme2_loop,ai_profile,init,start_shield,max_layers_override,tags,enabled,notes
+player,You,,,400,0.5,JOY|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD,1,3,6,LO_ANGER|LO_SADNESS|LO_JOY,,,,,,,,,,,,10,0,,PLAYER,1,
+enemy,The Commuter,ANGER,REGULAR,250,0.4,ANGER|ANGER|SADNESS,ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|BLIND,-1,3,6,,L1:1.2|*:0.75,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"AI reads the matchups sheet, so retuning it retunes the AI. \`drops\` is what beating this one may leave. The \`*\` in spawn_lines is what stops L3, L4 and L6 being empty of enemies until they have units of their own — the Commuter rides every line, which is the joke and also the fallback."
+enemy_anger_strong,The Enforcer,ANGER,STRONG,330,0.5,ANGER|ANGER|ANGER|SADNESS,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|ATK_SADNESS|DEFEND|RECHARGE,-1,3,6,,L1:0.14,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Anger, turned up: one more layer than the Commuter and a third more stamina, and its pool is nearly all Anger, so an Anger-layered player is drinking most of it while anyone else is not."
+enemy_surprise,The Interruption,SURPRISE,REGULAR,240,0.4,SURPRISE|SURPRISE|ANGER,ATK_SURPRISE|HVY_SURPRISE|STARTLE|ATK_ANGER|DEFEND|RECHARGE,-1,3,6,,L2:1.2,CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,L2's own. Slightly under the Commuter on stamina because STARTLE is worth more than it costs when it lands.
+enemy_surprise_strong,The Reversal,SURPRISE,STRONG,320,0.5,SURPRISE|SURPRISE|SURPRISE|JOY,ATK_SURPRISE|HVY_SURPRISE|STARTLE|GEN_ANGER|ATK_JOY|DEFEND|RECHARGE,-1,3,6,,L2:0.12,CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"Three Surprise layers deep. GEN_ANGER is in the pool so it can grow a layer that does NOT absorb Surprise, which is the counter to a player who came dressed for it."
+enemy_sadness_weak,The Straggler,SADNESS,WEAK,150,0.3,SADNESS|SADNESS,ATK_SADNESS|INFLICT_SAD|DEFEND|RECHARGE,-1,2,4,,L2:0.6|L5:0.7,CRYSTAL:1:0.45|SEGMENT:2:0.40,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"No heavy in the pool, on purpose: a WEAK enemy chips. Two slots, two layers, and INFLICT_SAD is the one thing it can do that you will remember. RARE EVEN AT HOME — the sheet says L5 at 0.15, not 1.0, because it was asked for as an uncommon sight on both its lines. Raise the L5 cell to make it Line 5's regular."
+enemy_joy_weak,The Reveller,JOY,WEAK,150,0.3,JOY|JOY,ATK_JOY|GEN_JOY|DEFEND|RECHARGE,-1,2,4,,L2:0.6,CRYSTAL:1:0.45|SEGMENT:2:0.40,,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how it was asked for. Reads as Line 2 being where the wrong people end up. Add \`|L4:1.0\` to give Joy its own regular."
+boss_fondo,The Terminus,ANGER,STRONG,430,0.55,ANGER|ANGER|ANGER|ANGER,ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|DEFEND|RECHARGE,-1,4,6,,,CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70,The Terminus,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"The end of Line 1, and the armor it leaves is four layers of Anger - so the fight that grants it is four layers of Anger. Pure type on purpose: an Anger-layered player drinks half of this, which is exactly the trade the reward is offering."
+boss_sant_antoni,The Comedown,SURPRISE,STRONG,400,0.55,SURPRISE|SURPRISE|JOY|SURPRISE,ATK_SURPRISE|HVY_SURPRISE|MID_SURPRISE|STARTLE|GEN_JOY|DEFEND|RECHARGE,-1,4,6,,,CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70,The Comedown,,,,,,,,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,Leaves the Set of Rush. Its own pool is what the set is not: volume. The reward for beating a thing that swings six times is one ability that swings once and staggers.
+boss_line_manager,The Line Manager,JOY,STRONG,520,0.6,JOY|JOY|JOY|SURPRISE|JOY,ATK_JOY|HVY_JOY|GEN_JOY|ATK_SURPRISE|STARTLE|DEFEND|RECHARGE,-1,4,6,,,CRYSTAL:5:1.0|SEGMENT:5:0.90|ORB:2:0.80,The Line Manager,LINE_MANAGER,1.5,3,PAPARAZZI,,audio/line-manager.m4a,audio/line-manager-phase2.m4a,GREEDY_MAX_DAMAGE,8,0,,ENEMY,1,"THE KEY TO LINE 4 IS BEHIND HER. Five layers, nearly all Joy, because she is not defending a position - she is defending a mood, and every hit that is not Joy is someone ruining it. \`bg_bright\` triples the backdrop tint so her fight is lit like a rooftop rather than a tunnel, \`fx\` fires the camera flashes, and the two theme columns swap the music out for hers alone."`,
 
 /* --- abilities ---
    kind DAMAGE|SHIELD · power = damage or shield charges · blank emotion = typeless
@@ -268,6 +295,7 @@ ATK_SURPRISE,Sucker Punch,SURPRISE,20,DAMAGE,35,0,1,BURST,ENEMY,SINGLE,0,0,0,0,0
 HVY_SURPRISE,Whiplash,SURPRISE,45,DAMAGE,90,2,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Attack. *Charges* first, then hits for triple.",0,,,,0,0,,,,LOWEST_MS,COMMON,,1,
 MID_SURPRISE,Double Take,SURPRISE,30,DAMAGE,60,1,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,"Attack. *Charges* once, then hits hard.",0,,,,0,0,,,,LOWEST_MS,COMMON,,1,"Between ATK_SURPRISE and HVY_SURPRISE in every respect: one charging station rather than none or two, and power to match. The Set of Jolt is built around it."
 STARTLE,Out of Nowhere,SURPRISE,25,DEBUFF,0,0,0,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,2,Debuff. Target *misses a third* of its attacks for *2 turns*.,0,,,RATTLED,0,2,,,,LOWEST_MS,COMMON,,1,"Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it with a weaker basic economy rather than with a bigger bill."
+DRUG_HIT,Drug Hit,SURPRISE,20,DAMAGE,35,0,1,BURST,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,1,3,Attack. Cracks the outermost {LAYER} and leaves them *Dizzy* for a turn.,0,,,DIZZY,0,1,,,,LOWEST_MS,COMMON,,1,"Costed as a BASIC - exactly ATK_SURPRISE's cost and power - because Dizzy lasts one turn and is a coin flip rather than a lock. The Set of Rush leaves it, and it is the only thing in that set, so it has to be worth carrying on its own."
 SELF_HARM,Self Harm,,0,SELFHARM,25,0,0,WARN,SELF,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; costs you {MS}.,0,,,,0,0,,,,SELF,OVERLOAD,,1,OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed.
 FEED,Feed,,0,FEED,30,0,0,DROP,ENEMY,SINGLE,0,0,0,0,0,0,0,0,1,0,0,Status. Forced by {OVERLOAD}; *heals* your opponent.,0,,,,0,0,,,,AS_WRITTEN,OVERLOAD,,1,OVERLOAD ONLY. Heals your opponent. Cannot be moved or removed.`,
 
@@ -281,6 +309,7 @@ LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
 LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,GEN_JOY,,1,0,,,,1,
 LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
 LO_SURPRISE,SURPRISE,Jolt,MID_SURPRISE,,,,1,0,PAS_JOLT,,,1,"One attack and one passive, deliberately. Surprise is not about volume of swings - it is about what happens when one goes wrong, which is what PAS_JOLT turns into charge."
+LO_RUSH,SURPRISE,Rush,DRUG_HIT,,,,3,0,PAS_RUSH,,,1,Sant Antoni's reward. Its passive turns every critical into rushCritSlots extra slots instead of critSlots - three instead of one - so a set that offers one attack is really offering a bigger line whenever a hit goes well.
 LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.`,
 
 /* --- stations ---
@@ -437,12 +466,13 @@ items: `id,name,emotion,weight,cost,enabled,notes`,
    MaxMS; layer1/layer2 are the Emotional Layers it grants in battle — blank means the
    armor grants none. One `passive` per piece, resolved by ArmorFx in MAP/src/gear.js.
    `cost` and `trade_in` are for the store, which does not exist yet.  */
-armor: `id,name,tier,ms_mod,layer1,layer2,layer3,passive,cost,trade_in,enabled,notes
-ARM_SCARS,Calloused Scars,1,80,ANGER,,,PAS_THICKSKIN,,,1,"Starter. One layer, and it is the one that hits back."
-ARM_SHELL,Apathetic Shell,2,120,DISGUST,FEAR,,PAS_NUMB,120 DISGUST + 60 FEAR,ARM_SCARS,1,"Two layers. Slow to feel anything, which is the point."
-ARM_GLASSES,Rose-Tinted Glasses,2,60,JOY,SURPRISE,,PAS_DENIAL,140 JOY + 40 SURPRISE,ARM_SCARS,1,"Least stamina, brightest layers."
-ARM_SHOULDERS,Heavy Shoulders,3,150,SADNESS,ANGER,,PAS_ENDURE,220 SADNESS + 90 ANGER,ARM_SHELL,1,Carries the most and moves the slowest.
-ARM_STATIC,Static Coat,2,100,DISGUST,SURPRISE,SURPRISE,PAS_NUMB,,,1,"Three layers, which is why the sheet has a layer3 column at all. One of Disgust under two of Surprise."`,
+armor: `id,name,tier,ms_mod,layer1,layer2,layer3,layer4,passive,cost,trade_in,enabled,notes
+ARM_SCARS,Calloused Scars,1,80,ANGER,,,,PAS_THICKSKIN,,,1,"Starter. One layer, and it is the one that hits back."
+ARM_SHELL,Apathetic Shell,2,120,DISGUST,FEAR,,,PAS_NUMB,120 DISGUST + 60 FEAR,ARM_SCARS,1,"Two layers. Slow to feel anything, which is the point."
+ARM_GLASSES,Rose-Tinted Glasses,2,60,JOY,SURPRISE,,,PAS_DENIAL,140 JOY + 40 SURPRISE,ARM_SCARS,1,"Least stamina, brightest layers."
+ARM_SHOULDERS,Heavy Shoulders,3,150,SADNESS,ANGER,,,PAS_ENDURE,220 SADNESS + 90 ANGER,ARM_SHELL,1,Carries the most and moves the slowest.
+ARM_STATIC,Static Coat,2,100,DISGUST,SURPRISE,SURPRISE,,PAS_NUMB,,,1,"Three layers, which is why the sheet has a layer3 column at all. One of Disgust under two of Surprise."
+ARM_FONDO,The Terminus Coat,4,140,ANGER,ANGER,ANGER,ANGER,PAS_THICKSKIN,,,1,"EARNED, NOT SOLD - the Fondo boss leaves it, which is why it has no cost. Four layers of one emotion: everything Anger throws at you is halved and charges you, and everything else goes straight through four times over. The most committed piece in the game, and the reason the sheet has a layer4 column."`,
 
 /* --- world_bands ---
    day / hour / weather -> multipliers on a station's live attributes. Every
@@ -471,7 +501,18 @@ CLEAR,*,0,24,CLEAR,0.85,1,1,0.95,4,1,You can see what is coming.`,
    set and it holds still until the window ends. `emotions` drives the colours the effect
    is drawn in; `blurb` is what the tag says when tapped.  */
 city_status: `id,name,emotions,fx,lines,share,day,hours,density,aggro,fog,diltransience,blurb,enabled,notes
-RUSH_HOUR,Rush Hour,DISGUST|ANGER,RUSH,L1|L2|L5,0.4,MON|TUE|WED|THU|FRI,7-10|17-20,1.6,1.5,,,"The platforms are packed. Far more of them are out on the affected stretches, and they are quicker to take an interest.",1,"The reference status, and the only one designed. Everything else waits on the design."`
+RUSH_HOUR,Rush Hour,DISGUST|ANGER,RUSH,L1|L2|L5,0.4,MON|TUE|WED|THU|FRI,7-10|17-20,1.6,1.5,,,"The platforms are packed. Far more of them are out on the affected stretches, and they are quicker to take an interest.",1,"The reference status, and the only one designed. Everything else waits on the design."`,
+
+/* --- objectives ---
+   PROGRESSION. One row per thing the player can earn and the place they earn
+   it. `station` is where the floating ? appears and `emotion` colour-codes it.
+   `requirement` is the standardised test — DEFEAT_BOSS means: travel there and beat the
+   boss, who fights as `unit`. `reward` is a pipe list of KIND:ID — ARMOR/SET add to what
+   the profile OWNS, KEY grants a Line Key. `once`=1 retires the marker when it is cleared.  */
+objectives: `id,name,station,requirement,unit,reward,once,marker,emotion,card_tag,hint,enabled,notes
+OBJ_FONDO,The Last of the Anger,FONDO,DEFEAT_BOSS,boss_fondo,ARMOR:ARM_FONDO,1,QUESTION,ANGER,ENTITY,"Something is still turning trains around up there, and still wearing every year of it.",1,"The end of Line 1. Grants ARM_FONDO — four layers of Anger, which is more than any purchasable piece and the reason it is not purchasable."
+OBJ_SANT_ANTONI,Something For The Comedown,SANT_ANTONI,DEFEAT_BOSS,boss_sant_antoni,SET:LO_RUSH,1,QUESTION,SURPRISE,ENTITY,The night ended here and never quite let go. Whatever it was on is still going.,1,"Grants the Set of Rush: Drug Hit, and a passive that makes every critical worth three slots instead of one."
+OBJ_URQUINAONA,The Line Manager,URQUINAONA,DEFEAT_BOSS,boss_line_manager,KEY:L4,1,QUESTION,JOY,ENTITY,"Somebody up there decides whose day this is, and it has never once been yours.",1,"THE GATE. Line 4 is unreachable until this row is cleared, so this is the one objective that opens the network rather than the kit. Her fight is lit three times as bright as any other and has its own music — both of those live on her units row, not here."`
 };
 
 /* --- CSV reader: handles quoted fields, so notes may contain commas ---- */
@@ -521,3 +562,4 @@ const ITEMS     = byId(parseCSV(DATA.items).filter(r=>r.enabled));
 const ARMOR     = byId(parseCSV(DATA.armor).filter(r=>r.enabled));
 const WORLD_BANDS = parseCSV(DATA.world_bands).filter(r=>r.enabled);
 const CITY_STATUS = parseCSV(DATA.city_status).filter(r=>r.enabled);
+const OBJECTIVES  = parseCSV(DATA.objectives).filter(r=>r.enabled);

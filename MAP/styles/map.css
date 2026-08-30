@@ -991,3 +991,115 @@ button{text-transform:inherit; letter-spacing:inherit}
    guessed number, so the two cannot overlap at any screen size. */
 .ridestats.show ~ .endbtn{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 .ridestats.show ~ .bagbtn{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+
+/* ---- WHAT AN OBJECTIVE LEFT BEHIND ----------------------------------------
+   The rarest panel in the map — at most three times in a save — so it is
+   allowed to take the middle of the screen rather than sliding up from the
+   bottom edge the way the dilemma and the station panel do. Same `.framed`
+   language as both of those: an animated stroke around an inset card, so it is
+   obviously the same object as everything else here and obviously a bigger
+   occasion.
+
+   `--frame` is the one thing it does differently: a slow sweep through white
+   rather than a line's colour, because what is inside is not a journey. */
+/* `pointer-events:auto` is NOT optional: `.hud` is pointer-events:none so the
+   map underneath stays draggable, and a panel that forgets to opt back in is a
+   panel whose only button does nothing. That is exactly the bug the tooltip
+   veil had. */
+.reward{position:absolute; left:14px; right:14px; top:50%; display:none;
+  transform:translateY(-50%); z-index:6; text-align:center; pointer-events:auto;
+  --frame:linear-gradient(90deg,#f4efe4,#9a8f80,#f4efe4)}
+.reward.show{display:block; animation:rwin 420ms steps(7) both}
+@keyframes rwin{
+  from{opacity:0; transform:translateY(calc(-50% + 14px)) scale(.94)}
+  to{opacity:1; transform:translateY(-50%) scale(1)}}
+.reward h3{font-size:13px; letter-spacing:.14em; margin-bottom:3px}
+.reward .rwwhere{font-size:10px; letter-spacing:.10em; color:var(--muted);
+  margin-bottom:10px}
+.reward .rwlines{display:flex; flex-direction:column; gap:6px; margin-bottom:10px}
+/* one line per thing granted, each landing a beat after the last */
+.reward .rwline{display:flex; align-items:center; gap:9px; text-align:left;
+  padding:7px 10px; background:linear-gradient(180deg,#2b2620,#1e1a16);
+  box-shadow:inset 0 0 0 1px rgba(244,239,228,.10);
+  animation:rwline 300ms steps(6) both;
+  animation-delay:calc(200ms + var(--si,0) * 110ms)}
+@keyframes rwline{from{opacity:0; transform:translateX(-10px)} to{opacity:1; transform:none}}
+.reward .rwline .sym{width:15px; height:15px; flex:0 0 15px; color:var(--ink)}
+.reward .rwline .sym svg{width:100%; height:100%; display:block}
+.reward .rwtxt{display:flex; flex-direction:column; gap:1px; min-width:0}
+.reward .rwtxt b{font-size:11px; letter-spacing:.08em}
+.reward .rwtxt small{font-size:8px; letter-spacing:.14em; color:var(--muted)}
+.reward .rwnote{font-size:9px; line-height:1.5; color:var(--muted);
+  text-transform:none; letter-spacing:.02em; margin-bottom:10px}
+.reward .rwgo{width:100%}
+
+/* ---- AN OBJECTIVE, IN THE STATION PANEL -----------------------------------
+   Above the attribute list rather than inside it: fog and aggro are things the
+   station IS, and this is a reason to go there. Coloured by the objective's own
+   emotion, which is the same colour the ? floating over it on the map. */
+.peek .objs{display:flex; flex-direction:column; gap:5px; margin-bottom:9px}
+.peek .objline{padding:6px 9px; border-left:3px solid var(--emo,#f4efe4);
+  background:linear-gradient(90deg, color-mix(in srgb, var(--emo,#f4efe4) 16%, transparent), transparent 70%)}
+.peek .objline b{display:block; font-size:10px; letter-spacing:.10em;
+  color:var(--emo,#f4efe4)}
+.peek .objline small{display:block; margin-top:2px; font-size:9px; line-height:1.5;
+  color:var(--muted); text-transform:none; letter-spacing:.02em}
+
+/* ---- WHO IS WAITING ON THE PLATFORM ---------------------------------------
+   The Guardian's announcement. Full bleed, because it is not a panel that has
+   arrived on top of the map — it is the map being taken over for three seconds
+   by the thing at the end of the trip.
+
+   `pointer-events:auto` so nothing behind it can be tapped while it plays: it
+   is a statement, not a prompt, and a stray tap on the station underneath would
+   open the peek panel behind a fight that is about to start. */
+.guardian{position:absolute; inset:0; z-index:8; display:none;
+  pointer-events:auto; align-items:center; justify-content:center;
+  background:radial-gradient(120% 80% at 50% 50%,
+    color-mix(in srgb, var(--emo,#f4efe4) 26%, transparent) 0%,
+    rgba(6,5,4,.86) 58%, rgba(6,5,4,.96) 100%)}
+.guardian.show,.guardian.going{display:flex}
+.guardian.show{animation:gbin 260ms steps(4) both}
+.guardian.going{animation:gbout 300ms steps(4) both}
+@keyframes gbin{from{opacity:0} to{opacity:1}}
+@keyframes gbout{from{opacity:1} to{opacity:0}}
+
+.gbwrap{display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:0 18px; text-align:center}
+.gbsym{width:38px; height:38px; color:var(--emo,#f4efe4); display:block;
+  filter:drop-shadow(0 0 7px var(--emo,#f4efe4));
+  animation:gbpulse 620ms steps(2) infinite}
+.gbsym svg{width:100%; height:100%; display:block}
+@keyframes gbpulse{0%{opacity:1; transform:scale(1)} 50%{opacity:.35; transform:scale(.92)} 100%{opacity:1; transform:scale(1)}}
+.gbtext{font-size:17px; line-height:1.45; letter-spacing:.20em;
+  color:var(--emo,#f4efe4);
+  text-shadow:0 0 10px var(--emo,#f4efe4), 2px 2px 0 #0b0a08}
+/* a rule that draws itself across, so the banner is doing something for the
+   whole three seconds rather than being a still frame that sits there */
+.gbrule{display:block; height:3px; width:min(74%,240px);
+  background:linear-gradient(90deg,transparent,var(--emo,#f4efe4),transparent);
+  animation:gbrule var(--gbrule,3000ms) linear both}
+@keyframes gbrule{from{transform:scaleX(0)} to{transform:scaleX(1)}}
+
+/* SHE SHAKES. A Guardian manifests — a thing arriving. A Line Manager appears —
+   a thing that was always there deciding to be seen. The difference has to be
+   legible before the words are read. */
+.guardian.manager .gbwrap{animation:gbshake 90ms steps(2) infinite}
+.guardian.manager .gbtext{font-size:19px; letter-spacing:.24em}
+@keyframes gbshake{
+  0%{transform:translate(-3px,1px) rotate(-.6deg)}
+  50%{transform:translate(3px,-2px) rotate(.7deg)}
+  100%{transform:translate(-2px,2px) rotate(-.4deg)}}
+
+/* The warning that sits above an objective's name in the station panel. What
+   the `?` on the map cannot say on its own: whether the thing waiting here is a
+   fight or a find. Colour-coded to the objective's own emotion for an entity;
+   the treasure tag takes the interface's own gold instead, because a find has
+   no emotion behind it. */
+.peek .objline .objtag{display:flex; align-items:center; gap:5px; margin-bottom:3px;
+  font-size:8px; letter-spacing:.16em; color:var(--emo,#f4efe4)}
+.peek .objline .objtag i{width:9px; height:9px; flex:0 0 9px; display:block}
+.peek .objline .objtag i svg{width:100%; height:100%; display:block}
+.peek .objline.entity .objtag{animation:objblink 900ms steps(2) infinite}
+@keyframes objblink{0%{opacity:1} 55%{opacity:.4} 100%{opacity:1}}
+.peek .objline.treasure .objtag{color:#f2c14e}

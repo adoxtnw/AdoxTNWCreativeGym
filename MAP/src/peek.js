@@ -93,7 +93,20 @@ const Peek = {
       body = '<p class="fogged">Obscured. Too much fog on the line to read this ' +
              'station from here.</p>';
     }else{
+      /* WHAT IS WAITING HERE, above the numbers rather than among them. An
+         objective is not an attribute of the station like fog or aggro — it is
+         a reason to come, and burying it in a definition list beside "Threat
+         x1.02" would make it read as one more statistic. Its own block, in its
+         own colour, and only while it is still owing. */
+      const owed = Objectives.pending(this.id).map(o => {
+        const tag = Objectives.cardTag(o);
+        return '<div class="objline pxr ' + tag.kind.toLowerCase() + '" style="--emo:' +
+          (EMOTIONS[o.emotion] ? EMOTIONS[o.emotion].hex : "#f4efe4") + '">' +
+          '<span class="objtag"><i>' + glyphSVG(tag.icon) + '</i>' + tag.text + '</span>' +
+          '<b>' + esc(o.name) + '</b><small>' + esc(o.hint || "") + '</small></div>';
+      }).join("");
       body =
+        (owed ? '<div class="objs">' + owed + '</div>' : '') +
         '<dl>' +
         row("Weather", WorldState.weather()) +
         row("Threat",  rate(a.density) + " &middot; &times;" + a.density.toFixed(2)) +

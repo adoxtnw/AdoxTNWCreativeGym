@@ -111,6 +111,38 @@ function pickEnemyUnit(lineId){
   return slices[slices.length - 1].id;
 }
 const isEnemyKind = kind => kind === "ENEMY_PASSIVE" || kind === "ENEMY_AGGRO";
+
+/* ---- ENEMIES THAT LOCK ON --------------------------------------------------
+   Some of the entities that drift past do not wait to be prodded: they fix on
+   you and count down, and when the countdown runs out the fight happens whether
+   or not you wanted it.
+
+   IT IS A PROPERTY OF THE SPAWN, NOT OF THE ROW. It used to be a second
+   `travel_elements` row with its own `kind`, which meant "an enemy that locks
+   on" and "an enemy that does not" were two different KINDS OF OBJECT competing
+   for the same slice of the same roll — so making them rarer made enemies
+   rarer, and the two numbers could never be tuned apart. Now there is one enemy
+   row and `aggroChance` decides, per spawn, which of the two this one is.
+
+   MULTIPLIED BY THE STATION'S OWN AGGRO, which is what that column has always
+   been for: a hostile stretch of network really is more hostile, rather than
+   the world state moving a number nothing reads.
+
+   TIER IS A HARD GATE. A hard fight you did not choose is a punishment; the one
+   thing that makes a STRONG enemy fair is that taking it on is a decision. The
+   list is in the sheet (`aggroTiers`) rather than here, so which tiers may
+   ambush you is a balance question and not a code change. */
+function aggroTiers(){
+  return String(RULES.aggroTiers || "WEAK|REGULAR").split("|").map(s => s.trim()).filter(Boolean);
+}
+function rollAggro(tier){
+  if(aggroTiers().indexOf(tier) < 0) return false;
+  const base = num(RULES.aggroChance, 0.25);
+  if(base <= 0) return false;
+  /* the destination is what the ride's difficulty has been read off all along */
+  const world = J.to ? stationAttrs(J.to).aggro : 1;
+  return Math.random() < Math.min(1, base * world);
+}
 /* WEAK / REGULAR / STRONG, as a size on the ride. The element row's `size` is
    still the baseline; a tier scales it, so retuning the element retunes all
    three at once. */
@@ -221,6 +253,11 @@ function spawnElement(id){
      screen before you commit is the only warning there is. */
   const col  = row && EMOTIONS[row.emotion] ? hexRGB(EMOTIONS[row.emotion].hex) : null;
   const s = isEnemyKind(e.kind) ? tierSize(e.size, tier) : e.size;
+  const aggro = isEnemyKind(e.kind) && rollAggro(tier);
+  /* THE ROW'S `lock_secs` IS AN OVERRIDE, not the switch. Blank or zero means
+     "however long the rules say", so the countdown can be retuned for the whole
+     game in one cell instead of once per element row. */
+  const lockMs = aggro ? secsToMs(num(e.lock_secs, 0) || num(RULES.aggroLockSecs, 5)) : 0;
   /* Something FLYING BY enters from the top of the frame. Something running
      PARALLEL is already alongside when you notice it, so it starts on screen —
      entering from the top and creeping would just read as a slow fly-by. */
@@ -229,7 +266,13 @@ function spawnElement(id){
     id, e, unit, tier, col, size: s,
     x: s + Math.random() * (W - s * 2),
     y: parallel ? H * (0.18 + Math.random() * 0.55) : -s,
-    lock: num(e.lock_secs, 0) > 0 ? secsToMs(e.lock_secs) : 0,   /* ms */
+    aggro,
+    lock: lockMs,                      /* ms remaining */
+    /* KEPT, RATHER THAN RE-DERIVED. The ring used to work its own total back out
+       of `lock_secs` every frame, which is a division by the very cell that is
+       now usually blank — the ring would have been drawn against zero. What the
+       countdown started at is a fact about this spawn. */
+    lockTotal: lockMs,
     life: secsToMs(num(e.life_min, 3) + Math.random() * (num(e.life_max, 3) - num(e.life_min, 3))),
     age: 0,                            /* ms */
     spin: Math.random() * 6.283,       /* prisms start at their own angle */
@@ -661,23 +704,67 @@ ElementFx.define("ENEMY_PASSIVE", {
 });
 
 /* ENEMY_AGGRO — locks on and counts down. When it reaches zero the fight
-   happens whether or not you wanted it. Drawn with the countdown around it,
-   because a forced encounter with no warning is just a punishment. */
+   happens whether or not you wanted it. Drawn with the countdown around it and
+   a warning over it, because a forced encounter with no warning is just a
+   punishment. The two say different things on purpose: the sign says THIS ONE
+   IS COMING, the ring says HOW LONG YOU HAVE. */
 ElementFx.define("ENEMY_AGGRO", Object.assign({}, ElementFx.of("ENEMY_PASSIVE"), {
   draw(el, col){
     ElementFx.of("ENEMY_PASSIVE").draw(el, col);
     col = el.col || col;
     const a = elAlpha(el), r = el.size / 2 + 3;
-    const total = secsToMs(num(el.e.lock_secs, 5));   /* the lock is in ms now */
-    const left = Math.max(0, el.lock) / total;
-    /* the ring closes as the countdown runs out */
+    /* `lockTotal` is what this spawn STARTED with. Deriving it from the sheet
+       here divided by a cell that is now normally blank. */
+    const total = el.lockTotal || secsToMs(num(RULES.aggroLockSecs, 5));
+    const left = Math.max(0, Math.min(1, el.lock / total));
+    /* THE RING CLOSES AS THE COUNTDOWN RUNS OUT, and it is drawn `aggroRingThick`
+       pixels deep rather than one — at ride speed, against a moving parallax, a
+       single-pixel arc on a thirteen-pixel body was a suggestion rather than a
+       clock. Concentric passes rather than a wider brush: a thick arc drawn by
+       fattening each plotted point leaves gaps on the diagonals. */
     const hot = [255, 90, 90];
-    for(let t = 0; t < 6.283 * left; t += 0.16)
-      blendPx(el.x + Math.cos(t - 1.57) * r, el.y + Math.sin(t - 1.57) * r, hot, a);
-    /* and it flashes once it is nearly out of time */
-    if(left < 0.34 && (frame & 2)) blendPx(el.x, el.y - r - 2, hot, a);
+    const thick = Math.max(1, Math.round(num(RULES.aggroRingThick, 2)));
+    const step = 0.16 / thick;                 /* denser, or the outer ring dots */
+    for(let k = 0; k < thick; k++){
+      const rr = r + k;
+      for(let t = 0; t < 6.283 * left; t += step)
+        blendPx(el.x + Math.cos(t - 1.57) * rr, el.y + Math.sin(t - 1.57) * rr, hot, a);
+    }
+    /* THE WARNING SIGN, in the enemy's OWN colour — the same colour-coding the
+       body already carries, so what is bearing down on you and what type it is
+       are one glance rather than two. It flashes at `aggroWarnHz`, on the
+       display clock rather than the 12 fps one, because a sign that blinks in
+       step with the game clock reads as part of the scenery. */
+    const hz = num(RULES.aggroWarnHz, 4.5);
+    const on = (Math.floor(performance.now() * hz / 1000) & 1) === 0;
+    if(on) drawWarnSign(el.x, el.y - r - Math.round(el.size * 0.55) - 2,
+                        Math.max(7, Math.round(el.size * 0.8)), col, a);
   }
 }));
+
+/* A filled triangle with a bang cut out of it — the ⚠ sign, drawn on the map's
+   own grid rather than borrowed from a font. Procedural rather than a bitmap so
+   it holds its proportions at every enemy size: a WEAK dart and a STRONG spined
+   shape are very different widths and a fixed 7x7 stamp reads as a sticker on
+   one of them and a smudge on the other. */
+function drawWarnSign(cx, cy, w, col, a){
+  const h = Math.round(w * 0.88), half = w / 2;
+  const dark = [22, 18, 16];
+  const bar = Math.max(1, Math.round(w * 0.16));
+  for(let y = 0; y < h; y++){
+    /* the triangle widens toward its base; +0.35 so the apex is a point and not
+       a single stranded pixel */
+    const reach = ((y + 0.35) / h) * half;
+    for(let x = -reach; x <= reach; x++){
+      const py = cy - h / 2 + y;
+      /* the bang: a stem down the middle, a gap, then the dot */
+      const stem = y > h * 0.32 && y < h * 0.66;
+      const dot  = y > h * 0.74 && y < h * 0.88;
+      const inBang = Math.abs(x) < bar / 2 && (stem || dot);
+      blendPx(cx + x, py, inBang ? dark : col, a);
+    }
+  }
+}
 
 /* Remove one element by identity — used when a tap consumes it outright. */
 function dropElement(el){
@@ -690,10 +777,16 @@ ElementFx.define("_default", {
   tap(){ return false; }
 });
 
+/* WHICH PAINTER THIS ELEMENT USES. Locking on is a property of the SPAWN now,
+   not of the row, so the kind alone can no longer answer it — everything that
+   used to look up `el.e.kind` goes through here instead. One function, so the
+   drawing and the tapping can never disagree about what this thing is. */
+const elFx = el => el.aggro ? ElementFx.of("ENEMY_AGGRO") : ElementFx.of(el.e.kind);
+
 function drawElements(col){
   for(let i = 0; i < Trip.live.length; i++){
     const el = Trip.live[i];
-    ElementFx.of(el.e.kind).draw(el, col);
+    elFx(el).draw(el, col);
   }
 }
 /* THE HIT BOX IS MUCH BIGGER THAN THE PICTURE, on purpose.
@@ -714,7 +807,7 @@ function tapElement(px, py){
     const d = Math.hypot(el.x - px, el.y - py);
     if(d < reach && d < bestD){ bestD = d; best = el; }
   }
-  return best ? ElementFx.of(best.e.kind).tap(best) : false;
+  return best ? elFx(best).tap(best) : false;
 }
 
 /* ---- the EMOTIONAL TRIP bar ---------------------------------------------- */

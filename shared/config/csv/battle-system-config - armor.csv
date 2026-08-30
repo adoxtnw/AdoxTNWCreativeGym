@@ -1,8 +1,9 @@
-"Emotional Armor. `ms_mod` is ADDED to the player's base MaxMS; layer1/layer2 are the Emotional Layers it grants in battle (blank = none). One passive per piece. cost/trade_in are for the Wandering Store, which is not built yet.",,,,,,,,,,,
-id,name,tier,ms_mod,layer1,layer2,layer3,passive,cost,trade_in,enabled,notes
-LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned,LIVE,LIVE,LIVE,LIVE,planned
-ARM_SCARS,Calloused Scars,1,80,ANGER,,,PAS_THICKSKIN,,,1,"Starter. One layer, and it is the one that hits back."
-ARM_SHELL,Apathetic Shell,2,120,DISGUST,FEAR,,PAS_NUMB,120 DISGUST + 60 FEAR,ARM_SCARS,1,"Two layers. Slow to feel anything, which is the point."
-ARM_GLASSES,Rose-Tinted Glasses,2,60,JOY,SURPRISE,,PAS_DENIAL,140 JOY + 40 SURPRISE,ARM_SCARS,1,"Least stamina, brightest layers."
-ARM_SHOULDERS,Heavy Shoulders,3,150,SADNESS,ANGER,,PAS_ENDURE,220 SADNESS + 90 ANGER,ARM_SHELL,1,Carries the most and moves the slowest.
-ARM_STATIC,Static Coat,2,100,DISGUST,SURPRISE,SURPRISE,PAS_NUMB,,,1,"Three layers, which is why the sheet has a layer3 column at all. One of Disgust under two of Surprise."
+"Emotional Armor. `ms_mod` is ADDED to the player's base MaxMS; layer1..layer4 are the Emotional Layers it grants in battle, outermost first (blank = none, and a gap ends the run). One passive per piece. The ceiling is `maxLayers`, not the number of columns - add layer5 here and in layersOf() the day a piece needs it. cost/trade_in are for the Wandering Store, which is not built yet.",,,,,,,,,,,,
+id,name,tier,ms_mod,layer1,layer2,layer3,layer4,passive,cost,trade_in,enabled,notes
+LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
+ARM_SCARS,Calloused Scars,1,80,ANGER,,,,PAS_THICKSKIN,,,1,"Starter. One layer, and it is the one that hits back."
+ARM_SHELL,Apathetic Shell,2,120,DISGUST,FEAR,,,PAS_NUMB,120 DISGUST + 60 FEAR,ARM_SCARS,1,"Two layers. Slow to feel anything, which is the point."
+ARM_GLASSES,Rose-Tinted Glasses,2,60,JOY,SURPRISE,,,PAS_DENIAL,140 JOY + 40 SURPRISE,ARM_SCARS,1,"Least stamina, brightest layers."
+ARM_SHOULDERS,Heavy Shoulders,3,150,SADNESS,ANGER,,,PAS_ENDURE,220 SADNESS + 90 ANGER,ARM_SHELL,1,Carries the most and moves the slowest.
+ARM_STATIC,Static Coat,2,100,DISGUST,SURPRISE,SURPRISE,,PAS_NUMB,,,1,"Three layers, which is why the sheet has a layer3 column at all. One of Disgust under two of Surprise."
+ARM_FONDO,The Terminus Coat,4,140,ANGER,ANGER,ANGER,ANGER,PAS_THICKSKIN,,,1,"EARNED, NOT SOLD - the Fondo boss leaves it, which is why it has no cost. Four layers of one emotion: everything Anger throws at you is halved and charges you, and everything else goes straight through four times over. The most committed piece in the game, and the reason the sheet has a layer4 column."

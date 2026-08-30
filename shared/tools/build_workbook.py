@@ -205,6 +205,17 @@ ABILS = [
     uses=2, status_apply="RATTLED", status_duration=2,
     notes="Surprise's debuff. Softer than BLIND and cheaper, because Surprise pays for it "
           "with a weaker basic economy rather than with a bigger bill."),
+ # THE FIRST ABILITY THAT BOTH HITS AND HANGS A STATUS. Every DAMAGE row before
+ # this one left `status_apply` blank and every status came from a DEBUFF row, so
+ # the two were effectively separate kinds of turn. Kinds.DAMAGE now reads
+ # status_apply the way DEBUFF always has, which means this is a data row and not
+ # a special case - any attack can carry a status by filling in two cells.
+ ab(id="DRUG_HIT", blurb='Attack. Cracks the outermost {LAYER} and leaves them *Dizzy* for a turn.',
+    name="Drug Hit", emotion="SURPRISE", cost=20, kind="DAMAGE", power=35, hits_layer=1, icon="BURST",
+    status_apply="DIZZY", status_duration=1,
+    notes="Costed as a BASIC - exactly ATK_SURPRISE's cost and power - because Dizzy lasts one "
+          "turn and is a coin flip rather than a lock. The Set of Rush leaves it, and it is the "
+          "only thing in that set, so it has to be worth carrying on its own."),
  ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Status. Forced by {OVERLOAD}; costs you {MS}.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
     target="SELF", wild_target="SELF", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed."),
@@ -251,18 +262,24 @@ sheet("matchups", MU_COLS, MU_LIVE, MUS,
 # ───────────────────────────── units ─────────────────────────────
 U_COLS = ["id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","line_dir",
           "line_cap","max_bonus_slots","loadouts","spawn_lines","drops",
+          "persona","role","scale","bg_bright","fx","theme_opening","theme_loop","theme2_loop",
           "ai_profile","init","start_shield","max_layers_override","tags","enabled","notes"]
 U_LIVE = {"id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","line_dir","line_cap",
-          "max_bonus_slots","loadouts","spawn_lines","drops"}
+          "max_bonus_slots","loadouts","spawn_lines","drops",
+          "persona","role","scale","bg_bright","fx","theme_opening","theme_loop","theme2_loop"}
 def en(**k):
     """An enemy row. Everything an enemy shares with every other enemy is here, so a
     new one is the handful of cells that actually make it that enemy."""
     row = dict(tier="REGULAR", start_ec_pct=0.40, line_dir=-1, line_cap=3, max_bonus_slots=6,
-               loadouts="", ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0,
+               loadouts="", persona="", role="", scale="", bg_bright="", fx="",
+               theme_opening="", theme_loop="", theme2_loop="",
+               ai_profile="GREEDY_MAX_DAMAGE", init=8, start_shield=0,
                max_layers_override="", tags="ENEMY", enabled=1, notes="")
     row.update(k); return row
 UNITS_ROWS = [
  dict(id="player", name="You", emotion="", tier="", spawn_lines="", max_ms=400, start_ec_pct=0.50,
+      persona="", role="", scale="", bg_bright="", fx="",
+      theme_opening="", theme_loop="", theme2_loop="",
       layers="JOY|SADNESS", pool="ATK_ANGER|ATK_SADNESS|ATK_JOY|DEFEND|RECHARGE|HVY_ANGER|HVY_SADNESS|HVY_JOY|GEN_DISGUST|GEN_ANGER|ROT|INFLICT_SAD", line_dir=1,
       line_cap=3, max_bonus_slots=6, loadouts="LO_ANGER|LO_SADNESS|LO_JOY",
       drops="",
@@ -320,9 +337,51 @@ UNITS_ROWS = [
     notes="L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how "
           "it was asked for. Reads as Line 2 being where the wrong people end up. Add "
           "`|L4:1.0` to give Joy its own regular."),
+ # ---- STATION BOSSES ------------------------------------------------------
+ # NOT ON THE TRACK. Every one of these has a BLANK spawn_lines, which is what
+ # keeps them out of the ride roll: they are reached by travelling TO their
+ # station and nowhere else. The objectives sheet names them; without a row
+ # there pointing at one, it can never be fought at all.
+ #
+ # `persona` PINS the character. Every other enemy draws one at random from the
+ # dialogue sheet, which is what makes the same units row a different person each
+ # time - correct for a commuter, wrong for a boss, who has to be the SAME person
+ # every time you come back for her.
+ en(id="boss_fondo", name="The Terminus", emotion="ANGER", tier="STRONG",
+    max_ms=430, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
+    layers="ANGER|ANGER|ANGER|ANGER",
+    pool="ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|DEFEND|RECHARGE",
+    spawn_lines="", persona="The Terminus",
+    drops="CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70",
+    notes="The end of Line 1, and the armor it leaves is four layers of Anger - so the fight "
+          "that grants it is four layers of Anger. Pure type on purpose: an Anger-layered "
+          "player drinks half of this, which is exactly the trade the reward is offering."),
+ en(id="boss_sant_antoni", name="The Comedown", emotion="SURPRISE", tier="STRONG",
+    max_ms=400, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
+    layers="SURPRISE|SURPRISE|JOY|SURPRISE",
+    pool="ATK_SURPRISE|HVY_SURPRISE|MID_SURPRISE|STARTLE|GEN_JOY|DEFEND|RECHARGE",
+    spawn_lines="", persona="The Comedown",
+    drops="CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70",
+    notes="Leaves the Set of Rush. Its own pool is what the set is not: volume. The reward for "
+          "beating a thing that swings six times is one ability that swings once and staggers."),
+ en(id="boss_line_manager", name="The Line Manager", emotion="JOY", tier="STRONG",
+    max_ms=520, start_ec_pct=0.60, line_cap=4, max_bonus_slots=6,
+    layers="JOY|JOY|JOY|SURPRISE|JOY",
+    pool="ATK_JOY|HVY_JOY|GEN_JOY|ATK_SURPRISE|STARTLE|DEFEND|RECHARGE",
+    spawn_lines="", persona="The Line Manager", role="LINE_MANAGER", scale=1.5,
+    bg_bright=3, fx="PAPARAZZI",
+    theme_opening="", theme_loop="audio/line-manager.m4a",
+    theme2_loop="audio/line-manager-phase2.m4a",
+    drops="CRYSTAL:5:1.0|SEGMENT:5:0.90|ORB:2:0.80",
+    notes="THE KEY TO LINE 4 IS BEHIND HER. Five layers, nearly all Joy, because she is not "
+          "defending a position - she is defending a mood, and every hit that is not Joy is "
+          "someone ruining it. `bg_bright` triples the backdrop tint so her fight is lit like "
+          "a rooftop rather than a tunnel, `fx` fires the camera flashes, and the two theme "
+          "columns swap the music out for hers alone."),
 ]
 sheet("units", U_COLS, U_LIVE, UNITS_ROWS,
-  widths={"layers":26,"pool":40,"spawn_lines":20,"notes":42},
+  widths={"layers":26,"pool":40,"spawn_lines":20,"persona":18,"role":16,
+          "theme_opening":26,"theme_loop":26,"theme2_loop":26,"notes":42},
   notes=("One row per combatant. 'layers' is outermost-first and rotates as it takes hits. "
          "'pool' is which abilities this unit may use. Add enemies by adding rows. "
          "`drops` is what BEATING this unit may leave, as kind:amount:chance - "
@@ -335,7 +394,20 @@ sheet("units", U_COLS, U_LIVE, UNITS_ROWS,
          "a strong one is a seven-pointed star and a large spined shape. "
          "`spawn_lines` is where the map may produce it, as line:weight - L2:0.15|L5:0.15 "
          "means an uncommon sight on either. `*` is every line, and is what keeps a line "
-         "with no units of its own from being empty."))
+         "with no units of its own from being empty. LEAVE IT BLANK for a boss: a unit the "
+         "ride can never roll is one only the objectives sheet can reach. "
+         "`persona` PINS this unit to one row of the dialogue sheet instead of drawing a "
+         "character at random, which is what a boss needs and an anonymous commuter does not. "
+         "`bg_bright` multiplies how strongly this enemy's colour lights the battle backdrop "
+         "(blank or 1 is normal, 3 is three times as bright); `fx` names a flourish the fight "
+         "runs around it (PAPARAZZI); `theme_opening`/`theme_loop` swap the battle music for "
+         "this fight alone, and blank means the usual theme - a blank OPENING with a loop "
+         "filled in simply starts on the loop. "
+         "`role` marks a unit as something the game treats specially: LINE_MANAGER gives it "
+         "the second wind at bossPhaseAt, the shaking announcement on the platform, the two "
+         "parting lines and the seven-second sink, and `theme2_loop` is the music its second "
+         "phase is fought to. `scale` is how large it is drawn in battle against an ordinary "
+         "enemy of its tier - 1.5 is half again - and blank is 1."))
 
 # ───────────────────────────── layer_types (reserved) ─────────────────────────────
 LT_COLS = ["id","emotion","display_name","durability","on_break_effect","on_break_value",
@@ -379,6 +451,11 @@ SE_ROWS = [
     blurb="{SURPRISE} came from nowhere. *A third* of your attacks go wide.",
     notes="Surprise's own miss status. missChance() takes the HIGHEST of everything on a "
           "unit rather than summing, so Rattled and Blinded together are just Blinded."),
+ se(id="DIZZY",    name="Dizzy",   duration=1, icon="BURST", color="#9a6bb0", miss_chance=0.5,
+    blurb="The carriage is still moving without you. *Half* of your attacks miss outright.",
+    notes="Blinded's miss rate for a SINGLE turn - what Drug Hit leaves behind. The whole "
+          "difference between this and BLINDED is how long you live with it, which is what "
+          "makes a one-turn status worth costing as a basic attack rather than as a debuff."),
 ]
 sheet("status_effects", SE_COLS, SE_LIVE, SE_ROWS,
   widths={"notes":52},
@@ -566,6 +643,29 @@ RULES = [
  ("startSets","LO_ANGER|LO_SADNESS|LO_JOY|LO_DISGUST|LO_SURPRISE","The Move Sets a profile OWNS. `equippedSlots` of them can be carried at once, so this is the shelf to pick from rather than the loadout itself."),
  ("startArmorOwned","ARM_SCARS|ARM_STATIC","Armor a profile OWNS, beyond the one it is wearing. Same idea as startSets."),
  ("joltEc",20,"Emotional Charge the Set of Jolt's passive returns each time one of your attacks misses."),
+ ("critSlots",1,"Extra line slots a critical earns, for anyone without a passive that says otherwise. The slot is good for exactly one line."),
+ ("rushCritSlots",3,"What PAS_RUSH (the Set of Rush) turns that into. Raising it raises the ceiling of the whole set, which is the one number worth balancing it on."),
+ # ---- MAP: progression objectives ----
+ ("objectiveWobble",0.9,"How far an objective's marker swings, in map pixels. It is a wobble, not an orbit: the ? never leaves the top of its station."),
+ ("objectiveBeatMs",760,"Period of the white circle's beat, in ms. One breath per station, so a screen of them does not pulse in lockstep - each is offset by a hash of its own id."),
+ # ---- MAP: enemies that lock on ----
+ ("aggroChance",0.25,"Fraction of the enemies that appear on a ride which LOCK ON and count down to forcing the fight. Multiplied by the target station's own aggro, so a hostile stretch of network really is more hostile. 0 turns the whole behaviour off."),
+ ("aggroTiers","WEAK|REGULAR","Which tiers may lock on. A STRONG enemy is deliberately not on this list: a hard fight you did not choose is a punishment, and the one thing that makes a strong enemy fair is that taking it on is a decision."),
+ ("aggroRingThick",2,"Thickness, in art pixels, of the countdown ring drawn around a locked-on enemy."),
+ ("aggroWarnHz",4.5,"How many times a second the warning sign above a locked-on enemy flashes."),
+ ("mapShakeMs",420,"How long the ride screen shakes when a fight starts."),
+ ("mapShakeAmp",7,"How far the ride screen is thrown, in CSS pixels, at the start of that shake. It decays to nothing over mapShakeMs."),
+ ("guardianWarnMs",3000,"How long the banner announcing the station's Guardian Entity holds before the fight begins on its own."),
+ # ---- BATTLE: running away ----
+ ("fleeHoldMs",3000,"How long a press has to be held on the battle arena before the ring closes and the fight is abandoned."),
+ ("fleeSegmentCost",5,"Track Segments forfeited every time a fight is run from. Taken off the current ride's progress, never below zero."),
+ # ---- BATTLE: the Line Manager's second wind ----
+ ("bossPhaseAt",0.2,"Fraction of MaxMS at which a LINE MANAGER refuses to fall and takes her second wind. She cannot be killed below this until it has happened."),
+ ("bossPhaseTo",0.5,"What she recovers to."),
+ ("bossRechargeMs",5000,"How long that recovery takes. Deliberately long: it is the fight being taken away from you and handed back."),
+ ("bossFlashes",4,"White flashes before the recovery, and again when it completes."),
+ ("bossSinkMs",7000,"How long a beaten LINE MANAGER takes to shake, sink and fade off the bottom of the screen."),
+ ("bossHushMs",520,"How quickly the music and the interface go when she refuses to fall."),
 ]
 sheet("rules", ["key","value","description"], {"key","value"},
   [dict(key=k, value=v, description=d) for k,v,d in RULES],
@@ -621,6 +721,11 @@ SND = [
  ("ui_page","square",760,1010,60,0.18,0.16,"MAP: moving between tabs."),
  ("ui_equip","square",640,1560,170,0.26,0.32,"MAP: something is put on."),
  ("ui_deny","sawtooth",340,180,150,0.24,0.20,"MAP: refused - not owned, no route, no key."),
+ ("map_screech","sawtooth",3200,240,520,0.50,0.55,"MAP: a fight starts. Violent, and the same sound whether the enemy forced it or you did - what it marks is the moment the ride stops being a ride."),
+ ("boss_charge","sawtooth",90,1500,4600,0.34,0.30,"BATTLE: a Line Manager pulling her stamina back up. Long and rising, the length of the recovery itself."),
+ ("boss_roar","sawtooth",1400,120,900,0.52,0.60,"BATTLE: a Line Manager refusing to fall."),
+ ("flee_hold","square",300,1300,3000,0.16,0.22,"BATTLE: the escape ring closing under a held finger. Quiet and rising - it has to be audible under three seconds of nothing happening without becoming the loudest thing in the fight."),
+ ("flee_go","noise",1800,200,420,0.40,0.50,"BATTLE: the ring closes and the fight is abandoned."),
  ("map_tripup","sine",520,880,180,0.22,0.18,"A segment lands in the Emotional Trip bar. Soft and rising — the one sound in the ride that is a reward rather than a click."),
  ("ui_station","triangle",680,1180,140,0.24,0.34,"MAP: a station panel opens."),
 ]
@@ -657,8 +762,15 @@ if os.path.exists(_dlg_src):
 # The thirty imported rows stay blank and so stay available to everyone, and a
 # WEAK or STRONG enemy speaks only in its own voice. Blank is not "no tier", it
 # is "any tier".
-def dlg(emotion, persona, tier, intro, winning, losing, defeat):
+def dlg(emotion, persona, tier, intro, winning, losing, defeat, phase2=None, defeat2=None):
+    """PHASE2 and DEFEAT2 are LINE MANAGER ONLY, and optional everywhere else.
+
+    A Line Manager refuses to fall at bossPhaseAt and says so, and she gets two
+    parting lines rather than one. Nothing else in the game reaches either state,
+    so every other persona leaves them blank and stays exactly four rows."""
     states = [("INTRO", intro), ("WINNING", winning), ("LOSING", losing), ("DEFEAT", defeat)]
+    if phase2:  states.append(("PHASE2",  phase2))
+    if defeat2: states.append(("DEFEAT2", defeat2))
     return [dict(emotion=emotion, persona=persona, state=s, line=l, tier=tier,
                  enabled=1, notes="") for s, l in states]
 
@@ -727,6 +839,29 @@ for rows in [
      "They're LOVING this! Look at them! They're loving it!",
      "Two euros. Whole carriage. Two euros...",
      "Next stop's better. Next stop's always better."),
+ # ---- BOSS: pinned, one row each ------------------------------------------
+ # These are never drawn at random. The units row NAMES the persona, so the
+ # Terminus is the Terminus every single time you go back up Line 1 — which is
+ # the whole difference between a boss and an encounter. The tier is BOSS rather
+ # than STRONG so they cannot be handed to an ordinary strong enemy by accident.
+ dlg("ANGER", "The Terminus", "BOSS",
+     "End of the line. Everybody off. EVERYBODY OFF, I said!",
+     "Forty years I've turned this train around. You'll not be the one that stops me.",
+     "There's no more track. There's no more TRACK!",
+     "Somebody has to be here when it ends. It was always going to be me."),
+ dlg("SURPRISE", "The Comedown", "BOSS",
+     "Wait. Wait — what time is it? What DAY is it? Who let the light in?!",
+     "It's not over! It was never over! One more, come on, ONE MORE!",
+     "My heart's doing something. My heart's doing something wrong—",
+     "Take it. Take the lot. I never want to feel that good again."),
+ dlg("JOY", "The Line Manager", "BOSS",
+     "Ohmygod hiii! Okay so — you're kind of ruining the vibe right now? Smile.",
+     "This city is literally MY brunch and you are literally not invited!",
+     "No no no, this isn't — I don't DO bad days. Somebody fix this. FIX IT!",
+     "Fine. FINE. Keep your stupid little line. I'm moving to Lisbon anyway.",
+     phase2="You don't GET it. You can't beat me — I AM the good time. "
+            "I am every rooftop in this city. I AM JOY.",
+     defeat2="...it was such a good year. It was such a good, good year."),
 ]:
     _dlg.extend(rows)
 # ───────────────────────────── loadouts ─────────────────────────────
@@ -758,6 +893,15 @@ LOADOUTS_ROWS = [
     notes="One attack and one passive, deliberately. Surprise is not about volume of "
           "swings - it is about what happens when one goes wrong, which is what PAS_JOLT "
           "turns into charge."),
+ # EARNED, NOT ISSUED. The first Move Set that is not in `startSets`: the Sant
+ # Antoni boss leaves it, and until then it is not on the shelf at all. One
+ # ability wide on purpose - what the set actually buys is the passive, and the
+ # passive is about having ROOM, so filling its own slots would be arguing with
+ # itself.
+ lo("LO_RUSH",    "SURPRISE","Rush",  "DRUG_HIT", passive="PAS_RUSH", tier=3,
+    notes="Sant Antoni's reward. Its passive turns every critical into rushCritSlots extra "
+          "slots instead of critSlots - three instead of one - so a set that offers one attack "
+          "is really offering a bigger line whenever a hit goes well."),
  lo("LO_FEAR",    "FEAR",    "Fear",     notes="No Fear abilities exist yet."),
 ]
 sheet("loadouts", LO_COLS, LO_LIVE, LOADOUTS_ROWS,
@@ -926,10 +1070,13 @@ if ST_COLS:
 AR_COLS, AR_ROWS = _seed("armor")
 if AR_COLS:
     sheet("armor", AR_COLS,
-          {"id","name","tier","ms_mod","layer1","layer2","passive","cost","trade_in","enabled"},
+          {"id","name","tier","ms_mod","layer1","layer2","layer3","layer4","passive",
+           "cost","trade_in","enabled"},
           AR_ROWS, widths={"id":16,"name":24,"passive":16,"cost":24,"trade_in":14,"notes":46},
-          notes="Emotional Armor. `ms_mod` is ADDED to the player's base MaxMS; layer1/layer2 are "
-                "the Emotional Layers it grants in battle (blank = none). One passive per piece. "
+          notes="Emotional Armor. `ms_mod` is ADDED to the player's base MaxMS; layer1..layer4 are "
+                "the Emotional Layers it grants in battle, outermost first (blank = none, and a "
+                "gap ends the run). One passive per piece. The ceiling is `maxLayers`, not the "
+                "number of columns - add layer5 here and in layersOf() the day a piece needs it. "
                 "cost/trade_in are for the Wandering Store, which is not built yet.")
 
 IT_COLS, IT_ROWS = _seed("items")
@@ -990,6 +1137,81 @@ sheet("city_status", CS_COLS,
             "every client picks the same set and it holds still until the window ends. "
             "`emotions` drives the colours the effect is drawn in (a mix reads as a mix); "
             "`blurb` is what the tag says when it is tapped.")
+
+# ─────────────────── MAP: progression objectives ───────────────────
+# WHERE PROGRESSION LIVES. One row = one thing you can get, the place you get it,
+# and what you have to do there. Nothing about it is in code: the map reads this
+# sheet to decide which stations wear a `?`, the encounter reads it to decide who
+# the boss at that station IS, and the reward is granted by looking up ids in the
+# sheets that already own them. Adding a fourth objective is a row.
+#
+# THE REQUIREMENT IS A VOCABULARY, not a free-text field, so that every objective
+# is checked the same way and a new one cannot invent its own rules:
+#
+#   DEFEAT_BOSS   beat the station boss at `station`, fighting as `unit`
+#
+# That is the only verb implemented. Anything else is inert and says so in the
+# console rather than silently never firing.
+#
+# THE REWARD IS `KIND:ID`, the same grammar as units.drops and stations.spawn, and
+# a pipe list so one objective may leave several things:
+#
+#   ARMOR:ARM_FONDO   a row of the armor sheet, added to what the profile OWNS
+#   SET:LO_RUSH       a row of the loadouts sheet, ditto
+#   KEY:L4            a Line Key, which is what opens a line to routing
+#
+# Every id is resolved against the live tables when it is granted, so an objective
+# pointing at something that has been renamed grants nothing rather than corrupting
+# a profile — the same rule the save file is read under.
+OB_COLS = ["id","name","station","requirement","unit","reward","once","marker",
+           "emotion","card_tag","hint","enabled","notes"]
+OB_COLS, OB_ROWS = (_seed("objectives") if os.path.exists(
+    os.path.join(csv_dir(), "battle-system-config - objectives.csv")) else (OB_COLS, []))
+if not OB_ROWS:
+    OB_ROWS = [
+      dict(id="OBJ_FONDO", name="The Last of the Anger", station="FONDO",
+           requirement="DEFEAT_BOSS", unit="boss_fondo", reward="ARMOR:ARM_FONDO",
+           once=1, marker="QUESTION", emotion="ANGER", card_tag="ENTITY",
+           hint="Something is still turning trains around up there, and still wearing "
+                "every year of it.",
+           enabled=1,
+           notes="The end of Line 1. Grants ARM_FONDO — four layers of Anger, which is more "
+                 "than any purchasable piece and the reason it is not purchasable."),
+      dict(id="OBJ_SANT_ANTONI", name="Something For The Comedown", station="SANT_ANTONI",
+           requirement="DEFEAT_BOSS", unit="boss_sant_antoni", reward="SET:LO_RUSH",
+           once=1, marker="QUESTION", emotion="SURPRISE", card_tag="ENTITY",
+           hint="The night ended here and never quite let go. Whatever it was on is "
+                "still going.",
+           enabled=1,
+           notes="Grants the Set of Rush: Drug Hit, and a passive that makes every critical "
+                 "worth three slots instead of one."),
+      dict(id="OBJ_URQUINAONA", name="The Line Manager", station="URQUINAONA",
+           requirement="DEFEAT_BOSS", unit="boss_line_manager", reward="KEY:L4",
+           once=1, marker="QUESTION", emotion="JOY", card_tag="ENTITY",
+           hint="Somebody up there decides whose day this is, and it has never once "
+                "been yours.",
+           enabled=1,
+           notes="THE GATE. Line 4 is unreachable until this row is cleared, so this is the "
+                 "one objective that opens the network rather than the kit. Her fight is lit "
+                 "three times as bright as any other and has its own music — both of those "
+                 "live on her units row, not here."),
+    ]
+sheet("objectives", OB_COLS,
+      {"id","name","station","requirement","unit","reward","once","marker","emotion",
+       "card_tag","hint","enabled"}, OB_ROWS,
+      widths={"id":20,"name":26,"station":16,"requirement":16,"unit":20,"reward":22,
+              "marker":12,"card_tag":12,"hint":56,"notes":56},
+      notes="PROGRESSION. One row per thing the player can earn, and the place they earn it. "
+            "`station` is a stations-sheet id and is where the floating ? appears; `emotion` "
+            "colour-codes that ?. `requirement` is the standard test - DEFEAT_BOSS is the only "
+            "one implemented, and it means: travel to that station and beat the boss waiting "
+            "there, who fights as `unit`. `reward` is a pipe list of KIND:ID - ARMOR:xxx and "
+            "SET:xxx are added to what the profile owns (they still have to be equipped in the "
+            "menu), KEY:L4 grants a Line Key. `once`=1 means the ? disappears for good once it "
+            "is cleared. `hint` is what the station panel says about it before it is done. `card_tag` is "
+            "the warning the station panel wears: ENTITY reads EXTREME EMOTIONAL DISTURBANCE, "
+            "TREASURE reads OPPORTUNITY FOR TREASURE. Blank falls back to ENTITY when the row "
+            "names a `unit` and TREASURE when it does not.")
 
 ML_COLS, ML_ROWS = _seed("metro_lines")
 if ML_COLS:
@@ -1061,6 +1283,63 @@ def _validate():
         if not pool: pool = [k for k in seen if k[0] == emo and k[2] == ""]
         if not pool:
             bad.append(f"units.{u['id']} ({emo}/{tier}) has no persona to speak as")
+    # A PINNED persona has to exist, or the boss quietly falls back to a random
+    # commuter and stops being a boss. This is the check the runtime cannot make
+    # loudly: pickPersona() degrades on purpose rather than throwing.
+    personas = {r["persona"] for r in _dlg}
+    for u in UNITS_ROWS:
+        if u.get("persona") and u["persona"] not in personas:
+            bad.append(f"units.{u['id']}.persona -> no dialogue persona '{u['persona']}'")
+    # A LINE MANAGER has a scripted second wind and two parting lines. Without
+    # those two rows she goes silent at the two moments the whole fight is built
+    # around, and silence there looks like the sequence failing rather than like
+    # a missing line.
+    said = {}
+    for r in _dlg:
+        said.setdefault(r["persona"], set()).add(r["state"])
+    for u in UNITS_ROWS:
+        if u.get("role") != "LINE_MANAGER": continue
+        if not u.get("persona"):
+            bad.append(f"units.{u['id']} is a LINE_MANAGER with no pinned persona"); continue
+        if not u.get("theme2_loop"):
+            bad.append(f"units.{u['id']} is a LINE_MANAGER with no theme2_loop for its second phase")
+        missing = {"PHASE2", "DEFEAT2"} - said.get(u["persona"], set())
+        if missing:
+            bad.append(f"dialogue '{u['persona']}' is a LINE MANAGER and has no "
+                       + ", ".join(sorted(missing)))
+
+    # ---- objectives: every reference, both ends -----------------------------
+    # This sheet is nothing BUT references — a station, a unit, and a reward that
+    # names a row of another sheet — so it is the one most worth checking here.
+    # A dangling reward is silent at runtime by design (an unknown id grants
+    # nothing rather than corrupting a profile), which is exactly why the build
+    # has to be the thing that notices.
+    st_station_ids = {r["id"] for r in ST_ROWS} if ST_COLS else set()
+    ar_ids = {r["id"] for r in AR_ROWS} if AR_COLS else set()
+    unit_ids = {r["id"] for r in UNITS_ROWS}
+    REQUIREMENTS = {"DEFEAT_BOSS"}
+    REWARDS = {"ARMOR": ar_ids, "SET": lo_ids, "KEY": line_ids}
+    for o in OB_ROWS:
+        oid = o.get("id") or "?"
+        if st_station_ids and o.get("station") not in st_station_ids:
+            bad.append(f"objectives.{oid}.station -> no station '{o.get('station')}'")
+        if o.get("requirement") not in REQUIREMENTS:
+            bad.append(f"objectives.{oid}.requirement -> '{o.get('requirement')}' is not "
+                       + "/".join(sorted(REQUIREMENTS)))
+        if o.get("unit") and o["unit"] not in unit_ids:
+            bad.append(f"objectives.{oid}.unit -> no unit '{o['unit']}'")
+        if o.get("emotion") and o["emotion"] not in emo_ids:
+            bad.append(f"objectives.{oid}.emotion -> no emotion '{o['emotion']}'")
+        if o.get("card_tag", "") not in ("", "ENTITY", "TREASURE"):
+            bad.append(f"objectives.{oid}.card_tag -> '{o.get('card_tag')}' is not ENTITY/TREASURE")
+        for r in pipes(o.get("reward")):
+            kind, _, ident = r.partition(":")
+            kind = kind.strip().upper(); ident = ident.strip()
+            if kind not in REWARDS:
+                bad.append(f"objectives.{oid}.reward -> '{kind}' is not "
+                           + "/".join(sorted(REWARDS)))
+            elif REWARDS[kind] and ident not in REWARDS[kind]:
+                bad.append(f"objectives.{oid}.reward -> {kind} has no '{ident}'")
     if bad:
         raise SystemExit("! workbook has broken references:\n  " + "\n  ".join(bad))
     print("  references OK — %d abilities, %d units, %d dialogue rows" %
@@ -1068,6 +1347,6 @@ def _validate():
 _validate()
 
 WB._sheets.sort(key=lambda s: ["README","emotions","abilities","loadouts","matchups","units","dialogue","prompts","moments",
-  "layer_types","status_effects","synergies","rules","sounds","stations","metro_lines","travel_elements","items","armor","world_bands","city_status","checks"].index(s.title))
+  "layer_types","status_effects","synergies","rules","sounds","stations","metro_lines","travel_elements","items","armor","world_bands","city_status","objectives","checks"].index(s.title))
 WB.save(book_path())
 print("saved")

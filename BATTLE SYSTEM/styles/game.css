@@ -148,6 +148,7 @@ body{background:var(--void); color:var(--ink);
 /* ============ STAGE ============ */
 .stage{flex:1; min-height:78px; display:flex; align-items:center; justify-content:center}
 .sprwrap{position:relative; width:min(52vw,186px); height:min(52vw,186px);
+  transform:scale(var(--esc,1)); transform-origin:50% 50%;
   animation:hover 3.6s steps(43) infinite alternate}
 .sprwrap canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated}
 #sprOut{z-index:2}
@@ -1023,3 +1024,118 @@ body{background:var(--void); color:var(--ink);
   box-shadow:inset 0 0 0 3px #322d42}
 .frgo:not([disabled]):active{transform:translate(2px,2px);
   box-shadow:2px 3px 0 rgba(6,4,14,.85)}
+
+/* ---- PAPARAZZI ------------------------------------------------------------
+   The Line Manager is being photographed by nobody, constantly. Flashes are
+   thrown around her in ragged bursts (see EnemyFx.PAPARAZZI in dialogue.js) —
+   a hard white pop with a coloured afterglow, on the STAGE rather than on her
+   sprite, because the flashes belong to the room and not to the entity.
+
+   `pointer-events:none` throughout: the stage is behind the ability panel and
+   a decorative layer must never be the thing that eats a tap. */
+.paparazzi{position:absolute; inset:0; z-index:3; pointer-events:none; overflow:hidden}
+.paparazzi i{position:absolute; width:10px; height:10px; margin:-5px 0 0 -5px;
+  pointer-events:none; transform:scale(var(--s,1));
+  background:
+    radial-gradient(closest-side, #fff 0%, rgba(255,255,255,.85) 38%, rgba(255,255,255,0) 72%);
+  animation:popflash 400ms steps(6) forwards}
+/* The four-point star that says CAMERA rather than "a white dot". Drawn as two
+   crossed bars on a pseudo-element so it scales with the flash. */
+.paparazzi i::before{content:""; position:absolute; inset:-14px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0) 42%, rgba(255,255,255,.9) 50%, rgba(255,255,255,0) 58%),
+    linear-gradient(0deg,  rgba(255,255,255,0) 42%, rgba(255,255,255,.9) 50%, rgba(255,255,255,0) 58%);
+  animation:popstreak 400ms steps(6) forwards}
+@keyframes popflash{
+  0%{opacity:0; transform:scale(calc(var(--s,1) * .3))}
+  12%{opacity:1; transform:scale(calc(var(--s,1) * 2.6))}
+  100%{opacity:0; transform:scale(calc(var(--s,1) * 1.1))}}
+@keyframes popstreak{
+  0%{opacity:0} 14%{opacity:.9} 100%{opacity:0}}
+
+/* ---- THE SECOND WIND -------------------------------------------------------
+   Everything except the arena and your own layers goes, so that what is left on
+   the screen is exactly what she is talking about: her, and the thing she is
+   about to take another run at. The bubble is exempt — the whole point of the
+   hush is that she is the only thing still speaking — and so is the flash,
+   which is the next beat. */
+.screen.hush > *:not(.stage):not(.flash):not(.bubblewrap):not(.pstrip){
+  opacity:0; transition:opacity var(--hush,520ms) steps(4)}
+.screen.hush > .stage,.screen.hush > .pstrip{transition:none}
+
+/* the bar climbing back. A pulse on the panel, so five seconds of a number
+   going up is visibly something being DONE rather than the game hanging. */
+#ePanel.recharging{animation:recharge 460ms steps(3) infinite}
+@keyframes recharge{
+  0%{filter:brightness(1)} 50%{filter:brightness(1.55) saturate(1.3)} 100%{filter:brightness(1)}}
+
+/* THE FALL. The sink itself is a Web Animation on the wrapper (boss.js); this is
+   the faster jitter underneath it, which has to be quick while the fall is slow.
+   Two layers, because one keyframe list would have to spell out every shudder at
+   every depth. */
+.sprwrap.sinking canvas{animation:bossshake 70ms steps(2) infinite}
+@keyframes bossshake{
+  0%{transform:translate(-2px,1px)} 50%{transform:translate(3px,-2px)}
+  100%{transform:translate(-1px,2px)}}
+
+/* ---- RUNNING AWAY ---------------------------------------------------------
+   A ring that closes under the finger. Never a button: a control that says
+   "leave" every turn is an interface arguing against its own subject. */
+.fleering{position:absolute; z-index:38; width:80px; height:80px;
+  margin:-40px 0 0 -40px; pointer-events:none;
+  animation:fadein 120ms steps(3) both}
+.fleering svg{width:100%; height:100%; display:block; overflow:visible}
+.fleering .ftrack{fill:none; stroke:rgba(240,236,224,.16); stroke-width:5}
+.fleering .farc{fill:none; stroke:#f0ece0; stroke-width:5; stroke-linecap:butt;
+  transform:rotate(-90deg); transform-origin:50% 50%;
+  filter:drop-shadow(0 0 5px rgba(240,236,224,.75))}
+.fleering .flabel{position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; font-size:11px; letter-spacing:.16em; color:#f0ece0;
+  text-shadow:1px 1px 0 #0b0b0e}
+.fleering .fcost{position:absolute; left:50%; top:calc(100% + 5px);
+  transform:translateX(-50%); white-space:nowrap;
+  font-size:8px; letter-spacing:.14em; color:var(--fury,#e53859);
+  text-shadow:1px 1px 0 #0b0b0e; opacity:calc(.35 + var(--k,0) * .65)}
+@keyframes fadein{from{opacity:0} to{opacity:1}}
+.fleering.gone{animation:fadeout 180ms steps(3) forwards}
+@keyframes fadeout{from{opacity:1} to{opacity:0}}
+.fleering.fired{animation:fleefire 300ms steps(5) forwards}
+@keyframes fleefire{
+  from{opacity:1; transform:scale(1)}
+  to{opacity:0; transform:scale(2.4)}}
+.screen.fleeing{animation:fleeout 260ms steps(4) both}
+@keyframes fleeout{from{filter:none} to{filter:brightness(.25) saturate(.2)}}
+
+/* ---- THE RESULTS SCREEN ---------------------------------------------------
+   The title is the size of the thing that just happened, and it is in the
+   colour of the emotion that was beaten — beating Joy and beating Anger are not
+   the same screen. The glow is what stops a large flat word reading as a
+   placeholder. */
+.results .conquered{font-size:clamp(26px,9.5vw,44px); line-height:1.02;
+  letter-spacing:.10em; text-align:center; margin-bottom:4px;
+  color:var(--emo,#f0ece0);
+  text-shadow:0 0 12px var(--emo,#f0ece0), 0 0 26px color-mix(in srgb, var(--emo,#f0ece0) 55%, transparent),
+              3px 3px 0 #0b0b0e;
+  animation:conqglow 1500ms steps(6) infinite alternate}
+@keyframes conqglow{
+  from{filter:brightness(1)}
+  to{filter:brightness(1.35)}}
+
+/* THE SYMBOL CARRIES THE ROW — first on the line and by far the largest thing
+   on it. It sits on its own dark chip rather than straight on the card, and
+   that is not decoration: the row is a LIGHT card with near-black text, and the
+   colours that actually mean something here are the interface's bright ones —
+   stamina mint, an emotion's own hue. Painted directly they were white on
+   white, and the Track Segment's arrow showed up as nothing but the one-pixel
+   shadow `iconSVG` draws under every glyph. On a dark chip each keeps its real
+   colour and every one of them reads. */
+.results .rline .rsym{width:34px; height:34px; flex:0 0 34px;
+  display:flex; align-items:center; justify-content:center; padding:4px;
+  color:var(--rc,#f0ece0); background:#171326;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.10)}
+.results .rline .rsym svg{width:100%; height:100%; display:block;
+  filter:drop-shadow(0 0 5px color-mix(in srgb, var(--rc,#f0ece0) 75%, transparent))}
+/* a stripe of the same colour down the leading edge, so the row is identifiable
+   from the side even where the chip is not being looked at */
+.results .rline{box-shadow:var(--bevel), 4px 5px 0 rgba(6,4,14,.85),
+  inset 4px 0 0 var(--rc,transparent)}

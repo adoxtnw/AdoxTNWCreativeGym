@@ -40,6 +40,7 @@ other defeat keeps — the in-flight vault is part of the save for exactly that 
 | The multi-leg trip and the vault it is wagering | `src/run.js` |
 | Station inspection, and choosing a destination | `src/peek.js` |
 | Handing a fight to the battle system | `src/encounter.js`, `src/handoff.js` |
+| What can be earned, where, and the `?` that marks it | `src/objectives.js` |
 | Stats strip, route header, dilemma, encounter markup | `src/hud.js` |
 
 **Crystals** are the currency, one per emotion, taken from the line you were riding.
@@ -523,14 +524,122 @@ that went wrong.
 descriptor sends loadouts and layers but not the armor id, so honouring armor's passive here
 would be a claim the data does not support.
 
-**Armor can carry three layers now.** The sheet had `layer1`/`layer2` until a piece needed a
-third; `layer3` is a column, `layersOf()` reads it, and the ceiling is `maxLayers` (6) rather
-than however many columns happen to exist. Adding a fourth is a column and nothing else.
+**The Set of Rush** (`LO_RUSH`) is the second, and the first one that is *earned* rather than
+issued — the Sant Antoni boss leaves it, and it is deliberately not in `startSets`.
+
+| | |
+|---|---|
+| **Set of Rush** (`LO_RUSH`) | one attack, `DRUG_HIT` — a basic that leaves the target **Dizzy** for one turn |
+| its passive | `PAS_RUSH` — **a critical grants `rushCritSlots` (3) extra slots instead of `critSlots` (1)** |
+
+Same shape as Jolt and the same reason: one ability wide, because what the set actually buys
+is the passive, and the passive is about having *room*. `critSlots` is a rule now rather than
+a hard-coded `1` in `fx.js`, which is what gave the passive somewhere to say otherwise.
+`addExtra` still stops at `maxExtraSlots`, so three may land as fewer on a line already
+carrying Overload — correct, and only the slots actually granted fly in.
+
+**Dizzy** is a `status_effects` row: `miss_chance` 0.5, duration 1 — Blinded's rate for a
+single turn. Drug Hit is the first ability in the game that both hits and applies a status;
+`Kinds.DAMAGE` reads `status_apply` the way `DEBUFF` always has, so that is a data change and
+not a special case. Any attack can carry a status by filling in two cells.
+
+**Armor can carry four layers now.** The sheet had `layer1`/`layer2` until a piece needed a
+third, and then a fourth; `layer3` and `layer4` are columns, `layersOf()` reads them, and the
+ceiling is `maxLayers` (6) rather than however many columns happen to exist. Adding a fifth is
+a column and nothing else — the promise held twice.
 
 **The starting kit is a floor, not a snapshot.** `seedProfile()` tops up owned sets and armor
 from the rules rather than only writing them at creation — otherwise a profile saved before a
 Move Set existed could never reach it, because ownership is only ever written once. Anything
 earned or equipped since is left exactly as it is.
+
+## Progression objectives
+
+**One sheet, `objectives`, and no station is named anywhere in the code.** A row says where a
+thing can be earned, what you have to do, and what you get:
+
+| column | |
+|---|---|
+| `station` | a stations-sheet id — where the floating `?` appears |
+| `emotion` | colour-codes that `?` |
+| `requirement` | the standardised test. `DEFEAT_BOSS` is the only one implemented |
+| `unit` | which `units` row the boss at that station fights as |
+| `reward` | a pipe list of `KIND:ID` — `ARMOR:…`, `SET:…`, `KEY:…` |
+| `once` | 1 retires the marker for good once it is cleared |
+| `hint` | what the station panel says while it is still owing |
+
+The three that exist today: **Fondo** leaves `ARM_FONDO`, four layers of Anger; **Sant
+Antoni** leaves the Set of Rush; **Urquinaona** is the Line Manager, and she has the key to
+Line 4.
+
+### Why the requirement is a vocabulary and not a condition
+
+The obvious design is a free-text condition per row, and it is the wrong one: every objective
+would be its own special case, checked in its own place, and the fifth would need code the way
+the first did. `requirement` is a small closed set of verbs `objectives.js` knows how to test.
+A row asking for anything else says so in the console and is inert, rather than silently never
+firing.
+
+### What an objective owns
+
+Nothing but references. The armor is in the armor sheet, the Move Set in `loadouts`, the boss
+in `units` — and everything her fight *looks and sounds like* is on that units row too, not
+here, because those are facts about a fight rather than about progression. Four new columns
+carry them:
+
+| `units` column | |
+|---|---|
+| `persona` | pins the enemy to one dialogue persona instead of casting at random — a boss has to be the same person every time you come back |
+| `bg_bright` | multiplies how hard the emotion lights the battle backdrop. The Line Manager is `3` |
+| `fx` | a flourish the fight runs around this enemy — `PAPARAZZI` |
+| `theme_opening` / `theme_loop` | swap the battle music for this fight alone |
+
+A boss also has a **blank `spawn_lines`**, which is what keeps it out of the ride roll: a unit
+the track can never produce is one only the objectives sheet can reach.
+
+Rewards are resolved against the live tables at the moment they are granted, the same way a
+save file is read — a renamed id grants nothing rather than writing a dangling reference into
+a profile. The workbook's build-time validator is what makes that a non-event in practice.
+
+### Owned, not worn
+
+`ARMOR` and `SET` rewards go onto the shelf and change nothing about what the player is
+carrying. Turning up in new armor because you won a fight would undo whatever build they had
+deliberately chosen, at the one moment they are least expecting the game to touch it. The
+panel says so; the loadout tab is where it goes on. A Line Key is the exception and needs no
+instruction — it is not worn, it opens a line.
+
+### The marker, and the two motions
+
+A floating, glowing, colour-coded `?` in a white circle. The **wobble** is position (two
+different periods for x and y, so it drifts in a small figure rather than sliding along one
+axis) and the **beat** is size. Tying them together — a marker that grew as it rose — would
+read as one animation, and it is meant to read as something hovering *and* something
+breathing. Every marker is on its own phase, offset by a hash of the objective's id: three
+pulsing in lockstep look like a UI element repeated, three out of step look like three
+separate things.
+
+It is sized off the station's own radius, so it holds its proportions at every zoom. And **a
+station with something owing is never decluttered away** — minor stops vanish when you pull
+out far enough, which is what keeps the map legible, but Fondo and Sant Antoni are both
+ordinary single-line stops and a progression marker exists to be spotted from a distance.
+
+### Where the reward is shown
+
+Not where it was won. It is granted the instant the boss falls, and at that instant the screen
+is a wipe travelling back to the map — a panel raised into that is a panel raised behind an
+animation. `RewardPanel.queue()` takes it and `flush()` shows it once the map has settled into
+IDLE, so the first thing seen on arriving home is what you came back with.
+
+### Three times as bright is not `alpha * 3`
+
+Alpha saturates. The default glow is `backdropGlow` 0.55, so anything past about 1.8× is the
+same picture as 1.8×, and asking for three would quietly get you not much more than two.
+Brightness on a screen is three things at once, so `bg_bright` spends itself on all three: the
+tint goes more opaque until it saturates, the colour is then lifted toward white, and the
+falloff is pushed further down the panel so the light fills the room instead of hanging in the
+top corner. Below about 1.7× only the first of those does anything, which is why every
+ordinary enemy renders byte-identically to before.
 
 ## The rules about MS and EC
 

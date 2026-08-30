@@ -175,7 +175,17 @@ let E_CFG=enemyCfg(S.enemy);
 /* CALL THIS WHENEVER `S.enemy` IS REPLACED. The geometry is built once per fight
    rather than once per frame, so a new enemy arriving from the map would
    otherwise be drawn at the size of the one this page booted with. */
-function refreshEnemyShape(){ E_CFG=enemyCfg(S.enemy); glowCache={}; }
+function refreshEnemyShape(){
+  E_CFG=enemyCfg(S.enemy); glowCache={};
+  /* HOW BIG THIS ONE IS DRAWN. Not part of the ring geometry: the canvas is 64
+     pixels across and the rings already breathe out to its edge, so scaling the
+     GEOMETRY would push a big enemy straight through the buffer wall and clip
+     it. The sprite is drawn at its own resolution and DISPLAYED larger, which is
+     also the only way a boss can overhang the arena — which is the point of it
+     being bigger. */
+  const wrap=document.querySelector(".sprwrap");
+  if(wrap) wrap.style.setProperty("--esc", (S.enemy.scale||1).toFixed(3));
+}
 const P_CFG={baseR:RULES.playerRingBaseR, spacing:RULES.playerRingSpacing, breathe:RULES.playerRingBreathe};
 let t=0, frozen=false, timer=null, glowCache={};
 let stepMs=1000/12, acc=0, lastTs=0, rafId=0, lastTickAt=0, watchdog=null;

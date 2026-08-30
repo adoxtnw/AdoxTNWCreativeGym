@@ -160,6 +160,13 @@ function enterPhase(p){
          the map in a half-spent state. */
       Player.restOnMap();
       Player.save();
+      /* ANYTHING EARNED AT THE FAR END IS SHOWN HERE, not where it was won.
+         The reward is granted the instant the boss falls, but the screen at
+         that moment is a wipe on its way back to the map — a panel raised into
+         it would be covered by the thing that is still animating. Waiting for
+         the map to settle means the first thing the player sees on arriving
+         home is what they came back with. */
+      RewardPanel.flush();
       break;
   }
   syncHud();

@@ -137,6 +137,13 @@ function encounterOnTrack(enemy){
      ENCOUNTER with nothing to resume it, and the first one's callback restored
      a "previous phase" that was itself ENCOUNTER. The ride simply stopped. */
   if(Encounter.open) return false;
+  /* THE SAME NOISE WHOEVER STARTED IT. An entity that ran its countdown out and
+     an entity you reached for are the same event from the ride's point of view —
+     the ride has stopped being a ride — and giving them two different sounds
+     would be saying they are two things. Here rather than at either call site
+     for exactly that reason: this is the one door both go through. */
+  sfx("map_screech");
+  mapShake(num(RULES.mapShakeMs, 420), num(RULES.mapShakeAmp, 7));
   const back = {phase: J.phase, f: J.f};
   const opened = Encounter.start("TRACK", enemy, () => {
     /* THE OUTCOME DOES NOT DECIDE THIS, THE STAMINA DOES. Win, lose or flee,
@@ -156,11 +163,40 @@ function encounterOnTrack(enemy){
      it from there once the colour has finished coming in. */
   return true;
 }
-function encounterBoss(){
+async function encounterBoss(){
   /* A boss cannot be refused — but nor can it barge in on a fight that is
      still running. One encounter at a time; the platform waits. */
   if(Encounter.open) return;
-  Encounter.start("BOSS", {id: "STATION_BOSS", station: Run.dest}, outcome => {
+  if(Encounter.announcing) return;    /* the warning is already up */
+  /* CAPTURED NOW, not read in the callback. `Run.dest` is cleared by
+     `Run.finish()`, which winRun() reaches through — so by the time the reward
+     is being granted the trip that earned it has already been settled and the
+     destination is gone. */
+  const at = Run.dest;
+  /* WHO IS ACTUALLY WAITING HERE. Every station boss used to be the same
+     generic `enemy` row, because nothing had ever had a reason to say
+     otherwise; an objective is that reason, and it names the unit on its own
+     row. Null means nothing is owing at this station and the boss is the fight
+     it always was. */
+  const unit = Objectives.bossUnit(at);
+  /* THREE SECONDS OF WARNING, AND THEN IT STARTS ON ITS OWN. Awaited rather than
+     fired alongside: the colour flood and the curtain are the fight beginning,
+     and beginning it underneath its own announcement would be the announcement
+     for nothing. The phase is already BOSSWAIT, which holds the world still and
+     draws the platform banner, so there is nothing to guard against here except
+     being asked twice. */
+  Encounter.announcing = true;
+  await GuardianBanner.show(unit || "enemy");
+  Encounter.announcing = false;
+  if(Encounter.open) return;          /* something else got in while it played */
+  Encounter.start("BOSS", {id: "STATION_BOSS", station: at, unit: unit}, outcome => {
+    /* THE REWARD IS CLAIMED BEFORE THE RUN IS SETTLED, and independently of how
+       the run settles: `claim` only pays out on a WIN, and a win here is a win
+       whatever happens to the vault afterwards. It is also claimed before the
+       MS check below, so beating the boss on your last point of stamina still
+       counts — you won the fight; the ride is a separate question. */
+    const got = Objectives.claim(at, outcome);
+    if(got.length) RewardPanel.queue(at, got);
     /* Same rule, and one more case the rule does not cover on its own: being
        beaten by the boss while still standing. The station is not taken, so it
        is not a win — but the run is not lost either, so it resolves the way

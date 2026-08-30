@@ -65,6 +65,14 @@
      <!-- GDD 5: the Traveler's Dilemma, at every intermediate platform -->
      <div class="dilemma framed" id="dilemma"></div>
 
+     <!-- What a cleared progression objective left behind. Raised at most three
+          times in a whole save, once the map has settled back to IDLE. -->
+     <div class="reward framed" id="reward"></div>
+
+     <!-- Three seconds of warning before the fight you cannot refuse. No
+          button: there is no choice, and offering one would be a lie. -->
+     <div class="guardian" id="guardian"></div>
+
      <!-- station inspection, and where a destination is chosen -->
      <div class="peek framed" id="peek"></div>
 
@@ -102,6 +110,8 @@
      gear    -> armor/set passives, and the arithmetic that turns kit into stats
      world   -> the hour, the day, the weather, and what they do to a station
      player  -> who is riding, what they carry, and the save
+     objectives-> the progression sheet: what can be earned, where, and the ?
+                that marks it. Reads Player and the tables at run time
      route   -> paths across the network, gated by Line Keys
      audio   -> the synth and the music slot. Reads RULES/SOUNDS at run time
      travel  -> the travel screen: parallax, track, train
@@ -134,6 +144,7 @@
 <script src="src/world.js"></script>
 <script src="src/city.js"></script>
 <script src="src/player.js"></script>
+<script src="src/objectives.js"></script>
 <script src="src/vault.js"></script>
 <script src="src/route.js"></script>
 <script src="src/audio.js"></script>

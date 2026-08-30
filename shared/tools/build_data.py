@@ -39,6 +39,7 @@ CONST_FOR = {
  "armor":          'const ARMOR     = byId(parseCSV(DATA.armor).filter(r=>r.enabled));',
  "world_bands":    'const WORLD_BANDS = parseCSV(DATA.world_bands).filter(r=>r.enabled);',
  "city_status":    'const CITY_STATUS = parseCSV(DATA.city_status).filter(r=>r.enabled);',
+ "objectives":     'const OBJECTIVES  = parseCSV(DATA.objectives).filter(r=>r.enabled);',
 }
 
 DROP_COLUMNS = {"suggested_cost", "cost_delta"}
@@ -56,7 +57,7 @@ APP_TABLES = {
   # MAP's own sheets. More get added here as the map GDD defines them.
   "MAP":           ["emotions", "rules", "sounds", "units", "abilities", "loadouts",
                     "stations", "metro_lines", "travel_elements", "items", "armor",
-                    "world_bands", "city_status"],
+                    "world_bands", "city_status", "objectives"],
 }
 TABLES = APP_TABLES.get(os.path.basename(APP), APP_TABLES["BATTLE SYSTEM"])
 # Emitted in CONST_FOR's own order, not TABLES' — declaration order is part
@@ -81,6 +82,7 @@ HEADER_COMMENTS = {
  "city_status": "CITY-WIDE CONDITIONS. A status is a thing happening to Barcelona that\n   picks a SUBSET of stations on the lines it names and changes them: their attributes\n   multiply, and the map paints `fx` around them. `hours` holds one or more BARCELONA\n   local windows (7-10|17-20), to_hour exclusive, and a window may wrap past midnight.\n   `share` is the fraction of eligible stations affected \u2014 which ones is decided by a\n   hash of the station, the status and the current window, so every client picks the same\n   set and it holds still until the window ends. `emotions` drives the colours the effect\n   is drawn in; `blurb` is what the tag says when tapped.",
  "world_bands": "day / hour / weather -> multipliers on a station's live attributes. Every\n   MATCHING row multiplies, so BASE is the floor and the rest stack on it. Hours are\n   BARCELONA local and to_hour is exclusive; a band may wrap past midnight. `weather`\n   comes from WorldState (stubbed today, a real API later). Higher priority wins nothing\n   on its own \u2014 it only orders the rows for readability.",
  "metro_lines": "one row per line, `stations` in running order. Colour is not stored: it\n   comes from the emotion, so the map cannot drift out of step with battle.",
+ "objectives": "PROGRESSION. One row per thing the player can earn and the place they earn\n   it. `station` is where the floating ? appears and `emotion` colour-codes it.\n   `requirement` is the standardised test — DEFEAT_BOSS means: travel there and beat the\n   boss, who fights as `unit`. `reward` is a pipe list of KIND:ID — ARMOR/SET add to what\n   the profile OWNS, KEY grants a Line Key. `once`=1 retires the marker when it is cleared.",
  "dialogue":  "what each enemy says. state: INTRO | WINNING | LOSING | DEFEAT. A battle picks one\n   persona at random from the rows matching the enemy's emotion.",
 }
 
@@ -158,7 +160,7 @@ def main():
 const SCHEMA = {
   bool: ["hits_layer", "enabled"],
   list: ["layers", "pool", "loadouts", "emotions", "lines", "stations", "spawn",
-        "spawn_lines", "day", "weather", "keys", "drops"]
+        "spawn_lines", "day", "weather", "keys", "drops", "reward"]
 };
 
 const DATA = {
