@@ -88,25 +88,32 @@ const Peek = {
       l.id + '</span>';
     const rate = v => v >= 1.25 ? "high" : v <= 0.8 ? "low" : "normal";
 
+    /* WHAT IS WAITING HERE, above the numbers rather than among them. An
+       objective is not an attribute of the station like fog or aggro — it is a
+       reason to come, and burying it in a definition list beside "Threat x1.02"
+       would make it read as one more statistic. Its own block, in its own
+       colour, and only while it is still owing.
+
+       OUTSIDE THE FOG BRANCH, deliberately. Fog withholds a station's numbers,
+       and it should — but the `?` floating over that station is drawn on the map
+       whatever the weather, so refusing to say a word about it here would be the
+       panel disagreeing with the thing the player is looking at. The card says
+       WHAT is waiting; the fog still withholds how bad it is going to be. */
+    const owed = Objectives.pending(this.id).map(o => {
+      const tag = Objectives.cardTag(o);
+      return '<div class="objline pxr ' + tag.kind.toLowerCase() + '" style="--emo:' +
+        (EMOTIONS[o.emotion] ? EMOTIONS[o.emotion].hex : "#f4efe4") + '">' +
+        '<span class="objtag"><i>' + glyphSVG(tag.icon) + '</i>' + tag.text + '</span>' +
+        '<b>' + esc(o.name) + '</b><small>' + esc(o.hint || "") + '</small></div>';
+    }).join("");
+    const objs = owed ? '<div class="objs">' + owed + '</div>' : '';
+
     let body;
     if(fogged){
-      body = '<p class="fogged">Obscured. Too much fog on the line to read this ' +
+      body = objs + '<p class="fogged">Obscured. Too much fog on the line to read this ' +
              'station from here.</p>';
     }else{
-      /* WHAT IS WAITING HERE, above the numbers rather than among them. An
-         objective is not an attribute of the station like fog or aggro — it is
-         a reason to come, and burying it in a definition list beside "Threat
-         x1.02" would make it read as one more statistic. Its own block, in its
-         own colour, and only while it is still owing. */
-      const owed = Objectives.pending(this.id).map(o => {
-        const tag = Objectives.cardTag(o);
-        return '<div class="objline pxr ' + tag.kind.toLowerCase() + '" style="--emo:' +
-          (EMOTIONS[o.emotion] ? EMOTIONS[o.emotion].hex : "#f4efe4") + '">' +
-          '<span class="objtag"><i>' + glyphSVG(tag.icon) + '</i>' + tag.text + '</span>' +
-          '<b>' + esc(o.name) + '</b><small>' + esc(o.hint || "") + '</small></div>';
-      }).join("");
-      body =
-        (owed ? '<div class="objs">' + owed + '</div>' : '') +
+      body = objs +
         '<dl>' +
         row("Weather", WorldState.weather()) +
         row("Threat",  rate(a.density) + " &middot; &times;" + a.density.toFixed(2)) +

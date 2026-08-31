@@ -641,6 +641,68 @@ falloff is pushed further down the panel so the light fills the room instead of 
 top corner. Below about 1.7× only the first of those does anything, which is why every
 ordinary enemy renders byte-identically to before.
 
+## Enemies that lock on
+
+Some of the entities drifting past do not wait to be prodded: they fix on you and count
+down, and when the countdown runs out the fight happens whether or not you wanted it.
+
+**It is a property of the SPAWN, not of the row.** It used to be a second `travel_elements`
+row with its own `kind`, which meant "an enemy that locks on" and "an enemy that does not"
+were two different kinds of object competing for the same slice of the same roll — so making
+one rarer made *enemies* rarer, and the two could never be tuned apart. Now there is one
+enemy row and `aggroChance` (0.25) decides per spawn, multiplied by the destination
+station's own `aggro`, which is what that column has always been for.
+
+**Tier is a hard gate.** `aggroTiers` is `WEAK|REGULAR`. A hard fight you did not choose is
+a punishment; the one thing that makes a STRONG enemy fair is that taking it on is a
+decision.
+
+| | |
+|---|---|
+| the countdown ring | `aggroRingThick` (2) pixels deep, drawn as concentric passes — fattening each plotted point leaves gaps on the diagonals |
+| the warning sign | a ⚠ in the **enemy's own colour**, flashing at `aggroWarnHz`, drawn procedurally so it holds its proportions from a WEAK dart to a STRONG spined shape |
+
+The ring says *how long you have*; the sign says *this one is coming*. `lockTotal` is kept
+on the spawn rather than re-derived from the sheet — the ring used to divide by the very
+cell that is now normally blank.
+
+**A fight starting is violent.** `map_screech` and a decaying screen shake, at the one door
+both paths go through (`encounterOnTrack`) — an entity that ran its countdown out and an
+entity you reached for are the same event from the ride's point of view, and two different
+sounds would be saying they are two things. The shake is composed into `applyCanvasTransform()`
+along with the lean, because two things writing `cv.style.transform` is two things fighting
+over it.
+
+## Who is waiting on the platform
+
+The Station Guardian is the fight you cannot refuse, and it used to simply *happen*. Three
+seconds of warning is the difference between an ambush and an arrival, and then it starts on
+its own — there is no button, because there is no choice, and offering one would be a lie
+about what a Guardian is.
+
+A **Line Manager** gets different words *and shakes*: a Guardian manifests, which is a thing
+arriving; she appears, which is a thing that was always there deciding to be seen. Read off
+`units.role`, so it is data.
+
+## What a "?" station's card says
+
+A `?` says there is *something* here. It should not also have to say *what* — walking into a
+Line Manager because the marker looked like the marker over a chest is the kind of surprise
+that reads as the game not having told you.
+
+| `objectives.card_tag` | the card says |
+|---|---|
+| `ENTITY` | ⚠ EXTREME EMOTIONAL DISTURBANCE, in the objective's own colour, blinking |
+| `TREASURE` | OPPORTUNITY FOR TREASURE |
+
+Blank falls back to the obvious one: a row naming a `unit` is a fight, a row that does not is
+a find — so an objective added later gets the right warning without anyone remembering to
+fill the column in.
+
+It sits **outside the fog branch**. Fog withholds a station's numbers, and it should — but
+the `?` over that station is drawn whatever the weather, so refusing to say a word about it
+would be the panel disagreeing with the thing the player is looking at.
+
 ## The rules about MS and EC
 
 **The map is where you are whole.** Mental Stamina only moves during a ride, so standing on

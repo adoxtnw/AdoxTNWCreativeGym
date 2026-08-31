@@ -748,7 +748,10 @@ ElementFx.define("ENEMY_AGGRO", Object.assign({}, ElementFx.of("ENEMY_PASSIVE"),
    shape are very different widths and a fixed 7x7 stamp reads as a sticker on
    one of them and a smudge on the other. */
 function drawWarnSign(cx, cy, w, col, a){
-  const h = Math.round(w * 0.88), half = w / 2;
+  /* NEARLY EQUILATERAL. At 0.88 it came out squat, and a squat triangle with a
+     hole in it reads as a road sign rather than as a warning — the shape people
+     recognise is taller than it is wide at the apex. */
+  const h = Math.round(w * 0.95), half = w / 2;
   const dark = [22, 18, 16];
   const bar = Math.max(1, Math.round(w * 0.16));
   for(let y = 0; y < h; y++){
@@ -757,9 +760,12 @@ function drawWarnSign(cx, cy, w, col, a){
     const reach = ((y + 0.35) / h) * half;
     for(let x = -reach; x <= reach; x++){
       const py = cy - h / 2 + y;
-      /* the bang: a stem down the middle, a gap, then the dot */
-      const stem = y > h * 0.32 && y < h * 0.66;
-      const dot  = y > h * 0.74 && y < h * 0.88;
+      /* THE BANG: a stem, a gap, then the dot — and the gap is what makes it a
+         bang rather than a slot. The dot stops well short of the base so there
+         is triangle left underneath it; running them together turned the whole
+         lower half into one notch. */
+      const stem = y > h * 0.26 && y < h * 0.62;
+      const dot  = y > h * 0.72 && y < h * 0.84;
       const inBang = Math.abs(x) < bar / 2 && (stem || dot);
       blendPx(cx + x, py, inBang ? dark : col, a);
     }

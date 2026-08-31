@@ -39,6 +39,13 @@ const Escape = {
     if(S.phase !== "BUILD" || S.busy) return false;
     if(S.enemy && S.enemy.phaseBusy) return false;
     if(document.querySelector(".results, .over")) return false;
+    /* THE OPENING IS NOT THE FIGHT. `S.phase` is already BUILD while the intro
+       is still playing — the state machine is simply waiting — so an impatient
+       tap on the diagonal line would have opened an escape ring over a fight
+       that had not started. `preintro` is the class the arena wears until the
+       interface has been drawn into place. */
+    const sc = $("screen");
+    if(sc.classList.contains("preintro")) return false;
     const t = ev.target;
     return !(t && t.closest && t.closest(this.BLOCKED));
   },
