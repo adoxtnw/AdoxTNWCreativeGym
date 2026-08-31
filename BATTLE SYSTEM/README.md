@@ -119,16 +119,109 @@ lines rather than one (`DEFEAT` then `DEFEAT2` — states only a Line Manager re
 then she shakes her way off the bottom of the screen over `bossSinkMs` (7s). A thing that
 was the embodiment of an emotion does not pop.
 
-**And she is drawn 1.5x larger** (`units.scale`). By `transform`, not by layout: the ring
-canvas is 64px across and the rings already breathe to its edge, so scaling the *geometry*
-would push her through the buffer wall and clip her. Scaling the display is also the only
-way she can overhang the arena, which is the point of her being bigger.
+**And she is drawn 1.5x larger** (`units.scale`, carried by every station boss). By
+`transform`, not by layout: the ring canvas is 64px across and the rings already breathe to
+its edge, so scaling the *geometry* would push her through the buffer wall and clip her.
+Scaling the display is also the only way she can overhang the arena, which is the point of
+her being bigger.
+
+*And it silently did nothing for three passes.* `transform` is ONE property. `.sprwrap`
+carried a static `transform:scale(var(--esc))` **and** ran the `hover` bob — and a running
+animation does not compose with the static declaration, it replaces it. The computed transform
+was `matrix(1,0,0,1,0,2.4)`: the bob, at scale 1. `--esc` was being set to 1.5 correctly the
+whole time and had no effect on anything, which is exactly why it kept looking undone. The
+scale is now written into both ends of the `hover` keyframes, where the animation cannot
+overwrite it. Worth remembering the shape of this one: **the value was right, the property was
+already spoken for.**
+
+`--esc` is set on `.enemyholder` rather than on the sprite, so it inherits to the name plate
+too — the sprite scales about its own centre, so a boss at 1.5x grows ~47px upward and walked
+straight over a name parked 30px above the box. The plate's offset is derived from the same
+variable, so a bigger boss later moves it further on its own.
 
 **A theme may be one file now.** `theme_opening` blank with `theme_loop` filled in simply
 loops from the first sample — the original theme being a run-up plus a body is a property of
 *that recording*, not of what a theme is. The pair is chosen together and never a column at
 a time, or a unit supplying only a loop inherits the default theme's opening and plays
 thirty seconds of the wrong music first.
+
+## The first heal
+
+`LO_DISGUST` carries **Self-Respect** — 45 MS back, 35 EC, **one use, three-turn cooldown**.
+Disgust is the right colour for it: the set is otherwise entirely about what you cannot stand
+in somebody else, and this is the same feeling turned around.
+
+It needed a new `HEAL` kind. `FEED` already heals, but it heals the **opponent** — it is the
+punishment Overload forces into your line — so reusing it would have been reusing the word
+rather than the behaviour. `power` carries the amount, the way it does for shield charges,
+grown layers and charge gained; the sheet's `heal` column is still marked *planned* and using
+it would have put this one ability's magnitude in a different cell from everybody else's.
+
+**Clamped to MaxMS, and that is not tidiness.** MS is also the ceiling Emotional Charge has to
+stay under, so a heal that overshot would quietly hand out headroom the armor never granted.
+
+| from | to |
+|---|---|
+| 200 | 245 |
+| 380 | 400 (not 425) |
+| 400 | 400 |
+
+The build-phase projection agrees with the live result, so the preview never promises a number
+the fight then contradicts.
+
+## `ai_profile`: how an enemy decides
+
+The column had existed since the sheet did and nothing read it, so every enemy in the game
+shared one brain. That is fine until an enemy's whole idea is that it fights differently.
+
+| | |
+|---|---|
+| `GREEDY_MAX_DAMAGE` | the default. Takes at most **one** debuff a round and spends the rest of the line on damage |
+| `DEBUFF_FIRST` | takes **every** debuff it can afford that would actually land, then fills what is left |
+
+With one brain for everybody, The Damp — an enemy built entirely around status — spent 62% of
+its slots on the feeblest attack in the game and landed a status a quarter of the time.
+Measured over 200 line builds:
+
+| | status-carrying picks |
+|---|---|
+| `GREEDY_MAX_DAMAGE` | 25.9% |
+| `DEBUFF_FIRST` | **86.4%** |
+
+It cannot loop for ever — each debuff costs charge and a slot, and affordability is re-tested
+every time round — and it will not repeat a status the target already has, so against a fully
+saturated player it drops straight back to chipping (17.3%) rather than wasting the line. An
+attack that also *hangs* something scores x4 for this profile, because its damage is all the
+scoring can see and for a 10-power chip that is nearly nothing.
+
+## Music: streamed or decoded
+
+`decodeAudioData` holds a whole track as Float32 PCM, which is a far bigger number than the
+file size suggests — 44100 x 2 channels x 4 bytes is **337 KB per second**:
+
+| | | decoded |
+|---|---|---|
+| `theme-opening.wav` | 14.8s | 5.0 MB |
+| `theme-loop.wav` | 73.7s | 24.8 MB |
+| `line-manager.m4a` | 204.4s | 68.8 MB |
+| `line-manager-phase2.m4a` | 106.7s | 35.9 MB |
+| | | **134.4 MB** |
+
+Decoding buys exactly one thing: scheduling the loop at `t0 + opening.duration` on the audio
+clock, sample-accurately, so the two halves of the original theme meet without a click. **A
+track handed over as one file has no such join**, so `startMusic()` streams it through an
+`<audio loop>` element instead and 105 MB of the table above is never allocated. Paying that
+for a gapless transition which does not exist is how a phone runs out of memory in the middle
+of a boss fight.
+
+Element volume is capped at 0..1, so a streamed track cannot be lifted by `musicVolume` (1.6)
+the way a decoded one is. The two streamed tracks are therefore mastered to where the decoded
+theme *ends up* — busy RMS -15.5 dBFS, which is -19.6 plus that 1.6x — so the two paths match
+by construction rather than by a gain applied at one end only. Re-measure if either is
+replaced.
+
+See also `?fx=` in `../MAP/README.md`: the title logo and the first-run dot field are animated
+feTurbulence filters too, and are dropped at `fx=lite`.
 
 ## Where to look
 

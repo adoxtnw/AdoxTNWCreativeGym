@@ -81,10 +81,54 @@ function renderDilemma(){
 
    It is the VAULT, not the bank: everything here is still unbanked and still
    losable, which is the whole tension of the Dilemma. The panel says so.     */
+/* ---- BAGGAGE — what this ride has got you, so far ---------------------------
+   Everything in here is UNBANKED. Crystals are kept by percentage and items are
+   rolled one at a time, so the two halves of the panel are separated and the
+   losable half says so out loud — the whole wager only means something if the
+   player can see what is riding on it.
+
+   THE CRYSTALS ARE THE RIDE'S OWN CRYSTAL. Each chip runs `gemPixels()`, the
+   same function that draws the prism drifting past the train, into a small
+   canvas of its own. A hand-made "crystal icon" for the menu would have drifted
+   from the real one the first time either was touched, and the player would be
+   catching one thing and looking at another.
+
+   The angle lives on the module rather than in the markup, so re-rendering the
+   panel — which `syncHud()` does on every phase change — never resets the spin
+   back to nothing.                                                            */
 const Baggage = {
   open: false,
+  spin: 0,
+
   toggle(){ this.open = !this.open; this.render(); syncHud(); dirty = true; },
   hide(){ if(!this.open) return; this.open = false; this.render(); syncHud(); dirty = true; },
+
+  /* One turn of every prism, on the 12 fps clock the rest of the game steps on
+     — and only while the panel is up, so a closed bag costs nothing. */
+  step(){
+    if(!this.open) return;
+    this.spin += 0.26;                       /* the ride's own rate */
+    this.paint();
+  },
+  paint(){
+    const el = $("baggage"); if(!el) return;
+    el.querySelectorAll("canvas.gem").forEach(cv => {
+      const col = hexRGB(cv.dataset.hex || "#f4efe4");
+      const ctx = cv.getContext("2d");
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const img = ctx.createImageData(cv.width, cv.height);
+      const D = img.data;
+      const cx = cv.width / 2, cy = cv.height / 2;
+      gemPixels(cv.height / 2 - 1, this.spin + Number(cv.dataset.fd || 0), col,
+        (dx, dy, c, k) => {
+          const x = Math.round(cx + dx), y = Math.round(cy + dy);
+          if(x < 0 || y < 0 || x >= cv.width || y >= cv.height) return;
+          const o = (y * cv.width + x) * 4;
+          D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = 255 * k;
+        });
+      ctx.putImageData(img, 0, 0);
+    });
+  },
 
   render(){
     const el = $("baggage"); if(!el) return;
@@ -95,45 +139,63 @@ const Baggage = {
     const need = Trip.target || 1, got = Math.min(Trip.collected, need);
     const pct = Math.round((got / need) * 100);
 
-    /* one counter per emotion, down the side */
-    const cry = Object.keys(EMOTIONS).map((e, i) =>
-      '<div class="bcry pxr" style="--emo:' + EMOTIONS[e].hex + '">' +
-      '<span class="dot" style="background:' + EMOTIONS[e].hex +
-      ';--fd:' + (i * 0.27).toFixed(2) + 's"></span><b>' + (v.crystals[e] || 0) + '</b>' +
-      '<small>' + esc(EMOTIONS[e].short || EMOTIONS[e].name) + '</small></div>').join("");
+    /* ONE ROW, one chip per emotion, each carrying the real prism. Every chip is
+       drawn even at zero: a purse that hides what it has none of makes the
+       player count the gaps, and six fixed positions can be read at a glance
+       without reading a single word. */
+    const cry = Object.keys(EMOTIONS).map((e, i) => {
+      const n = v.crystals[e] || 0;
+      return '<div class="bcry' + (n ? '' : ' none') + '" style="--emo:' + EMOTIONS[e].hex + '">' +
+        '<canvas class="gem" width="15" height="22" data-hex="' + EMOTIONS[e].hex +
+          '" data-fd="' + (i * 1.05).toFixed(2) + '"></canvas>' +
+        '<b>' + n + '</b>' +
+        '<small>' + esc(EMOTIONS[e].short || EMOTIONS[e].name) + '</small></div>';
+    }).join("");
 
-    /* the grid: one cell per thing carried, stacked by id */
+    /* THE LOSABLE HALF, as a list rather than a grid. A grid of cells says "how
+       full is the bag"; a list says "what exactly is in it, and how many", which
+       is the question worth answering about things you are about to roll for.
+       Stacked by id, and the symbol is the emotion's own — the items sheet has
+       no icon column and does not need one when every item already has a type. */
     const count = {};
     v.items.forEach(i => { count[i] = (count[i] || 0) + 1; });
     const ids = Object.keys(count);
-    const cells = ids.map(i => {
+    const items = ids.map(i => {
       const it = ITEMS[i];
-      const col = it && EMOTIONS[it.emotion] ? EMOTIONS[it.emotion].hex : "#5c5348";
-      const fd = ((i.length * 7) % 20) / 10;
-      return '<div class="bcell pxr" style="--emo:' + col + '">' +
-        '<i class="sym" style="--fd:' + fd + 's;color:' + col + '">' + glyphSVG("BAG") + '</i>' +
+      const em = it && EMOTIONS[it.emotion];
+      const col = em ? em.hex : "#5c5348";
+      return '<div class="bitem pxr" style="--emo:' + col + '">' +
+        '<i class="sym">' + glyphSVG(em ? em.icon : "BAG") + '</i>' +
         '<span class="bname">' + esc(it ? it.name : i) + '</span>' +
-        (count[i] > 1 ? '<b class="bx">&times;' + count[i] + '</b>' : '') + '</div>';
+        '<b class="bx">&times;' + count[i] + '</b></div>';
     }).join("");
-    /* empty cells so the grid keeps its shape and reads as a container */
-    let pad = "";
-    for(let i = ids.length; i < Math.max(9, Math.ceil((ids.length + 1) / 3) * 3); i++)
-      pad += '<div class="bcell empty pxr"></div>';
 
     el.innerHTML =
       '<div class="bhead"><i class="sym">' + glyphSVG("BAG") + '</i><b>BAGGAGE</b>' +
         '<span class="bhint">unbanked &mdash; still losable</span>' +
         '<button class="mclose pxr hudbtn" id="bgClose">&times;</button></div>' +
-      '<div class="bwrap">' +
-        '<div class="bgrid">' + cells + pad + '</div>' +
-        '<div class="bside">' +
-          '<div class="bseg pxr"><small>EMOTIONAL TRIP</small>' +
-            '<div class="bbar"><i style="height:' + pct + '%"></i></div>' +
-            '<b>' + got + '/' + need + '</b></div>' +
-          '<div class="bcrys">' + cry + '</div>' +
+      '<div class="bscroll">' +
+        '<div class="bseg"><small>EMOTIONAL TRIP</small>' +
+          '<div class="bbar"><i style="width:' + pct + '%"></i></div>' +
+          '<b>' + got + '/' + need + '</b></div>' +
+        '<div class="bcrys">' + cry + '</div>' +
+        '<div class="bsec">LOSABLE</div>' +
+        '<div class="bitems">' +
+          (items || '<p class="bempty">Nothing loose in the bag. ' +
+                    'Crystals above are still only banked when you step off.</p>') +
         '</div>' +
       '</div>';
+    /* WIRED EVERY RENDER, because every render replaces the button. It is also
+       the reason this panel could not be closed at all: the listener was here
+       and correct, and `.baggage` simply never opted back into pointer events
+       under `.hud{pointer-events:none}` — so the tap landed on the map behind
+       it. See map.css. */
+    /* No `sfx()` here: `uiSoundFor()` in mapview.js already claims `#bgClose`
+       for `ui_close`, and it fires on a capturing listener at the screen. Adding
+       one would simply play it twice — which is what happens whenever a control
+       is given a voice in two places. */
     $("bgClose").addEventListener("click", () => Baggage.hide());
+    this.paint();
   }
 };
 

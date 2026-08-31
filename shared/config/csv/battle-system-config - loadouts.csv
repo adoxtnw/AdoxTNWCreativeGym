@@ -4,7 +4,7 @@ LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,LIVE,planned
 LO_ANGER,ANGER,Anger,ATK_ANGER,HVY_ANGER,GEN_ANGER,,1,0,,,,1,
 LO_SADNESS,SADNESS,Sadness,ATK_SADNESS,HVY_SADNESS,INFLICT_SAD,,1,0,,,,1,
 LO_JOY,JOY,Joy,ATK_JOY,HVY_JOY,GEN_JOY,,1,0,,,,1,
-LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,,,1,0,,,,1,
+LO_DISGUST,DISGUST,Disgust,GEN_DISGUST,ROT,SELF_RESPECT,,1,0,,,,1,"Grow a layer, rot theirs, and pick yourself back up. The only set carrying a heal, which is most of the reason to take it."
 LO_SURPRISE,SURPRISE,Jolt,MID_SURPRISE,,,,1,0,PAS_JOLT,,,1,"One attack and one passive, deliberately. Surprise is not about volume of swings - it is about what happens when one goes wrong, which is what PAS_JOLT turns into charge."
 LO_RUSH,SURPRISE,Rush,DRUG_HIT,,,,3,0,PAS_RUSH,,,1,Sant Antoni's reward. Its passive turns every critical into rushCritSlots extra slots instead of critSlots - three instead of one - so a set that offers one attack is really offering a bigger line whenever a hit goes well.
 LO_FEAR,FEAR,Fear,,,,,1,0,,,,1,No Fear abilities exist yet.

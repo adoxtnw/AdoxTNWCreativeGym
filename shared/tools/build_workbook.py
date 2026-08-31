@@ -216,6 +216,40 @@ ABILS = [
     notes="Costed as a BASIC - exactly ATK_SURPRISE's cost and power - because Dizzy lasts one "
           "turn and is a coin flip rather than a lock. The Set of Rush leaves it, and it is the "
           "only thing in that set, so it has to be worth carrying on its own."),
+ # DISGUST HAD NO ATTACK AT ALL — two rows, an ADDLAYER and one debuff, which
+ # meant a Disgust enemy could only fight in somebody else's colour. These are
+ # what let one exist. Every one of them is deliberately feeble on damage: what
+ # Disgust does is not hurt you, it is get into everything and stay.
+ ab(id="ATK_DISGUST", blurb='Attack. Barely stings, and cracks the outermost {LAYER}.',
+    name="Sour Note", emotion="DISGUST", cost=12, kind="DAMAGE", power=14, hits_layer=1, icon="ROT",
+    notes="A fifth of a Heated Punch. It exists so a Disgust unit has something to do with a "
+          "slot it cannot afford a debuff for, not because anyone should fear it."),
+ ab(id="TAINT", blurb='Attack. Chips, and holds *1* broken {LAYER} down for a turn.',
+    name="Spoilage", emotion="DISGUST", cost=18, kind="DAMAGE", power=10, hits_layer=1, icon="ROT",
+    status_apply="NO_REGEN", status_duration=1, uses=3,
+    notes="The second ability to both hit and hang a status (see DRUG_HIT). Ten damage is "
+          "nothing; the point is that the layer it breaks does not come back this round."),
+ ab(id="SELF_RESPECT", blurb='Restore. Takes back *45* {MS}. Once a fight.',
+    name="Self-Respect", emotion="DISGUST", cost=35, kind="HEAL", power=45, hits_layer=0,
+    icon="SHIELD", target="SELF", wild_target="SELF", uses=1, cooldown=3,
+    notes="THE FIRST HEAL THE PLAYER HAS. Disgust is the right colour for it: the set is "
+          "otherwise entirely about what you cannot stand in somebody else, and this is the "
+          "same feeling turned around. One use and a three-turn cooldown, so it is a decision "
+          "about WHEN rather than a tap you fall back on - 45 is most of a heavy hit, and "
+          "spending it early because the bar looked low is the mistake it is designed to "
+          "allow. `power` is the amount, as it is for every other kind; the sheet's `heal` "
+          "column is still planned and using it would put this one ability's magnitude in a "
+          "different cell from everybody else's."),
+ ab(id="NAUSEA", blurb='Debuff. Target *misses* attacks AND turns one on *itself* for *2 turns*.',
+    name="Turn the Stomach", emotion="DISGUST", cost=30, kind="DEBUFF", power=0, hits_layer=0,
+    icon="ROT", uses=2, status_apply="NAUSEOUS", status_duration=2,
+    notes="The most expensive debuff in the game and worth it: two live levers at once, so it "
+          "costs the target accuracy and stamina in the same breath."),
+ ab(id="SPOIL", blurb='Debuff. *3* broken {LAYERS} stay broken, and nothing goes your way, for *3 turns*.',
+    name="Let It Rot", emotion="DISGUST", cost=32, kind="DEBUFF", power=0, hits_layer=0,
+    icon="ROT", uses=2, status_apply="SPOILED", status_duration=3,
+    notes="Longer than anything else and the only status that touches crit odds. It does no "
+          "damage whatsoever - it simply makes the next three turns worse than they should be."),
  ab(cooldown=0, uses=0, id="SELF_HARM", blurb='Status. Forced by {OVERLOAD}; costs you {MS}.',  name="Self Harm",emotion="",      cost=0,  kind="SELFHARM", power=25, hits_layer=0, icon="WARN",
     target="SELF", wild_target="SELF", rarity="OVERLOAD", enabled=1,
     notes="OVERLOAD ONLY. Forced into your line when Charge passes your ceiling. Cannot be moved or removed."),
@@ -266,7 +300,8 @@ U_COLS = ["id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","
           "ai_profile","init","start_shield","max_layers_override","tags","enabled","notes"]
 U_LIVE = {"id","name","emotion","tier","max_ms","start_ec_pct","layers","pool","line_dir","line_cap",
           "max_bonus_slots","loadouts","spawn_lines","drops",
-          "persona","role","scale","bg_bright","fx","theme_opening","theme_loop","theme2_loop"}
+          "persona","role","scale","bg_bright","fx","theme_opening","theme_loop","theme2_loop",
+          "ai_profile"}
 def en(**k):
     """An enemy row. Everything an enemy shares with every other enemy is here, so a
     new one is the handful of cells that actually make it that enemy."""
@@ -332,11 +367,51 @@ UNITS_ROWS = [
     max_ms=150, start_ec_pct=0.30, line_cap=2, max_bonus_slots=4,
     layers="JOY|JOY",
     pool="ATK_JOY|GEN_JOY|DEFEND|RECHARGE",
-    spawn_lines="L2:0.6",
+    spawn_lines="L2:0.6|L4:0.7",
     drops="CRYSTAL:1:0.45|SEGMENT:2:0.40",
-    notes="L2 ONLY, and rarely — it is not on L4, its own colour's line, because that is how "
-          "it was asked for. Reads as Line 2 being where the wrong people end up. Add "
-          "`|L4:1.0` to give Joy its own regular."),
+    notes="On L2 because that is where the wrong people end up, and on L4 because that is "
+          "where the right ones do. It is the same reveller either way; only the line around "
+          "it changes what that means."),
+ # ---- LINE 4 IS JOY, AND HAD NO JOY ON IT ---------------------------------
+ # Every line is an emotion, and L4's was the one emotion with nothing of its own
+ # riding it — the Reveller was on L2 only, so the Joy line was patrolled
+ # entirely by the Commuter's `*` fallback. A line should feel like the thing it
+ # is named after.
+ en(id="enemy_joy", name="The Celebrant", emotion="JOY", tier="REGULAR", max_ms=245,
+    layers="JOY|JOY|SURPRISE",
+    pool="ATK_JOY|HVY_JOY|GEN_JOY|ATK_SURPRISE|DEFEND|RECHARGE",
+    spawn_lines="L4:1.2",
+    drops="CRYSTAL:2:0.75|SEGMENT:3:0.55|ORB:1:0.40",
+    notes="L4's regular, and the counterpart to the Commuter on L1. The SURPRISE layer under "
+          "two of Joy is what stops a Joy-dressed player drinking the whole fight."),
+ en(id="enemy_joy_strong", name="The Euphoric", emotion="JOY", tier="STRONG",
+    max_ms=325, start_ec_pct=0.50,
+    layers="JOY|JOY|JOY|SURPRISE",
+    pool="ATK_JOY|HVY_JOY|GEN_JOY|ATK_SURPRISE|STARTLE|DEFEND|RECHARGE",
+    spawn_lines="L4:0.12",
+    drops="CRYSTAL:3:0.85|SEGMENT:4:0.70|ORB:1:0.55",
+    notes="Joy with nothing holding it back. HVY_JOY is the hardest single hit in the game and "
+          "this is the only ordinary enemy carrying it, which is the whole of its threat - a "
+          "long charge you can see coming and have to decide what to do about."),
+
+ # ---- THE ONE THAT DOES NOT HURT YOU --------------------------------------
+ # Rare, huge, and almost harmless per swing: its entire pool bar one attack is
+ # debuffs, and the attack it does have is the feeblest in the game. What it
+ # costs you is TIME and the state of your own line, not stamina. The counterplay
+ # is real and it is not combat: do not tap it, or run.
+ en(id="enemy_disgust_strong", name="The Damp", emotion="DISGUST", tier="STRONG",
+    max_ms=520, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
+    layers="DISGUST|DISGUST|SADNESS|DISGUST",
+    pool="ATK_DISGUST|TAINT|NAUSEA|SPOIL|ROT|GEN_DISGUST|DEFEND|RECHARGE",
+    spawn_lines="L4:0.10", ai_profile="DEBUFF_FIRST",
+    drops="CRYSTAL:3:0.90|SEGMENT:4:0.75|ORB:2:0.60",
+    notes="MORE STAMINA THAN A STATION BOSS and less damage than a weak enemy - the two facts "
+          "are the same design. Six of its eight abilities are debuffs or layers, and the AI "
+          "will not repeat a status the target already has (see aiDebuffChance), so it works "
+          "through all four in turn: your layers held down, your aim gone, your own attacks "
+          "turned on you, your crits gone. It cannot kill you quickly. It can make the rest of "
+          "the ride miserable, and it takes a very long time to shift."),
+
  # ---- STATION BOSSES ------------------------------------------------------
  # NOT ON THE TRACK. Every one of these has a BLANK spawn_lines, which is what
  # keeps them out of the ride roll: they are reached by travelling TO their
@@ -348,22 +423,26 @@ UNITS_ROWS = [
  # time - correct for a commuter, wrong for a boss, who has to be the SAME person
  # every time you come back for her.
  en(id="boss_fondo", name="The Terminus", emotion="ANGER", tier="STRONG",
-    max_ms=430, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
-    layers="ANGER|ANGER|ANGER|ANGER",
+    max_ms=344, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
+    layers="ANGER|ANGER|ANGER",
     pool="ATK_ANGER|HVY_ANGER|GEN_ANGER|BLIND|DEFEND|RECHARGE",
-    spawn_lines="", persona="The Terminus",
+    spawn_lines="", persona="The Terminus", scale=1.5,
     drops="CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70",
-    notes="The end of Line 1, and the armor it leaves is four layers of Anger - so the fight "
-          "that grants it is four layers of Anger. Pure type on purpose: an Anger-layered "
-          "player drinks half of this, which is exactly the trade the reward is offering."),
+    notes="The end of Line 1. PURE TYPE on purpose: an Anger-layered player drinks half of "
+          "this, which is exactly the trade the armor it leaves is offering. It used to mirror "
+          "that armor exactly - four layers and 430 stamina - which was tidy and much too "
+          "hard; three layers and a fifth less stamina is the same fight without the wall."),
  en(id="boss_sant_antoni", name="The Comedown", emotion="SURPRISE", tier="STRONG",
-    max_ms=400, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
-    layers="SURPRISE|SURPRISE|JOY|SURPRISE",
+    max_ms=320, start_ec_pct=0.55, line_cap=4, max_bonus_slots=6,
+    layers="SURPRISE|SURPRISE|JOY",
     pool="ATK_SURPRISE|HVY_SURPRISE|MID_SURPRISE|STARTLE|GEN_JOY|DEFEND|RECHARGE",
-    spawn_lines="", persona="The Comedown",
+    spawn_lines="", persona="The Comedown", scale=1.5,
     drops="CRYSTAL:4:1.0|SEGMENT:4:0.80|ORB:2:0.70",
     notes="Leaves the Set of Rush. Its own pool is what the set is not: volume. The reward for "
-          "beating a thing that swings six times is one ability that swings once and staggers."),
+          "beating a thing that swings six times is one ability that swings once and staggers. "
+          "The layer it LOST was the innermost Surprise - the JOY one is kept deliberately, "
+          "because it is the layer a player who came dressed for Surprise cannot drink, and "
+          "it is the only thing making the queue a puzzle rather than a wall."),
  en(id="boss_line_manager", name="The Line Manager", emotion="JOY", tier="STRONG",
     max_ms=520, start_ec_pct=0.60, line_cap=4, max_bonus_slots=6,
     layers="JOY|JOY|JOY|SURPRISE|JOY",
@@ -403,11 +482,18 @@ sheet("units", U_COLS, U_LIVE, UNITS_ROWS,
          "runs around it (PAPARAZZI); `theme_opening`/`theme_loop` swap the battle music for "
          "this fight alone, and blank means the usual theme - a blank OPENING with a loop "
          "filled in simply starts on the loop. "
+         "`ai_profile` is HOW IT DECIDES, as opposed to what it can do. "
+         "GREEDY_MAX_DAMAGE (the default, and what every enemy used to share) takes at most "
+         "one debuff a round and spends the rest of the line on damage. DEBUFF_FIRST takes "
+         "every debuff it can afford that would actually land, and only then fills what is "
+         "left - the difference between an enemy that occasionally inconveniences you and one "
+         "whose whole idea is that it never hurts you much. "
          "`role` marks a unit as something the game treats specially: LINE_MANAGER gives it "
          "the second wind at bossPhaseAt, the shaking announcement on the platform, the two "
          "parting lines and the seven-second sink, and `theme2_loop` is the music its second "
          "phase is fought to. `scale` is how large it is drawn in battle against an ordinary "
-         "enemy of its tier - 1.5 is half again - and blank is 1."))
+         "enemy of its tier - 1.5 is half again, and every station boss carries it - and blank "
+         "is 1."))
 
 # ───────────────────────────── layer_types (reserved) ─────────────────────────────
 LT_COLS = ["id","emotion","display_name","durability","on_break_effect","on_break_value",
@@ -451,6 +537,21 @@ SE_ROWS = [
     blurb="{SURPRISE} came from nowhere. *A third* of your attacks go wide.",
     notes="Surprise's own miss status. missChance() takes the HIGHEST of everything on a "
           "unit rather than summing, so Rattled and Blinded together are just Blinded."),
+ # BUILT OUT OF THE LEVERS THAT ARE ACTUALLY LIVE. `block_regen`, `miss_chance`,
+ # `self_hits` and `crit_mult` are the four the engine reads today; everything
+ # else on this sheet is still marked planned, and a status leaning on one of
+ # those would be a status that quietly does nothing.
+ se(id="NAUSEOUS", name="Nauseous", duration=2, icon="ROT", color="#56a36a",
+    miss_chance=0.4, self_hits=1,
+    blurb="You cannot keep anything down. *Two in five* of your attacks go wide, and one of "
+          "them comes back at *you* every round.",
+    notes="TWO levers at once, which is what makes it the priciest debuff in the game: it is "
+          "Blinded and Sad in a single slot, a little weaker at each than either is alone."),
+ se(id="SPOILED",  name="Spoiled", duration=3, icon="ROT", color="#3f7a52",
+    block_regen=3, crit_mult=-0.045,
+    blurb="*3* of your broken {LAYERS} are being held down, and nothing is going your way.",
+    notes="The only status that moves crit odds. -0.045 against a base critChance of 0.05 "
+          "leaves half a percent - not quite never, which is worse to play against than never."),
  se(id="DIZZY",    name="Dizzy",   duration=1, icon="BURST", color="#9a6bb0", miss_chance=0.5,
     blurb="The carriage is still moving without you. *Half* of your attacks miss outright.",
     notes="Blinded's miss rate for a SINGLE turn - what Drug Hit leaves behind. The whole "
@@ -597,6 +698,11 @@ RULES = [
  ("enemyRingScaleStrong",1.05,"Overall size of a STRONG enemy in battle. Do not raise much: the canvas is 64px and the rings breathe outward past this."),
  ("rideScaleWeak",0.78,"How big a WEAK enemy is during a ride, against its element row's own size. Do not go much lower: below about nine pixels across, three points stop reading as a triangle and it is just a small blob."),
  ("rideScaleStrong",1.55,"How big a STRONG enemy is during a ride. Size is the tier cue that survives being glanced at; the silhouette is the one that survives being looked at."),
+ ("rideEnemyScale",1.35,"How big EVERY enemy is on a ride, on top of its tier scale. The tier numbers above are ratios between enemies; this is the size of the whole family against the crystals and segments sharing the window with them, and it is what makes an entity read as a creature rather than as one more piece of debris."),
+ ("enemyTrail",5,"Ghosts left behind a moving enemy. 0 turns the trail off."),
+ ("enemyTrailMs",55,"How often a ghost is laid down, in ms. Longer spaces the trail out; shorter stacks it into a smear. Sampled on a timer rather than per frame so the trail is the same length whatever the frame rate."),
+ ("enemyTrailFade",0.42,"How strongly the newest ghost shows, against the enemy itself. Every one behind it is fainter again."),
+ ("enemyTrailSpread",0.34,"How far back each ghost is pushed, as a fraction of the enemy's own size. An entity drifts at less than half the track's speed, so its TRUE past positions sit almost on top of each other and draw a halo rather than a tail - this is what gives the wake length. 0 makes it a strict position history again."),
  ("enemyRingSpacing",4.7,"Enemy: radius step between one layer and the next in. baseR/spacing sets how many fit."),
  ("enemyRingBreathe",1.6,"Enemy ring breathing amplitude."),
  ("playerRingBaseR",300,"Player: radius of the outermost ring. Huge on purpose — a big circle reads as a nearly flat band."),
@@ -839,6 +945,38 @@ for rows in [
      "They're LOVING this! Look at them! They're loving it!",
      "Two euros. Whole carriage. Two euros...",
      "Next stop's better. Next stop's always better."),
+ # ---- STRONG / JOY: joy that is winning, and does not care who it is on ----
+ dlg("JOY", "The Cruise Ship", "STRONG",
+     "Six thousand of us and eleven hours ashore! Where's the cathedral? WHERE IS IT?",
+     "We are VERY good for this city. Everybody says so. EVERYBODY.",
+     "The horn went. That was the horn. Which way was the port—",
+     "Barcelona was lovely. What was it called again?"),
+ dlg("JOY", "The Verbena", "STRONG",
+     "Sant Joan! Nobody sleeps tonight! NOBODY SLEEPS, you hear me?!",
+     "Another one! Light another one! The whole street is ours till six!",
+     "Somebody's balcony is on fire. Somebody's balcony is ON FIRE.",
+     "Every year. Every single year, and it is always worth it."),
+ dlg("JOY", "The Sold-Out Show", "STRONG",
+     "Front row, both nights, and I have not stopped smiling since MARCH!",
+     "You weren't there. You'll never know. I'm sorry, but you'll never know.",
+     "It's nearly over. It's nearly over and then what—",
+     "Two hours. Eight hundred euros. I'd do it again tomorrow."),
+ # ---- STRONG / DISGUST: the thing that does not attack, it SETTLES ---------
+ dlg("DISGUST", "The Damp", "STRONG",
+     "I came through the wall in November. Nobody called anybody. Here we are.",
+     "Everything you own smells of me now. Everything. Even the clean things.",
+     "Air it out, then. Go on. Open every window you've got.",
+     "I'll be back up the same wall by Christmas. I always am."),
+ dlg("DISGUST", "The Backed-Up Drain", "STRONG",
+     "Six flats share me and not one of them will admit what they put down here.",
+     "It is coming back up the sink now. It is coming back UP.",
+     "Fine — bleach me. See how long that lasts.",
+     "You have not fixed anything. You have moved it four metres."),
+ dlg("DISGUST", "The Inspection", "STRONG",
+     "Unfit. That is the word. I do not have to explain the word.",
+     "There is a form for this and you filled it in wrong in 2019.",
+     "My office closes at two. This is not my problem at two.",
+     "Reapply in the spring. Somebody else will say no in the spring."),
  # ---- BOSS: pinned, one row each ------------------------------------------
  # These are never drawn at random. The units row NAMES the persona, so the
  # Terminus is the Terminus every single time you go back up Line 1 — which is
@@ -884,7 +1022,9 @@ LOADOUTS_ROWS = [
  lo("LO_ANGER",   "ANGER",   "Anger",   "ATK_ANGER","HVY_ANGER","GEN_ANGER"),
  lo("LO_SADNESS", "SADNESS", "Sadness", "ATK_SADNESS","HVY_SADNESS","INFLICT_SAD"),
  lo("LO_JOY",     "JOY",     "Joy",     "ATK_JOY","HVY_JOY","GEN_JOY"),
- lo("LO_DISGUST", "DISGUST", "Disgust", "GEN_DISGUST","ROT"),
+ lo("LO_DISGUST", "DISGUST", "Disgust", "GEN_DISGUST","ROT","SELF_RESPECT",
+    notes="Grow a layer, rot theirs, and pick yourself back up. The only set carrying a heal, "
+          "which is most of the reason to take it."),
  # REDEFINED, not added alongside. This row existed but nothing owned it and
  # nothing referenced it — three generic attacks with no idea of its own. The
  # design asked for something else entirely: one mid-strong attack, and a
@@ -1248,6 +1388,9 @@ def _validate():
             if e not in emo_ids: bad.append(f"units.{u['id']}.layers -> no emotion '{e}'")
         if u.get("emotion") and u["emotion"] not in emo_ids:
             bad.append(f"units.{u['id']}.emotion -> no emotion '{u['emotion']}'")
+        if u.get("ai_profile") not in ("", "GREEDY_MAX_DAMAGE", "DEBUFF_FIRST"):
+            bad.append(f"units.{u['id']}.ai_profile -> '{u['ai_profile']}' is not "
+                       "GREEDY_MAX_DAMAGE/DEBUFF_FIRST")
         if u.get("tier") not in ("", "WEAK", "REGULAR", "STRONG"):
             bad.append(f"units.{u['id']}.tier -> '{u['tier']}' is not WEAK/REGULAR/STRONG")
         for s in pipes(u.get("spawn_lines")):

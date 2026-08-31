@@ -80,3 +80,42 @@ const mapURLReady = (function(){
 /* Await this when you are about to NAVIGATE or mount; read `mapURLBase` when you
    only need something to show. */
 const mapURL = (page, query) => mapURLBase + page + (query || "");
+
+/* ---- HOW HARD THIS DEVICE IS ASKED TO WORK ---------------------------------
+   Two effects in this prototype are enormously more expensive than everything
+   else put together, and both of them are invisible in a profiler until the
+   page is already dead:
+
+     THE SWIM. `#map` carries `filter:url(#mapWave)` — an feTurbulence whose
+     baseFrequency is ANIMATED. An animated turbulence cannot be cached: the
+     fractal noise is regenerated every frame, over the whole upscaled canvas.
+     Measured here that is 2.48 MILLION device pixels of noise per repaint on a
+     desktop at DPR 2, and an iPhone at DPR 3 is half again more. Safari renders
+     SVG filters on the CPU and keeps a full-size backing store per filtered
+     layer, and a WebContent process that runs out of room does not throw — it
+     is killed, and Safari says "a problem repeatedly occurred".
+
+     THE FROSTED PANELS. `backdrop-filter: blur()` over a live canvas is
+     re-blurring the whole frame underneath, every frame, for as long as the
+     panel is open.
+
+   NEITHER IS LOAD-BEARING. The map is legible without the swim and the menu is
+   legible without the blur, so on a device where they are a risk they are
+   simply not drawn. Everything else is untouched.
+
+   THIS IS A GUESS THAT CAN BE TESTED, WHICH IS WHY THERE IS A SWITCH.
+   `?fx=full` forces both back on, `?fx=lite` forces both off, and the level is
+   logged at boot — so a crash can be bisected on the actual phone in one
+   reload rather than argued about. */
+function applyFxLevel(){
+  const m = /(?:\?|&)fx=(full|lite)/.exec(location.search);
+  /* iPadOS reports itself as a Mac, hence the touch-point test. */
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+              (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const level = m ? m[1] : (iOS ? "lite" : "full");
+  try{ document.documentElement.dataset.fx = level; }catch(e){}
+  console.info("fx=" + level + (m ? " (forced by the URL)" : iOS ? " (iOS default)" : "") +
+               " \u2014 ?fx=full / ?fx=lite to override");
+  return level;
+}
+applyFxLevel();

@@ -703,6 +703,114 @@ It sits **outside the fog branch**. Fog withholds a station's numbers, and it sh
 the `?` over that station is drawn whatever the weather, so refusing to say a word about it
 would be the panel disagreeing with the thing the player is looking at.
 
+## The Baggage panel
+
+Everything in it is **unbanked**: crystals are kept by percentage on the way out and items
+are rolled one at a time, so the two halves are separated and the losable half says so. The
+wager only means anything if the player can see what is riding on it.
+
+| | |
+|---|---|
+| crystals | one row, six fixed positions, each carrying the ride's own prism |
+| losable | a list, symbol on the left, stacked by id with a count |
+| the bars | the MS/EC strip stays on, above the panel |
+
+**The crystal chips ARE the ride's crystal.** Each runs `gemPixels()` — the same function
+that draws the prism drifting past the train — into a small canvas. That function now takes
+a `put(dx, dy, colour, alpha)` callback: the ride passes `blendPx` and paints into the frame
+buffer, the chip passes a canvas writer. A hand-made "crystal icon" for the menu would have
+drifted from the real one the first time either was touched, and the player would be catching
+one thing and looking at another. The angle lives on the module, so re-rendering the panel —
+which `syncHud()` does on every phase change — never resets the spin.
+
+**Six fixed positions, zeroes included.** A purse that hides what it has none of makes you
+count the gaps; six places that never move can be read without reading a word. An empty one
+is dimmed rather than removed.
+
+**A list, not a grid.** A grid of cells answers *how full is the bag*; a list answers *what
+exactly is in it and how many*, which is the question worth asking about things you are about
+to roll for one at a time. The symbol is the item's own emotion — the items sheet has no icon
+column and does not need one when every item already has a type.
+
+### The bug that made it a trap
+
+`.hud` is `pointer-events:none` so the map underneath stays draggable, and **every panel in
+it has to opt back in**. `.peek` and `.dilemma` do, on one shared line. `.baggage` never did.
+The close button's listener was there and correct the whole time; the tap went straight
+through the panel to the map behind it, and once opened the bag could not be closed by any
+means. Same omission as the tooltip veil, in a place where it cost far more.
+
+## What a caught thing flies to
+
+Everything used to arc to one point in the bottom-left corner where nothing was drawn — a
+"purse" that did not exist. A thing you catch should travel to the thing it becomes:
+
+| | |
+|---|---|
+| Track Segment | the trip bar |
+| Emotion Crystal | the BAGGAGE button |
+| Stamina Orb / Energy Triangle | the MS/EC bars they are added to |
+
+The rects are read only while something is actually in the air, so an ordinary frame costs no
+layout. `domTarget()` converts a DOM centre into the travel screen's own pixels (`PX` screen
+pixels per art pixel).
+
+**And the bag answers**, in the colour of what landed — the one thing the flight itself could
+not say. In two pieces, and for a reason: the button takes the colour and brightens, which
+needs nothing but the button, and the **ring is a separate element sitting over it**, because
+`.bagbtn` wears `.pxr` and a `clip-path` clips the element's box-shadow *and* its
+pseudo-elements away. A glow drawn on the button is a glow that is never rendered — the same
+fix the menu button's ring needed. `#screen` is `overflow:hidden` too and the button sits
+flush against its right edge, so half of any soft halo would be cut off even if it did draw.
+
+So the ring is a hard expanding outline rather than a blur, it carries a white core as well
+as the emotion's colour (a red ring on the red line's travel scene is invisible), and it
+leaves the button at full strength and fades only afterwards — ramping the opacity from the
+first frame put its brightest moment where the button was still covering it.
+
+## Entities on the ride
+
+They are `rideEnemyScale` (1.35) larger than everything else in the window, and they leave a
+wake. Two scales, on purpose: `rideScaleWeak`/`rideScaleStrong` are ratios *between* enemies
+and retuning them is a statement about the roster, while `rideEnemyScale` is the size of the
+whole family against the crystals and segments sharing the window — what makes an entity read
+as a creature rather than as one more piece of debris.
+
+**The wake is not a strict position history.** An entity drifts at less than half the track's
+speed and runs parallel to it, so five true past positions span about seven pixels — which
+draws a *halo* round the body and says "this thing is blurry" rather than "this thing is
+moving". Each ghost is also pushed back along the direction of travel in proportion to its
+age (`enemyTrailSpread`). The recorded positions still carry the sway, so the tail bends the
+way the creature swam; the push is what gives it length.
+
+Sampled on a timer (`enemyTrailMs`) rather than per frame, so the trail is the same length
+whatever the frame rate — a per-frame history piles every ghost inside one body at 60fps and
+stretches halfway across the window on a slow phone.
+
+## Performance: `?fx=`
+
+Two effects cost more than everything else on the page put together, and both are invisible
+in a profiler until the page is already dead:
+
+- **The swim.** `#map` carries `filter:url(#mapWave)` — an feTurbulence whose `baseFrequency`
+  is *animated*. An animated turbulence cannot be cached: the fractal noise is regenerated
+  every frame over the whole upscaled canvas. Measured here that is **2.48 million device
+  pixels of noise per repaint** at DPR 2, and an iPhone at DPR 3 is half again more. Safari
+  renders SVG filters on the CPU and holds a full-size backing store per filtered layer, and
+  a WebContent process that runs out of room is not given an exception — it is killed, and
+  Safari says *"a problem repeatedly occurred"*.
+- **The frosted panels.** `backdrop-filter: blur()` over a live canvas re-blurs the whole
+  frame underneath, every frame, for as long as the panel is open.
+
+Neither is load-bearing, so `applyFxLevel()` (`src/util.js`) turns both off on iOS by default.
+`?fx=full` forces them back on, `?fx=lite` forces them off, the level is logged at boot, and
+the map passes its level into the battle frame so the fight inherits it. **That makes a crash
+bisectable on the actual phone in one reload** rather than arguable.
+
+`will-change:filter` was also removed from `#map`: a filter already promotes the element to
+its own layer, so the hint bought nothing and cost a permanent full-size backing store for the
+largest element on the page.
+
 ## The rules about MS and EC
 
 **The map is where you are whole.** Mental Stamina only moves during a ride, so standing on

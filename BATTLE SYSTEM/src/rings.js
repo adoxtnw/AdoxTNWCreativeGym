@@ -183,8 +183,12 @@ function refreshEnemyShape(){
      it. The sprite is drawn at its own resolution and DISPLAYED larger, which is
      also the only way a boss can overhang the arena — which is the point of it
      being bigger. */
-  const wrap=document.querySelector(".sprwrap");
-  if(wrap) wrap.style.setProperty("--esc", (S.enemy.scale||1).toFixed(3));
+  /* SET ON THE HOLDER so it INHERITS to both children. `.sprwrap` needs it to
+     size itself and `.personaname` needs it to know how far the entity now
+     overhangs upward — and the name is a sibling of the sprite, not a child, so
+     a property set on the sprite would never reach it. */
+  const holder=document.querySelector(".enemyholder") || document.querySelector(".sprwrap");
+  if(holder) holder.style.setProperty("--esc", (S.enemy.scale||1).toFixed(3));
 }
 const P_CFG={baseR:RULES.playerRingBaseR, spacing:RULES.playerRingSpacing, breathe:RULES.playerRingBreathe};
 let t=0, frozen=false, timer=null, glowCache={};

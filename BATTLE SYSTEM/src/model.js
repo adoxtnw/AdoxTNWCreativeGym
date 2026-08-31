@@ -63,6 +63,11 @@ function makeUnit(id){
        long sink. It is on the unit so all six of them inherit the behaviour
        from one cell each, rather than from a list of ids somewhere in here. */
     role:r.role || "", scale:Number(r.scale) > 0 ? Number(r.scale) : 1,
+    /* HOW IT DECIDES, as opposed to what it can do. The column has existed since
+       the sheet did and nothing read it, so every enemy in the game shared one
+       brain — which is fine until an enemy's whole idea is that it fights
+       differently. See buildEnemyLine(). */
+    aiProfile:r.ai_profile || "GREEDY_MAX_DAMAGE",
     phase2:false, phaseBusy:false,
     themeOpening:r.theme_opening || "", themeLoop:r.theme_loop || "",
     theme2Loop:r.theme2_loop || "",

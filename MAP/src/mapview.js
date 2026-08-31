@@ -800,6 +800,7 @@ function pump(now){
     if((frame % 60) === 0) CityBar.render();
     MenuGauge.step();                   /* the card's bar, only while it is up */
     RideGauge.step();                   /* and the ride's, only while riding */
+    Baggage.step();                     /* and the bag's prisms, only while open */
     journeyStep();                        /* the whole ride runs on this clock */
     if(liveStates || cityLive() || objectivesLive() || J.phase === "IDLE") dirty = true;
   }

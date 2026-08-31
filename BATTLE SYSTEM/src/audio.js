@@ -160,7 +160,24 @@ function loadMusic(pair){
   return musicLoad;
 }
 
-/* file:// fallback — audible seam at the handoff, but it plays. */
+/* ---- STREAMED, NOT DECODED ------------------------------------------------
+   Also the file:// fallback, but it is the PRIMARY path for any track that has
+   no opening to seam to — see startMusic().
+
+   `decodeAudioData` holds the whole track in memory as Float32 PCM, and that is
+   a far bigger number than the file size suggests: 44100 samples x 2 channels x
+   4 bytes is 337 KB per second, so the four tracks in this game come to 134 MB
+   decoded. The Line Manager's two alone are 105 MB of it. An <audio> element
+   streams and holds a small buffer instead, which is the difference between a
+   fight that plays and a WebContent process that is killed for memory on a
+   phone.
+
+   LEVELS. Element volume is capped at 0..1, so a streamed track cannot be
+   lifted by `musicVolume` (1.6) the way a decoded one is. The two streamed
+   tracks are therefore mastered to where the decoded theme ENDS UP — busy RMS
+   -15.5 dBFS, which is -19.6 plus that 1.6x — so the two paths match by
+   construction rather than by a gain applied at one end only. Re-measure and
+   re-derive if either is replaced. */
 function startMusicEls(pair){
   const b=new Audio(pair.loop);
   /* Element volume is restricted to 0..1; the Web Audio gain may exceed 1. */
@@ -192,6 +209,13 @@ async function startMusic(){
   musicBus.connect(cleanBus);          // recorded audio bypasses the crusher
   musicOn=true;
   const pair=themeNow();
+  /* NO SEAM TO HIT, NO REASON TO DECODE. Decoding buys exactly one thing: the
+     ability to schedule the loop on the audio clock at `t0 + opening.duration`,
+     sample-accurately, so the two halves of the original theme meet without a
+     click. A track handed over as ONE file has no such join, and paying 69 MB
+     of resident PCM for a gapless transition that does not exist is how a phone
+     runs out of memory in the middle of a boss fight. */
+  if(!pair.opening){ startMusicEls(pair); return; }
   const bufs=await loadMusic(pair);
   if(!musicOn) return;                       // stopped while it was still decoding
   if(!bufs){ startMusicEls(pair); return; }

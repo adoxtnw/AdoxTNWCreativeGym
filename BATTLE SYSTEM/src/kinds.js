@@ -202,6 +202,35 @@ Kinds.define("FEED", {
   }
 });
 
+/* ---------- HEAL: take your own stamina back ----------
+   The mirror of FEED, and it needed to be its own kind rather than a reused one:
+   FEED heals the OPPONENT, because it is a punishment the Overload forces into
+   your line. This heals whoever played it.
+
+   `power` is the amount, the same way it is for every other kind here — shield
+   charges, grown layers, charge gained. The sheet has a `heal` column as well
+   and it is still marked planned; using it would have made this the one ability
+   in the game whose magnitude lives in a different cell from everybody else's.
+
+   CLAMPED TO MaxMS, which is not merely tidiness: MS is also the ceiling the
+   player's Emotional Charge has to stay under, so a heal that overshot would
+   quietly hand out headroom the armor never granted. */
+Kinds.define("HEAL", {
+  project({A, ab}){ A.ms = Math.min(A.msMax ?? Infinity, A.ms + ab.power); },
+  async run({actor, ab, onEnemy}){
+    const healed = Math.min(ab.power, actor.maxMs - actor.ms);
+    actor.ms += healed;
+    if(healed > 0) queueDelta(actor, "MS", healed);
+    AbilityFx.play("hit", {ab, actor, target: actor});
+    /* the same mint FEED tags a heal in — what colour "you got stamina back" is
+       should not depend on which ability did it */
+    unitTag(actor, healed > 0 ? "+" + healed + " MS" : "ALREADY WHOLE", "#b0ffe1");
+    sfx("regrow");
+    renderStats();
+    await sleep(460);
+  }
+});
+
 /* ---------- ADDLAYER: grow yourself another layer ----------
    Grown layers are TEMPORARY (`temp`): breakLayer never files them into `broken`,
    so once they are gone they never come back. */

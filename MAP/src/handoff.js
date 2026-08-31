@@ -66,7 +66,15 @@ const BattleFrame = {
          fighting whom. */
       /* resolved at load; `.then` rather than `await` because `open()` is not
          async and the frame is appended below either way */
-      battleURLReady.then(() => { f.src = battleURL("index.html", "?handoff=1"); });
+      /* THE QUALITY LEVEL CROSSES THE BOUNDARY TOO. The frame is its own
+         document, so it runs its own `applyFxLevel()` and would otherwise fall
+         back to the iOS default no matter what the map was told — which makes
+         `?fx=full` on the map a half-measure and bisecting a crash on a phone
+         confusing. Whatever this document settled on, the fight inherits. */
+      const fx = document.documentElement.dataset.fx;
+      battleURLReady.then(() => {
+        f.src = battleURL("index.html", "?handoff=1" + (fx ? "&fx=" + fx : ""));
+      });
       this.el = f;
       $("screen").appendChild(f);
 

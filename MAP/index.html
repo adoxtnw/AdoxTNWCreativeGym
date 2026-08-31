@@ -57,6 +57,11 @@
 
      <button class="endbtn bigbtn pxr hudbtn" id="endRide">END</button>
      <button class="bagbtn bigbtn pxr hudbtn" id="bagBtn">BAGGAGE</button>
+     <!-- The catch, as a SIBLING of the button rather than inside it: `.pxr`
+          cuts the button's corners with clip-path, which clips its box-shadow
+          AND its pseudo-elements away, so a flare drawn on the button itself
+          is a flare nobody sees. Same fix the menu button's ring needed. -->
+     <i class="bagflare" id="bagFlare"></i>
      <div class="baggage" id="baggage"></div>
 
      <!-- GDD 4: where this leg is going and how much of it is bridged -->

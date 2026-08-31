@@ -147,8 +147,16 @@ function rollAggro(tier){
    still the baseline; a tier scales it, so retuning the element retunes all
    three at once. */
 function tierSize(base, tier){
-  const k = tier === "WEAK"   ? num(RULES.rideScaleWeak, 0.72)
-          : tier === "STRONG" ? num(RULES.rideScaleStrong, 1.45) : 1;
+  /* TWO SCALES, AND THEY ARE ABOUT DIFFERENT THINGS. The tier numbers are
+     ratios BETWEEN enemies — a weak one against a strong one — and retuning
+     them is a statement about the roster. `rideEnemyScale` is the size of the
+     whole family against the crystals and segments sharing the window with
+     them, and it is what makes an entity read as a creature rather than as one
+     more piece of debris drifting past. Kept apart so raising one does not
+     silently flatten the other. */
+  const k = (tier === "WEAK"   ? num(RULES.rideScaleWeak, 0.72)
+           : tier === "STRONG" ? num(RULES.rideScaleStrong, 1.45) : 1)
+          * num(RULES.rideEnemyScale, 1);
   return Math.max(4, Math.round(base * k));
 }
 
@@ -284,6 +292,12 @@ function spawnElement(id){
     /* which way an enemy's silhouette turns. Two on screen turning in lockstep
        read as one sprite drawn twice. */
     rspinDir: Math.random() < 0.5 ? -1 : 1,
+    /* WHERE IT HAS BEEN. Sampled on a timer rather than per frame (see
+       `stepElementsSmooth`), so the trail is the same LENGTH whatever the frame
+       rate — at 60 fps a per-frame history would pile every ghost inside one
+       body and read as a smudge, and on a slow phone the same number would
+       stretch halfway across the window. */
+    trail: [], trailAt: 0,
     seed: Math.random(),
     sway: 0.4 + Math.random() * 0.9,
     state: "LIVE",
@@ -333,7 +347,17 @@ function stepElementsSmooth(dt){
   if(J.phase !== "RIDING" && J.phase !== "ANNOUNCE") return;
   dt = Math.min(dt, 100);              /* a background tab must not teleport them */
   const k = dt / STEP;                 /* how much of a 12 fps frame this was */
-  const bar = tripBarTip(), purse = {x: 10, y: H - 8};
+  /* WHERE A COLLECTED THING GOES, and it is a different place for each kind
+     now. Everything used to arc to one arbitrary point in the bottom-left
+     corner where nothing whatsoever was drawn — a "purse" that did not exist.
+     A thing you catch should travel to the thing it becomes: a segment to the
+     trip bar, a crystal to the bag it is banked in, and stamina or charge to
+     the bars they are added to. The rects are read ONLY while something is
+     actually in the air, so an ordinary frame costs no layout. */
+  const bar = tripBarTip();
+  const flying = Trip.live.some(el => el.state === "FLY");
+  const purse = flying ? domTarget("bagBtn",    {x: W - 18, y: H - 14}) : null;
+  const gauge = flying ? domTarget("rideStats", {x: W / 2,  y: H - 10}) : null;
   const t = performance.now();
   stepTripBar(dt);
 
@@ -344,7 +368,9 @@ function stepElementsSmooth(dt){
     if(el.state === "FLY"){
       el.fly += dt;
       /* segments climb into the trip bar; loot and crystals drop into the purse */
-      const tgt = el.e.kind === "SEGMENT" ? bar : purse;
+      const tgt = el.e.kind === "SEGMENT" ? bar
+                : el.e.kind === "CRYSTAL" ? purse
+                : gauge;
       const p = ease(Math.min(1, el.fly / 260));
       el.x = lerp(el.fx, tgt.x, p);
       el.y = lerp(el.fy, tgt.y, p);
@@ -359,6 +385,12 @@ function stepElementsSmooth(dt){
           sfx("map_tripup");
         }else sfx("map_collect", el.e.kind === "ENERGY" ? 1.35
                                 : el.e.kind === "ORB" ? 0.8 : 1);
+        /* THE BAG HAS TO ANSWER. A crystal that flies to a button and lands on
+           nothing reads as the animation having missed — the destination has to
+           acknowledge the arrival, and in the emotion's own colour, because
+           WHICH crystal it was is the only thing the flight did not already
+           say. */
+        if(el.e.kind === "CRYSTAL") bagCatch(J.line && J.line.emotion);
         payOut(el);
         Trip.live.splice(i, 1);
         /* filling the bar is what actually ends the ride */
@@ -378,6 +410,19 @@ function stepElementsSmooth(dt){
     el.y += J.speed * num(el.e.drift, 1) * k;
     el.x += Math.sin(t * 0.0016 + el.seed * 6.3) * el.sway * 0.6 * k;
 
+    /* ONLY ENEMIES LEAVE ONE. A crystal or a segment is an object in the
+       carriage with you; an entity is something moving THROUGH it, and the
+       smear is most of what says so. Recorded here rather than in the painter
+       because the painter runs on the 12 fps clock and this is the position
+       that moves at 60. */
+    if(el.aggro !== undefined && isEnemyKind(el.e.kind) && num(RULES.enemyTrail, 0) > 0){
+      if(t - el.trailAt >= num(RULES.enemyTrailMs, 55)){
+        el.trailAt = t;
+        el.trail.push({x: el.x, y: el.y});
+        while(el.trail.length > num(RULES.enemyTrail, 5)) el.trail.shift();
+      }
+    }
+
     /* A COLLECTABLE LEAVES BY THE BOTTOM EDGE, NEVER BY EXPIRING. Its lifetime
        is a safety net for something that somehow stops moving, not a timer —
        a segment that dissolves mid-screen is one the player was still reaching
@@ -387,6 +432,49 @@ function stepElementsSmooth(dt){
     if(gone) Trip.live.splice(i, 1);
   }
 }
+/* A HUD ELEMENT'S CENTRE, IN THE TRAVEL SCREEN'S OWN PIXELS. The panels are DOM
+   and the elements are drawn into a buffer at `PX` screen pixels each, so a
+   flight that ends on a button has to cross between the two — and it has to
+   cope with the button not being on screen at all, which is every phase but
+   this one. The fallback is roughly where the control would be. */
+function domTarget(id, fallback){
+  const el = $(id), sc = $("screen");
+  if(!el || !sc) return fallback;
+  const r = el.getBoundingClientRect();
+  if(!r.width || !r.height) return fallback;
+  const sr = sc.getBoundingClientRect();
+  return {x: (r.left + r.width / 2 - sr.left) / PX,
+          y: (r.top  + r.height / 2 - sr.top ) / PX};
+}
+
+/* The BAGGAGE button flaring in the colour of what just landed in it. */
+function bagCatch(emotion){
+  const b = $("bagBtn"); if(!b) return;
+  const e = EMOTIONS[emotion];
+  b.style.setProperty("--catch", e ? e.hex : "#f4efe4");
+  b.classList.remove("caught");
+  void b.offsetWidth;                       /* restart the animation, not queue it */
+  b.classList.add("caught");
+  /* the ring, on its own unclipped layer over the button — see .bagflare */
+  const f = $("bagFlare"), sc = $("screen");
+  if(f && sc){
+    /* laid over the button exactly, wherever it currently is — it rides higher
+       whenever the MS/EC bars are up, and it is sized by its own text */
+    const br = b.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    f.style.left   = (br.left - sr.left) + "px";
+    f.style.top    = (br.top  - sr.top ) + "px";
+    f.style.width  = br.width  + "px";
+    f.style.height = br.height + "px";
+    f.style.setProperty("--catch", e ? e.hex : "#f4efe4");
+    f.classList.remove("on"); void f.offsetWidth; f.classList.add("on");
+  }
+  clearTimeout(bagCatch._t);
+  bagCatch._t = setTimeout(() => {
+    b.classList.remove("caught");
+    if(f) f.classList.remove("on");
+  }, 820);
+}
+
 const collectable = el => el.e.kind === "SEGMENT" || el.e.kind === "CRYSTAL" ||
                           el.e.kind === "ORB" || el.e.kind === "ENERGY";
 
@@ -493,41 +581,57 @@ ElementFx.define("SEGMENT", {
    line, because the crystal you carry off a stretch of track is the colour of
    that track. Rotation is on `frame`: the shape turns at 12 fps while the whole
    prism travels at sixty. */
+/* ---- THE PRISM, DEFINED ONCE ------------------------------------------------
+   The rotating crystal is drawn in two places now — floating past on the ride,
+   and spinning on its own chip in the Baggage panel — and it has to be the SAME
+   OBJECT in both. A second, hand-made "crystal icon" for the menu would drift
+   from this one the first time either was touched, and the player would be
+   collecting one thing and looking at another.
+
+   So the shape is a function of an angle and a colour, and it hands its pixels
+   to whoever asked. The ride passes `blendPx` and paints into the frame buffer;
+   the Baggage chip passes a canvas writer. Neither knows about the other.
+
+   THREE VALUES, NOT TWO. A prism only reads as a solid if the faces are far
+   apart in brightness — a lit face, a shaded one, and a hard bright seam where
+   they meet. Two similar tints just look like a pill.                        */
+function gemPixels(h, ang, col, put){
+  const w = h * 0.66;
+  const c = Math.cos(ang), sn = Math.sin(ang);
+  const lit  = mix(col, 1.65);
+  const dark = mix(col, 0.34);
+  const edge = [255, 255, 255];
+  const seam = w * c;                          /* where the faces meet */
+
+  for(let dy = -h; dy <= h; dy++){
+    const k = Math.abs(dy) / h;
+    /* a gem: shoulders near the middle, tapering to points */
+    const half = w * (k < 0.34 ? 1 : 1 - ((k - 0.34) / 0.66) * 0.92);
+    if(half < 0.4) continue;
+    for(let dx = -half; dx <= half; dx++){
+      let cpx;
+      if(Math.abs(dx - seam) < 0.85) cpx = edge;          /* the ridge */
+      else if(dx < seam) cpx = dark;
+      else cpx = lit;
+      /* the outermost pixel of each row is the facet's rim */
+      if(Math.abs(Math.abs(dx) - half) < 0.7) cpx = dx < seam ? mix(col, 0.7) : edge;
+      put(dx, dy, cpx, 1);
+    }
+  }
+  /* a glint that catches once per turn, so the rotation is legible even when
+     the prism is small on screen */
+  if(sn > 0.78){
+    put(1, -h + 2, edge, 1);
+    put(2, -h + 2, edge, 0.6);
+  }
+}
+
 ElementFx.define("CRYSTAL", {
   draw(el, col){
-    const a = elAlpha(el), h = el.size / 2, w = h * 0.66;
-    const ang = el.spin + frame * 0.26;
-    const c = Math.cos(ang), sn = Math.sin(ang);
-    /* THREE VALUES, NOT TWO. A prism only reads as a solid if the faces are
-       far apart in brightness — a lit face, a shaded one, and a hard bright
-       seam where they meet. Two similar tints just look like a pill. */
-    const lit  = mix(col, 1.65);
-    const dark = mix(col, 0.34);
+    const a = elAlpha(el), white = el.flash > 0;
     const edge = [255, 255, 255];
-    const seam = w * c;                          /* where the faces meet */
-    const white = el.flash > 0;
-
-    for(let dy = -h; dy <= h; dy++){
-      const k = Math.abs(dy) / h;
-      /* a gem: shoulders near the middle, tapering to points */
-      const half = w * (k < 0.34 ? 1 : 1 - ((k - 0.34) / 0.66) * 0.92);
-      if(half < 0.4) continue;
-      for(let dx = -half; dx <= half; dx++){
-        let cpx;
-        if(Math.abs(dx - seam) < 0.85) cpx = edge;          /* the ridge */
-        else if(dx < seam) cpx = dark;
-        else cpx = lit;
-        /* the outermost pixel of each row is the facet's rim */
-        if(Math.abs(Math.abs(dx) - half) < 0.7) cpx = dx < seam ? mix(col, 0.7) : edge;
-        blendPx(el.x + dx, el.y + dy, white ? edge : cpx, a);
-      }
-    }
-    /* a glint that catches once per turn, so the rotation is legible even when
-       the prism is small on screen */
-    if(sn > 0.78){
-      blendPx(el.x + 1, el.y - h + 2, edge, a);
-      blendPx(el.x + 2, el.y - h + 2, edge, a * 0.6);
-    }
+    gemPixels(el.size / 2, el.spin + frame * 0.26, col,
+      (dx, dy, cpx, k) => blendPx(el.x + dx, el.y + dy, white ? edge : cpx, a * k));
   },
   tap(el){
     if(el.state !== "LIVE") return false;
@@ -645,7 +749,52 @@ function tierShapeF(tier, spin){
                                      num(RULES.enemyStarInner, 0.62));
   return null;                          /* REGULAR keeps the round body */
 }
+/* ---- THE SMEAR IT LEAVES ----------------------------------------------------
+   Ghosts of where the body was, oldest and faintest first, each a little
+   smaller than the last. Drawn as the SILHOUETTE rather than as the full body:
+   a trail made of eyes and facets reads as several enemies, and what it is
+   supposed to say is that there is one enemy and it is moving.
+
+   Cheap on purpose — a filled shape per ghost, no wobble and no per-row edge
+   work — because this runs for every enemy on screen every frame and the whole
+   point of the ride is that it stays smooth enough to catch things on. */
+function drawEnemyTrail(el, col){
+  const n = el.trail.length; if(!n) return;
+  const a = elAlpha(el), fade = num(RULES.enemyTrailFade, 0.42);
+  const f = tierShapeF(el.tier, frame * num(RULES.enemyShapeSpin, 0.018) * el.rspinDir);
+  /* A WAKE, NOT A STRICT HISTORY. An entity drifts at less than half the track's
+     speed and runs PARALLEL to it, so five true past positions span about seven
+     pixels — which draws a halo around the body rather than a tail behind it,
+     and says "this thing is blurry" instead of "this thing is moving". So each
+     ghost is also pushed BACK along the direction of travel in proportion to its
+     age. The recorded positions still carry the sway, so the tail bends the way
+     the creature swam; the push is what gives it length.
+
+     `enemyTrailSpread` is that push, as a fraction of the body per step, which
+     keeps a weak dart's wake in proportion to a strong one's. */
+  const spread = el.size * num(RULES.enemyTrailSpread, 0.34);
+  for(let i = 0; i < n; i++){
+    /* index 0 is the OLDEST, so it is the faintest, the smallest and the
+       furthest back */
+    const k = (i + 1) / n;
+    const ghost = a * fade * k * k;
+    if(ghost < 0.03) continue;
+    const g = el.trail[i], h = (el.size / 2) * (0.34 + 0.58 * k);
+    const back = (n - i) * spread;          /* elements travel DOWN the window */
+    const c = mix(col, 0.55 + 0.35 * k);
+    const R = Math.ceil(h) + 1;
+    for(let dy = -R; dy <= R; dy++)
+      for(let dx = -R; dx <= R; dx++){
+        const p = Math.hypot(dx, dy); if(p > R) continue;
+        const reach = f ? h * f(Math.atan2(dy, dx)) : h;
+        if(p > reach) continue;
+        blendPx(g.x + dx, g.y - back + dy, c, ghost);
+      }
+  }
+}
+
 function drawEnemyBody(el, col){
+  drawEnemyTrail(el, el.col || col);
   const a = elAlpha(el), s = el.size, h = s / 2;
   const t = frame * 0.3 + el.seed * 6.3;
   const white = el.flash > 0;

@@ -92,7 +92,11 @@ body{background:#000; color:var(--ink);
    whole frame to re-composite. */
 #map{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   image-rendering:pixelated; display:block;
-  filter:url(#mapWave); will-change:filter}
+  filter:url(#mapWave)}
+/* `will-change:filter` was here and has been removed. A filter already promotes
+   the element to its own layer, so the hint bought nothing — and what it cost
+   was a permanent full-size backing store for the largest element on the page,
+   held whether or not anything was animating. */
 
 /* ---- HUD: ordinary CSS text, the way the battle HUD does it ---- */
 .hud{position:absolute; inset:0; pointer-events:none}
@@ -804,55 +808,135 @@ button{text-transform:inherit; letter-spacing:inherit}
   opacity:0; pointer-events:none; transition:opacity .15s steps(2)}
 .bagbtn.show{opacity:1; pointer-events:auto}
 
+/* THE BUG THAT MADE THIS PANEL A TRAP. `.hud` is `pointer-events:none` so the
+   map underneath stays draggable, and every panel in it has to opt back in —
+   `.peek` and `.dilemma` do, on one shared line, and this one never did. The
+   close button's listener was there and correct the whole time; the tap simply
+   went through the panel to the map behind it. Once open, it could not be
+   closed by any means. Same omission as the tooltip veil, in a place where it
+   cost far more. */
 .baggage{position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
+  pointer-events:auto;
   background:rgba(10,8,7,.93);
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px)}
 .baggage.show{display:flex}
 .bhead{display:flex; align-items:center; gap:10px; padding:14px 12px;
   border-bottom:5px solid transparent;
   border-image:var(--ride,linear-gradient(90deg,#5c5348,#5c5348)) 1;
-  box-shadow:0 5px 0 rgba(6,4,14,.55)}
+  box-shadow:0 5px 0 rgba(6,4,14,.55); flex:none}
 .bhead .sym{width:26px; height:26px; color:var(--mint); flex:none}
 .bhead b{font-size:22px; letter-spacing:.16em; color:#fff;
   text-shadow:2px 2px 0 rgba(6,4,14,.85)}
-.bhint{flex:1; font-size:11px; color:var(--rose); text-transform:none}
-.bwrap{flex:1; display:flex; gap:10px; padding:12px; min-height:0}
-/* the grid is the point: one cell per thing, so a full bag LOOKS full */
-.bgrid{flex:1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
-  grid-auto-rows:88px; gap:8px; align-content:start; overflow-y:auto; min-height:0}
-.bcell{position:relative; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:5px; padding:6px;
-  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
-  box-shadow:inset 0 0 0 3px var(--emo,var(--line));
-  filter:drop-shadow(3px 3px 0 rgba(6,4,14,.8))}
-.bcell.empty{background:rgba(0,0,0,.3);
-  box-shadow:inset 0 0 0 2px #2f2a24; filter:none}
-.bcell .sym{width:30px; height:30px}
-.bname{font-size:10px; text-align:center; line-height:1.25; color:var(--ink)}
-.bx{position:absolute; right:4px; top:3px; font-size:13px; color:var(--mint)}
-/* the trip bar and the purse, down the side */
-.bside{flex:none; width:104px; display:flex; flex-direction:column; gap:10px}
-.bseg{--r1:3px; --r2:6px;
-  display:flex; flex-direction:column; align-items:center; gap:6px; padding:9px 6px;
-  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
-  box-shadow:inset 0 0 0 3px #0b0a08;
-  filter:drop-shadow(3px 3px 0 rgba(6,4,14,.8))}
-.bseg small{font-size:9px; color:var(--muted); letter-spacing:.08em; text-align:center}
-.bseg b{font-size:17px; color:var(--mint)}
-.bbar{position:relative; width:26px; height:96px; background:#100e0c;
+.bhint{flex:1; min-width:0; font-size:9px; line-height:1.3; color:var(--rose);
+  text-transform:none}
+
+/* THE BARS STAY ON. `.ridestats` is a sibling that lives at the bottom edge, and
+   this panel used to cover it — so opening the bag to decide whether to take one
+   more enemy hid the two numbers the decision is made on. The strip is lifted
+   above the panel and the panel is given room to end above it, which reads as
+   the bars being part of the bag rather than as something on top of it. */
+.bscroll{flex:1; min-height:0; overflow-y:auto; padding:12px 12px 96px;
+  display:flex; flex-direction:column; gap:12px}
+
+/* the trip, as one horizontal readout rather than a column down the side */
+.bseg{display:flex; align-items:center; gap:9px; flex:none}
+.bseg small{font-size:9px; color:var(--muted); letter-spacing:.10em; flex:none}
+.bseg b{font-size:15px; color:var(--mint); flex:none}
+.bbar{position:relative; flex:1; height:14px; background:#100e0c;
   box-shadow:inset 0 0 0 2px var(--line)}
-.bbar i{position:absolute; left:0; right:0; bottom:0; display:block;
-  background:linear-gradient(180deg,#eafff6,var(--mint) 62%,#6fbfa2)}
-.bcrys{display:grid; grid-template-columns:1fr 1fr; gap:6px}
-.bcry{--r1:2px; --r2:4px;
-  display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px;
+.bbar i{position:absolute; left:0; top:0; bottom:0; display:block;
+  background:linear-gradient(90deg,#6fbfa2,var(--mint) 62%,#eafff6)}
+
+/* ONE ROW, six fixed positions. Reading a purse should not mean reading words:
+   the same emotion is always in the same place, so what you have is a shape
+   rather than a list. They shrink rather than wrap — a purse that reflows to two
+   rows when one number reaches double figures is a purse that moves about. */
+.bcrys{display:flex; gap:5px; flex:none}
+.bcry{--r1:2px; --r2:4px; flex:1 1 0; min-width:0;
+  display:flex; flex-direction:column; align-items:center; gap:1px; padding:7px 2px 5px;
   background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
   box-shadow:inset 0 0 0 2px var(--emo,#0b0a08);
   filter:drop-shadow(2px 2px 0 rgba(6,4,14,.75))}
-.bcry .dot{width:12px; height:12px; box-shadow:2px 2px 0 rgba(6,4,14,.7);
-  animation:gfloat 2.6s steps(31) infinite alternate; animation-delay:var(--fd,0s)}
-.bcry b{font-size:15px; color:var(--ink)}
-.bcry small{font-size:8px; color:var(--muted)}
+/* an emotion you are carrying none of is still SHOWN, and still in its place —
+   just dimmed, so the eye skips it without having to count gaps */
+.bcry.none{opacity:.38; filter:none}
+.bcry canvas.gem{width:22px; height:33px; display:block; image-rendering:pixelated;
+  filter:drop-shadow(0 0 5px var(--emo,#0b0a08))}
+.bcry b{font-size:15px; color:var(--ink); line-height:1.1}
+.bcry small{font-size:7px; color:var(--muted); letter-spacing:.04em;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.bsec{flex:none; font-size:9px; letter-spacing:.20em; color:var(--rose);
+  padding-top:2px; border-top:2px solid #2f2a24; padding-top:9px}
+/* A LIST, NOT A GRID. A grid of cells answers "how full is the bag"; a list
+   answers "what exactly is in it and how many", which is the question worth
+   asking about things you are about to roll for one at a time. */
+.bitems{display:flex; flex-direction:column; gap:6px}
+.bitem{--r1:2px; --r2:4px; display:flex; align-items:center; gap:10px;
+  padding:8px 10px;
+  background:linear-gradient(180deg,var(--panelHi),var(--panel) 60%,#1d1a16);
+  box-shadow:inset 3px 0 0 var(--emo,var(--line)),
+             inset 0 0 0 2px rgba(244,239,228,.07);
+  filter:drop-shadow(2px 2px 0 rgba(6,4,14,.7))}
+.bitem .sym{width:22px; height:22px; flex:none; color:var(--emo,var(--ink));
+  filter:drop-shadow(0 0 4px var(--emo,transparent))}
+.bitem .sym svg{width:100%; height:100%; display:block}
+.bitem .bname{flex:1; min-width:0; font-size:11px; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.bitem .bx{font-size:13px; color:var(--mint); flex:none}
+.bempty{font-size:10px; line-height:1.6; color:var(--muted);
+  text-transform:none; letter-spacing:.02em}
+
+/* THE BAG ANSWERS WHEN SOMETHING LANDS IN IT, in the colour of what landed —
+   which is the one thing the flight itself could not say.
+
+   IN TWO PIECES, AND FOR A REASON. The button itself takes the colour and
+   brightens, which is unmissable and needs nothing but the button. The RING is
+   a separate element sitting over it, because `.bagbtn` wears `.pxr` — corners
+   cut with `clip-path` — and a clip-path clips the element's box-shadow and its
+   pseudo-elements away with everything else outside the path. A glow drawn on
+   the button is a glow that is never rendered. `#screen` is `overflow:hidden`
+   too, and the button sits flush against its right edge, so half of any soft
+   halo would be cut off even if it did draw.
+
+   So the ring is a hard expanding outline rather than a blur — which suits this
+   art far better in any case — and it carries a WHITE core as well as the
+   emotion's colour. A red ring on the red line's travel scene is invisible; the
+   white is what guarantees it reads whatever line you are riding. */
+/* POSITIONED IN JS, from the button's own rect. The button moves — it sits
+   higher whenever the ride bars are up — and it is sized by its own text, so
+   anchoring this to the same corner put the ring's centre on the button's
+   CORNER and threw most of it off the edge of the screen. The one place that
+   knows exactly where the button is, is the button. */
+.bagflare{position:absolute; z-index:5; display:none; pointer-events:none}
+.bagflare.on{display:block}
+/* two rings leaving at different rates, so it reads as a burst rather than as
+   one circle being scaled */
+.bagflare::before,.bagflare::after{content:""; position:absolute; inset:0;
+  border:5px solid var(--catch,#fff);
+  box-shadow:0 0 0 2px rgba(255,255,255,.95) inset,
+             0 0 0 2px rgba(255,255,255,.55),
+             0 0 16px var(--catch,#fff);
+  animation:bagring 660ms steps(7) 1 both}
+.bagflare::after{animation-delay:120ms; border-width:3px}
+/* IT LEAVES THE BUTTON AT FULL STRENGTH AND FADES ONLY AFTERWARDS. Ramping the
+   opacity from the first frame meant its brightest moment was the one where it
+   was still the size of the button and hidden behind it, and by the time it was
+   large enough to see it was down to two fifths. Now the loud half of the
+   animation happens where there is room for it. */
+@keyframes bagring{
+  0%  {transform:scale(.95); opacity:1}
+  45% {transform:scale(1.9); opacity:1}
+  100%{transform:scale(2.7); opacity:0}}
+
+.bagbtn.caught{animation:bagcatch 780ms steps(9) 1}
+@keyframes bagcatch{
+  0%  {background:var(--catch,#f4efe4); filter:brightness(1)}
+  14% {background:var(--catch,#f4efe4); filter:brightness(2) saturate(1.6);
+       transform:scale(1.16)}
+  46% {background:var(--catch,#f4efe4); filter:brightness(1.45) saturate(1.3);
+       transform:scale(1.05)}
+  100%{filter:brightness(1); transform:scale(1)}}
 
 /* =====================================================================
    MOTION IN THE MENU
@@ -968,9 +1052,14 @@ button{text-transform:inherit; letter-spacing:inherit}
    decision it informs is being made: is there enough left to take this
    enemy, or is it worth catching one more orb first.
    ===================================================================== */
-.ridestats{position:absolute; left:0; right:0;
+/* ABOVE THE BAGGAGE PANEL (z 6), not under it. The bag used to cover this
+   strip, so opening it to decide whether to take one more enemy hid the two
+   numbers that decision is made on. It is the only thing in the HUD that is
+   worth reading while something else is open, and `.bscroll` leaves room for it
+   so the panel ends above the bars rather than running under them. */
+.ridestats{position:absolute; left:0; right:0; z-index:7;
   bottom:calc(4px + env(safe-area-inset-bottom,0px));
-  z-index:4; display:none; padding:0 10px 2px; pointer-events:none}
+  display:none; padding:0 10px 2px; pointer-events:none}
 .ridestats.show{display:block}
 /* the ground behind it, so the bar reads over a moving track */
 .ridestats::before{content:""; position:absolute; inset:-6px 0 -10px;
@@ -1112,3 +1201,22 @@ button{text-transform:inherit; letter-spacing:inherit}
 .peek .objline.entity .objtag{animation:objblink 900ms steps(2) infinite}
 @keyframes objblink{0%{opacity:1} 55%{opacity:.4} 100%{opacity:1}}
 .peek .objline.treasure .objtag{color:#f2c14e}
+
+
+/* =====================================================================
+   LITE — what is not drawn on a device that cannot afford it
+   See applyFxLevel() in src/util.js for why, and for the ?fx= switch.
+   ===================================================================== */
+/* The swim: an ANIMATED feTurbulence over the whole upscaled canvas, and by a
+   long way the most expensive thing on the page. The map is completely legible
+   without it. */
+html[data-fx="lite"] #map{filter:none}
+/* The frosted panels: `backdrop-filter` over a live canvas re-blurs the entire
+   frame underneath for as long as the panel is open. Without it they simply
+   need to be opaque instead of translucent, which they very nearly are already. */
+html[data-fx="lite"] .menu{
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  background:rgba(9,7,6,.97)}
+html[data-fx="lite"] .baggage{
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  background:rgba(9,7,6,.985)}

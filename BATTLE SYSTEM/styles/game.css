@@ -558,7 +558,26 @@ body{background:var(--void); color:var(--ink);
 .phone{background:linear-gradient(180deg,#08080c 0%,#100e1c 30%,#171331 62%,var(--dark) 100%)}
 /* ---------- enemy: hovers, and lights the floor beneath it ---------- */
 .enemyholder{position:relative; display:flex; align-items:center; justify-content:center}
-@keyframes hover{from{transform:translateY(7px)} to{transform:translateY(-15px)}}
+/* THE SIZE HAS TO BE IN HERE, and that is the whole bug behind three rounds of
+   "make the boss bigger".
+
+   `transform` is ONE property. `.sprwrap` carries a static
+   `transform:scale(var(--esc))` for the boss size, and it also runs this
+   animation — and a running animation does not compose with the static
+   declaration, it REPLACES it. So the computed transform was
+   `matrix(1,0,0,1,0,2.4)`: the bob, at scale 1. `--esc` was being set correctly
+   to 1.5 the entire time and had no effect on anything, which is exactly why it
+   kept looking like it had not been done.
+
+   The scale is therefore written into both ends of the bob. It is a constant
+   for the length of the animation, so this only ever multiplies the hover; and
+   it stays on `.sprwrap` rather than moving to the canvases inside, because
+   `getBoundingClientRect()` on this element is what positions the speech
+   bubble's tail and sizes the falling rings in `enemyCollapse()` — scaling the
+   children would have made the box lie about how big the entity is. */
+@keyframes hover{
+  from{transform:translateY(7px)  scale(var(--esc,1))}
+  to  {transform:translateY(-15px) scale(var(--esc,1))}}
 .floorwrap{position:absolute; inset:0; opacity:0; transition:opacity .9s ease; pointer-events:none; z-index:-1}
 .floorwrap.lit{opacity:1}
 .floorlight{position:absolute; left:50%; bottom:-30px; width:78%; height:26px; pointer-events:none;
@@ -825,7 +844,15 @@ body{background:var(--void); color:var(--ink);
   border-left:10px solid transparent; border-right:10px solid transparent;
   border-bottom:13px solid var(--c)}
 /* ---------- the persona's name, hanging over the enemy ---------- */
-.personaname{position:absolute; left:50%; top:-30px; white-space:nowrap; z-index:4;
+/* PUSHED CLEAR OF AN OVERSIZED ENTITY. The sprite scales about its own centre,
+   so a boss at 1.5x grows half its height upward — 47px on a phone — and walked
+   straight over a name plate parked 30px above the box. The offset is derived
+   from the same `--esc` rather than guessed, so a bigger boss later moves it
+   further on its own. `top` and not `transform`, because `namefloat` already
+   owns this element's transform. */
+.personaname{position:absolute; left:50%;
+  top:calc(-30px - (var(--esc,1) - 1) * min(52vw,186px) / 2);
+  white-space:nowrap; z-index:4;
   font-size:12px; letter-spacing:.24em; color:var(--c); min-height:1em;
   text-shadow:2px 2px 0 #000, 0 0 16px currentColor;
   animation:namefloat 4.6s steps(55) infinite alternate; pointer-events:none}
@@ -1139,3 +1166,13 @@ body{background:var(--void); color:var(--ink);
    from the side even where the chip is not being looked at */
 .results .rline{box-shadow:var(--bevel), 4px 5px 0 rgba(6,4,14,.85),
   inset 4px 0 0 var(--rc,transparent)}
+
+
+/* =====================================================================
+   LITE — see applyFxLevel() in src/util.js
+   Both of these are animated feTurbulence filters, which cannot be cached:
+   the noise is regenerated every frame for as long as they are on screen.
+   The logo and the first-run dot field both read perfectly well still.
+   ===================================================================== */
+html[data-fx="lite"] .logoimg{filter:none}
+html[data-fx="lite"] .frgrid{filter:none}

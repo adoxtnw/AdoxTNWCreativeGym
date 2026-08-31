@@ -175,6 +175,7 @@ async function clashSequence(playerDied){
 }
 function buildEnemyLine(){
   const e=S.enemy, p=S.player;
+  const debuffFirst = e.aiProfile === "DEBUFF_FIRST";
   clearLine(e); applyOverload(e);
   let ec=e.ec;
   let layers=p.layers.map(l=>l.e), shield=p.shield;
@@ -190,7 +191,22 @@ function buildEnemyLine(){
   const affordable=a=>a.cost<=ec && ((a.charge||0)+1)<=emptySlots(e)
                       && cooldownLeft(e,a.id)===0 && usesLeft(e,a)>0;
   const debuffs=e.pool.filter(a=>a.kind==="DEBUFF" && affordable(a) && !hasStatus(p,a.status_apply));
-  if(debuffs.length && Math.random()<RULES.aiDebuffChance){
+  /* ---- AND HOW MANY OF THEM, which is `ai_profile` ------------------------
+     GREEDY_MAX_DAMAGE takes at most ONE debuff a round and spends the rest of
+     the line on damage. That is right for almost everything, and completely
+     wrong for an enemy whose entire idea is that it does not hurt you — with
+     one brain for everybody, The Damp spent 62% of its slots on the feeblest
+     attack in the game and landed a status a quarter of the time.
+
+     DEBUFF_FIRST takes EVERY debuff it can afford that would actually land,
+     and only then fills what is left. It cannot loop for ever: each one costs
+     charge and a slot, and `affordable` is re-tested every time round. */
+  if(debuffs.length && debuffFirst){
+    /* shuffled, or it works down the pool in sheet order every single round */
+    debuffs.slice().sort(() => Math.random() - 0.5).forEach(d => {
+      if(affordable(d) && placeEntries(e,d)) ec-=d.cost;
+    });
+  }else if(debuffs.length && Math.random()<RULES.aiDebuffChance){
     const d=debuffs[Math.floor(Math.random()*debuffs.length)];
     if(placeEntries(e,d)) ec-=d.cost;
   }
@@ -236,7 +252,11 @@ function buildEnemyLine(){
       best=opts[0]; let bestScore=-Infinity;
       for(const a of opts){
         // value per slot, so a slow heavy hitter is weighed against the quick ones it displaces
-        const score=a.power*matchup(layers[0]||null,a.emotion).dmg/((a.charge||0)+1);
+        let score=a.power*matchup(layers[0]||null,a.emotion).dmg/((a.charge||0)+1);
+        /* An attack that also HANGS something is worth far more than its damage
+           to a unit built around status — and its damage is all this scoring can
+           see, which for a 10-power chip is nearly nothing. */
+        if(debuffFirst && a.status_apply && !hasStatus(p,a.status_apply)) score*=4;
         if(score>bestScore){bestScore=score; best=a;}
       }
     }
