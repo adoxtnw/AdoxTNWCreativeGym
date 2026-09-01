@@ -223,6 +223,40 @@ replaced.
 See also `?fx=` in `../MAP/README.md`: the title logo and the first-run dot field are animated
 feTurbulence filters too, and are dropped at `fx=lite`.
 
+## Every sheet in the workbook
+
+`GDDs + Spreadsheets/battle-system-config.xlsx` is the single source of truth for content.
+Four of these had never been named in any document, which is how a sheet quietly stops
+existing.
+
+| sheet | what it decides | read by |
+|---|---|---|
+| `emotions` | the palette, icons and backdrop tints. The spine both apps share | both |
+| `abilities` | every ability. `kind` picks the behaviour from `Kinds` | battle |
+| `loadouts` | Move Sets — 1 to 4 abilities, an `ec_mod` and one passive | both |
+| `matchups` | attack emotion × layer emotion. **Adding a synergy is adding a row** | battle |
+| `units` | every combatant. Also `tier`, `spawn_lines`, `drops`, `ai_profile`, `role`, `scale` | both |
+| `dialogue` | who an enemy is today. Four states, or it falls silent | battle |
+| `status_effects` | one row per status; its columns are what it *does* | battle |
+| `rules` | 179 global tunables, read by name | both |
+| `sounds` | every effect, synthesised at runtime — there are no sfx files | both |
+| `prompts` | the cue above the attack line, drawn at random each turn | battle |
+| `moments` | the title screen's mood line — *"Barcelona, Sunday, …"* | battle |
+| `stations` | one row per **place**, not per stop | map |
+| `metro_lines` | one row per line, `stations` in running order | map |
+| `travel_elements` | what appears around the train on a ride | map |
+| `objectives` | what can be earned, where, and the **?** that marks it | map |
+| `armor` | Emotional Armor: `ms_mod` and `layer1`..`layer4` | map |
+| `items` | placeholders, so the roll-and-lose machinery has something to roll | map |
+| `world_bands` | day / hour / weather → multipliers on a station's attributes | map |
+| `city_status` | conditions happening to Barcelona, and where they land | map |
+| `layer_types` | **reserved.** Layers are plain emotions today | — |
+| `synergies` | **reserved.** Line-level combos | — |
+| `README` / `checks` | the workbook's own notes, and live validation formulas | — |
+
+`layer_types` and `synergies` are deliberately empty: they hold a shape for a design that is
+not written yet. Everything else is live.
+
 ## Where to look
 
 | You want | Read |

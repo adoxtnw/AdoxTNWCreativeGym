@@ -516,6 +516,67 @@ art uses. It displaces by several screen pixels, and **a one-pixel line simply c
 under it** — at fit zoom the network rendered as dashes. Nothing may be drawn thinner than
 two pixels while that filter is on.
 
+### The lesson was already written down, and it happened again
+
+`.hud` is `pointer-events:none` so the map underneath stays draggable, and **every panel in
+it has to opt back in**. That is recorded two entries above, from the tooltip veil. `.peek`
+and `.dilemma` do it on one shared line. `.baggage` never did — so its close button's
+listener was correct the whole time and the tap went straight through the panel to the map
+behind it. Once opened, the bag could not be closed by any means.
+
+A trap written down is not a trap avoided. What would have caught it is the check, not the
+note: `document.elementFromPoint()` at the control's own centre, which returns the canvas
+when the panel is inert and the button when it is not.
+
+### One property, one owner
+
+Two things writing `cv.style.transform` is two things fighting over it, and the loser is
+whichever ran first. The lean and the shake both want it, so neither sets it: they set
+numbers and `applyCanvasTransform()` composes them. It is the only writer.
+
+The same rule bites harder in CSS, where a **running animation replaces a static declaration
+of the same property rather than composing with it**. A boss's `transform:scale(var(--esc))`
+sat on an element that also ran a bob animation, and the scale simply never applied — for
+three passes, while the variable read back as correct. See *A running animation replaces the
+property* in `../BATTLE SYSTEM/ARCHITECTURE.md`.
+
+### An animated filter cannot be cached
+
+`feTurbulence` is CPU-generated fractal noise. With a **static** `baseFrequency` the browser
+generates it once; with an animated one it is regenerated every frame, over the whole
+filtered element. `#map` is the upscaled canvas, so that was **2,484,720 device pixels of
+noise per repaint** at DPR 2 — and Safari holds a full-size backing store per filtered layer,
+which is how a WebContent process gets killed rather than throwing.
+
+`will-change:filter` was on it too. A filter already promotes the element to its own layer,
+so the hint bought nothing and cost a permanent backing store for the largest element on the
+page.
+
+Neither the swim nor the frosted panels are load-bearing, so `applyFxLevel()` drops both on
+iOS and `?fx=` overrides it. **The switch matters as much as the fix**: it is the difference
+between a crash that can be bisected on the device in one reload and a crash that gets
+argued about.
+
+### A property of the spawn is not a property of the row
+
+"An enemy that locks on" was a second `travel_elements` row with its own `kind`. That made
+it a different **object** from an ordinary enemy, competing for the same slice of the same
+roll — so making ambushes rarer made *enemies* rarer, and the two numbers could never be
+tuned apart. There is one enemy row now and `aggroChance` decides per spawn.
+
+The tell is when two rows differ only in *how the same thing behaves*. Extends *what an
+enemy IS is decided at spawn, not at tap*: the same instinct, one level further out.
+
+### Deriving a value beats storing one, and re-deriving it beats both being wrong
+
+The aggro ring worked its own total back out of the sheet every frame — `lock_secs` — which
+is the cell that is now normally blank, so it would have divided by zero. What the countdown
+*started at* is a fact about this spawn, so `lockTotal` is written once when it is created.
+
+Storing it would have been wrong if the rule changed mid-flight; re-deriving it was wrong
+because the source moved. The question is not "store or derive" but **which fact is this,
+and what owns it.**
+
 ## This is a game, not a page
 
 The same distinction that settles most arguments in `../BATTLE SYSTEM/`:

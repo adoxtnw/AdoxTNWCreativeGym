@@ -1,0 +1,5 @@
+Armor ID,Armor Name,MS Modifier,Layer 1 Type,Layer 2 Type,Passive Effect
+ARM_01,Calloused Scars,+80 MS,Anger,None,
+ARM_02,Apathetic Shell,+120 MS,Disgust,Fear,
+ARM_03,Manic Rose-Tinted Glasses,+60 MS,Joy,Surprise,
+ARM_04,Heavy Shoulders,+150 MS,Sadness,Anger,

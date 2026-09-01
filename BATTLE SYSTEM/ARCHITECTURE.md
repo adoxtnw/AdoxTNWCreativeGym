@@ -121,6 +121,21 @@ that used to need code:
   wildcard rather than adding to it. Leave a line out and it never appears there.
 - **`pool`** — its abilities. Keep it mostly its own emotion, or the emotion means
   nothing.
+- **`ai_profile`** — *how it decides*, as opposed to what it can do.
+  `GREEDY_MAX_DAMAGE` (the default) takes at most one debuff a round and spends the
+  rest of the line on damage; `DEBUFF_FIRST` takes **every** debuff it can afford that
+  would actually land, then fills what is left. The column existed from the start and
+  nothing read it, so every enemy shared one brain — which is fine until an enemy's
+  whole idea is that it fights differently. See *When one enemy needs a different brain*.
+- **`scale`** — how large it is drawn, against an ordinary enemy of its tier. Applied by
+  `transform`, never by layout: the ring canvas is 64px and the rings already breathe to
+  its edge, so scaling the *geometry* pushes it through the buffer wall.
+- **`role`** — marks a unit as something the game treats specially. `LINE_MANAGER` gives
+  it the second wind, the two parting lines and the long sink (`src/boss.js`). Behaviour
+  keyed off a column, so the other five inherit all of it from one cell each.
+- **`bg_bright`**, **`fx`**, **`theme_opening`/`theme_loop`/`theme2_loop`** — what the
+  fight looks and sounds like. Facts about a fight, so they live on the unit rather than
+  in the progression sheet.
 
 If you want it to sound like itself rather than like everything else of its emotion,
 give it personas in `dialogue` carrying its tier, all four states each.
@@ -140,6 +155,11 @@ Note the AI needs teaching too: `buildEnemyLine` scores on damage-per-slot, so a
 DEBUFF scores zero and would never be chosen — it gets its own explicit branch.
 
 ### Adding an ability *kind*
+Registered today: `DAMAGE`, `SHIELD`, `CHARGE`, `HEAL`, `SELFHARM`, `FEED`, `ADDLAYER`,
+`DEBUFF`. Note `HEAL` and `FEED` are **not** the same kind wearing two hats — `FEED` heals
+the *opponent*, because it is the punishment Overload forces into your line. Reusing it for
+a player heal would have been reusing the word rather than the behaviour.
+
 One `Kinds.define()` in `src/kinds.js`. Each kind declares **two** things:
 
 ```js
@@ -524,3 +544,74 @@ internals exceed the budget will overrun, so `flyMs`, `impactFlashMs`,
 - Class names are shared across the whole document; `.over` (game-over overlay)
   once collided with an `over` state class and stretched a tag full-screen.
   Prefer specific names.
+
+## When one enemy needs a different brain
+
+`buildEnemyLine()` scores **damage per slot**. That is right for almost everything and
+completely wrong for an enemy built around status: a debuff projects to zero, so it always
+loses the comparison. The original fix was a single `aiDebuffChance` roll per turn — one
+debuff, then attacks — which is enough to stop `BLIND` rotting in the pool unused, and not
+enough for a unit whose whole idea is that it does not hurt you.
+
+Measured over 200 line builds for The Damp, whose pool is six debuffs and two feeble attacks:
+
+| profile | status-carrying picks |
+|---|---|
+| `GREEDY_MAX_DAMAGE` | 25.9% |
+| `DEBUFF_FIRST` | **86.4%** |
+
+`DEBUFF_FIRST` loops the debuff branch instead of firing it once, and scores a
+status-carrying *attack* at ×4 — its damage is all the scoring can see, and for a 10-power
+chip that is nearly nothing. It cannot loop for ever: each pick costs charge and a slot, and
+affordability is re-tested every time round. It will not repeat a status the target already
+has, so against a saturated player it drops straight back to chipping rather than wasting
+the line.
+
+**The general shape:** when an ability's value is not the thing the scoring function
+measures, the AI will never choose it. Either give the kind a `project()` that expresses its
+worth, or give the unit a profile that knows to want it.
+
+## A running animation replaces the property; it does not compose with it
+
+`transform` is one property. `.sprwrap` carried a static `transform:scale(var(--esc))` for
+the boss size **and** ran the `hover` bob — and the running animation replaced the static
+declaration outright. Computed transform was `matrix(1,0,0,1,0,2.4)`: the bob, at scale 1.
+`--esc` was being set to `1.500` correctly for three passes and had no effect on anything,
+which is exactly why it kept looking like the work had not been done.
+
+The scale now lives inside **both ends** of the keyframes, where the animation cannot
+overwrite it. It stays on `.sprwrap` rather than moving to the canvases inside, because that
+element's `getBoundingClientRect()` positions the speech-bubble tail and sizes the falling
+rings in `enemyCollapse()` — scaling the children would have made the box lie about how big
+the entity is.
+
+**The lesson is the diagnosis, not the fix.** `--esc` was correct, the CSS was correct, the
+screenshot looked plausible. What caught it was reading the *computed* transform and the
+*rendered* pixel size. Same family as *a clip-path clips the children too*: the value was
+right and the property was already spoken for.
+
+## Decoded audio is not the file size
+
+`decodeAudioData` holds a track as Float32 PCM: 44100 × 2 channels × 4 bytes is **337 KB per
+second**. The four tracks in this game are 24 MB of files and **134 MB decoded**.
+
+Decoding buys exactly one thing — scheduling the loop at `t0 + opening.duration` on the audio
+clock, sample-accurately, so the two halves of the original theme meet without a click. **A
+track handed over as one file has no such join**, so `startMusic()` streams it through an
+`<audio loop>` element and 105 MB is never allocated.
+
+Element volume is capped at 0..1, so a streamed track cannot be lifted by `musicVolume` (1.6)
+the way a decoded one is. The streamed tracks are mastered to where the decoded theme *ends
+up* — busy RMS −15.5 dBFS — so the two paths match by construction rather than by a gain
+applied at one end only.
+
+## Expensive effects are gated, not assumed affordable
+
+Two things on the page cost more than everything else put together, and neither is
+load-bearing: an **animated** `feTurbulence` (which cannot be cached — the noise is
+regenerated every frame) and `backdrop-filter: blur()` over a live canvas. `applyFxLevel()`
+in `src/util.js` turns both off on iOS by default; `?fx=full` / `?fx=lite` override and the
+level is logged at boot, so a crash is bisectable on the device rather than arguable. The
+map passes its level into the battle frame, which is its own document and would otherwise
+fall back to its own default.
+

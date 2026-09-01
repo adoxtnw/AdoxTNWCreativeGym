@@ -1,0 +1,5 @@
+Set ID,Set Name,Emotion Type,Crystal Cost,Required Trade-In,EC Modifier,Passive Effect,Move 1,Move 2,Move 3,Move 4
+ANG_01,Set of Anger I,Anger,50 Anger,None,+10 Max EC,,Venting Strike,Spiteful Block,,
+ANG_02,Set of Anger II,Anger,150 Anger,Set of Anger I,+15 Max EC,,Furious Lash,Boiling Blood,Reckless Charge,
+SAD_03,Set of Melancholy III,Sadness,120 Sadness + 40 Fear,Set of Melancholy II,-5 Max EC,,Grief Cleave,Numb,Isolation,Tearful Plea
+JOY_04,Set of Mania IV,Joy,200 Joy + 100 Surprise,Set of Mania III,+30 Max EC,,Delusional Strike,Euphoria Burst,Ignore Pain,Radiate

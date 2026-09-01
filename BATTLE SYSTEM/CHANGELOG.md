@@ -8,6 +8,175 @@ record of how it got that way.
 
 ---
 
+## Pass 45 — Line 4 has its own colour, and an enemy that never hurts you
+
+**L4 is the Joy line and had no Joy on it.** The Reveller was pinned to L2, so the whole
+line was patrolled by the Commuter's `*` fallback. Three rows fix it, and the Reveller now
+rides both — the same reveller either way; only the line around it changes what that means.
+
+| id | name | tier | MS | spawn |
+|---|---|---|---|---|
+| `enemy_joy` | The Celebrant | REGULAR | 245 | `L4:1.2` |
+| `enemy_joy_weak` | The Reveller | WEAK | 150 | `L2:0.6` · **`L4:0.7`** (was `L2:0.15`) |
+| `enemy_joy_strong` | The Euphoric | STRONG | 325 | `L4:0.12` |
+| `enemy_disgust_strong` | The Damp | STRONG | **520** | `L4:0.10` |
+
+Measured over 4,000 draws: `enemy_joy 41.3% · enemy 25.7% · enemy_joy_weak 25.6% ·
+enemy_joy_strong 4.0% · enemy_disgust_strong 3.5%`. L1 unchanged.
+
+### DISGUST could not fight in its own colour
+
+Two rows — an ADDLAYER and one debuff — and **no attack at all**. Four abilities and two
+statuses, built only on the four levers the engine actually reads (`block_regen`,
+`miss_chance`, `self_hits`, `crit_mult`); anything leaning on the columns still marked
+*planned* would have quietly done nothing.
+
+- **Sour Note** (12/14) — a fifth of a Heated Punch, so a Disgust unit has something to do
+  with a slot it cannot afford a debuff for
+- **Spoilage** (18/10) — chips, and holds one broken layer down for a turn
+- **NAUSEOUS** — miss 0.4 **and** self-hits 1. Two live levers in one slot
+- **SPOILED** — 3 layers held down, and `crit_mult -0.045` against a base of 0.05, leaving
+  half a percent. Not quite never, which is worse to play against than never
+
+### `ai_profile`, and the measurement that caught it
+
+The column had existed since the sheet did and **nothing read it**, so every enemy shared
+one brain — which scores damage per slot. The Damp, whose entire idea is that it does not
+hurt you, spent 62% of its line on the feeblest attack in the game.
+
+| profile | status-carrying picks (200 line builds) |
+|---|---|
+| `GREEDY_MAX_DAMAGE` | 25.9% |
+| `DEBUFF_FIRST` | **86.4%** |
+
+Against a player already carrying everything it drops back to chipping (17.3%) rather than
+wasting slots. A real round: the player lost **35 MS**, and **−35 of it was SELF HARM** —
+their own attack turned back on them by Nauseous. The enemy barely touched them.
+
+### Self-Respect — the first heal
+
+`LO_DISGUST` gains it: 45 MS, 35 EC, **one use, three-turn cooldown**. Needed a new `HEAL`
+kind: `FEED` already heals, but it heals the **opponent**, because it is the punishment
+Overload forces into your line. Clamped to MaxMS — not tidiness, since MS is also the
+ceiling EC must stay under, so a heal that overshot would hand out headroom the armor never
+granted. 200→245, 380→**400 not 425**, 400→400, and the projection agrees.
+
+### Also
+
+Fondo and Sant Antoni's guardians: **−20% stamina and one fewer layer** (430→344, 400→320,
+four layers→three). Both dropped the *innermost* — Sant Antoni keeps its JOY layer, the one
+a Surprise-dressed player cannot drink, which is the only thing making that queue a puzzle
+rather than a wall.
+
+**And the boss 1.5× finally worked.** `transform` is one property: `.sprwrap` carried a
+static `transform:scale(var(--esc))` **and** ran the `hover` bob, and a running animation
+replaces the static declaration rather than composing with it. Computed transform was
+`matrix(1,0,0,1,0,2.4)` — the bob, at scale 1. `--esc` had been set to 1.5 correctly for
+three passes and had no effect on anything. It now lives inside both ends of the keyframes.
+**The value was right; the property was already spoken for.**
+
+## Pass 44 — the ride, and two things that were killing the page on iOS
+
+Entities are `rideEnemyScale` (1.35) larger and leave a wake. Two scales kept apart: the
+tier numbers are ratios *between* enemies, this one is the size of the family against the
+crystals and segments sharing the window.
+
+**The wake is not a strict position history.** An entity drifts at less than half the
+track's speed, so five true past positions span about seven pixels — a *halo*, which says
+"this thing is blurry" rather than "this thing is moving". Each ghost is pushed back along
+the direction of travel in proportion to its age. The recorded positions still carry the
+sway; the push gives it length.
+
+### The page was being killed, and it was not throwing
+
+Safari's *"a problem repeatedly occurred"* is a WebContent process being killed, usually for
+memory. Two candidates, both invisible in a profiler until the page is already dead:
+
+- **`#map` carried an animated `feTurbulence`.** An animated turbulence cannot be cached —
+  the fractal noise is regenerated every frame over the whole upscaled canvas. Measured:
+  **2,484,720 device pixels per repaint** at DPR 2, and an iPhone at DPR 3 is half again
+  more. `will-change:filter` was also promoting a permanent full-size backing store for the
+  largest element on the page, for a layer the filter already promoted.
+- **134 MB of decoded PCM** if all four tracks decode — 337 KB per second of audio.
+
+`applyFxLevel()` turns the swim and the backdrop blurs off on iOS by default; `?fx=full` /
+`?fx=lite` override, the level is logged at boot, and the map passes it into the battle
+frame. **A crash that can be bisected on the actual phone in one reload.**
+
+`startMusic()` now streams any track with no opening to seam to, which is 105 MB never
+allocated. Decoding buys exactly one thing — the sample-accurate join between the theme's
+two halves — and a track handed over as one file has no such join.
+
+## Pass 43 — the Baggage panel, and the bug that made it a trap
+
+**It could not be closed. By any means.** `.hud` is `pointer-events:none` so the map stays
+draggable, and every panel has to opt back in; `.peek` and `.dilemma` do, on one shared
+line, and `.baggage` never did. The close listener was correct the whole time — the tap went
+through the panel to the map behind it. Same omission as the tooltip veil, in a place where
+it cost far more.
+
+Crystals are one row of six fixed positions, each running **`gemPixels()` — the same
+function that draws the prism drifting past the train**, into its own canvas. That function
+now takes a `put(dx, dy, colour, alpha)` callback: the ride passes `blendPx`, the chip
+passes a canvas writer. A hand-made icon would have drifted from the real one the first time
+either was touched. Losables became a list; the MS/EC bars stay on above the panel.
+
+Crystals now fly to the BAGGAGE button and it flares in the emotion's colour — in two
+pieces, because `.bagbtn` wears `.pxr` and **a clip-path clips box-shadow and
+pseudo-elements away**, so a glow drawn on the button is never rendered.
+
+## Pass 42 — enemies that lock on, running away, and a warning before the fight
+
+Locking on is a property of the **spawn**, not of the row. It used to be a second
+`travel_elements` row with its own kind, which meant the two were different objects
+competing for one roll — so making one rarer made *enemies* rarer. `aggroChance` (0.25)
+decides per spawn, multiplied by the station's own aggro. Measured: **WEAK 26.6%, REGULAR
+25.5%, STRONG 0%** — `aggroTiers` is a hard gate, because a hard fight you did not choose is
+a punishment.
+
+The countdown ring is two pixels deep and the ⚠ above it is in the enemy's own colour. Both
+paths into a fight go through one door, so `map_screech` and a decaying screen shake happen
+whether the enemy forced it or you did.
+
+**Running away**: hold anywhere on the arena for three seconds and lose five Track Segments.
+Never a button — a control that says *leave* every turn is an interface arguing against its
+own subject. `finish("flee")` is a third ending; the map is told `FLED`, which is not a loss.
+
+The **Guardian's warning** holds for three seconds and then starts on its own. No button,
+because there is no choice. A Line Manager's shakes and says something else.
+
+**Results**: a huge colour-coded title, symbols on dark chips. The double-arrival bug was a
+missing `.drawin` — rows were appended fully visible and then each played its arrival on top
+of itself.
+
+## Pass 41 — progression objectives
+
+One sheet, and no station named anywhere in the code. `requirement` is a closed vocabulary
+rather than a free-text condition, so the fifth objective needs no code the first did not.
+
+| station | requirement | reward |
+|---|---|---|
+| Fondo | `DEFEAT_BOSS` `boss_fondo` | `ARMOR:ARM_FONDO` — four layers of Anger |
+| Sant Antoni | `DEFEAT_BOSS` `boss_sant_antoni` | `SET:LO_RUSH` |
+| Urquinaona | `DEFEAT_BOSS` `boss_line_manager` | `KEY:L4` |
+
+**The Set of Rush**: Drug Hit — a basic that leaves the target Dizzy for a turn — and
+`PAS_RUSH`, which makes a critical worth `rushCritSlots` (3) instead of `critSlots` (1).
+That was a hard-coded `1` in `fx.js` with nowhere for a passive to say otherwise. Drug Hit
+is the first ability that both hits and hangs a status; `Kinds.DAMAGE` reads `status_apply`
+the way `DEBUFF` always has, so it is a data change and not a special case.
+
+**The Line Manager** is `units.role = LINE_MANAGER`, so all six inherit the whole sequence
+from one cell each. She cannot be killed below `bossPhaseAt` — and the gate has to intercept
+the *killing blow*, because "at 20%" cannot mean "when the bar lands on 20%": a heavy hit
+steps from 34% past zero and never passes through it. She also keeps her charge under the
+new ceiling, or the boss who has just declared herself the embodiment of an emotion comes
+back **overloaded**, feeding you and hurting herself.
+
+Rewards are **owned, not worn**. Turning up in new armor because you won a fight undoes
+whatever build the player deliberately chose, at the moment they least expect the game to
+touch it.
+
 ## Pass 40 — five more enemies, and a tier you can see
 
 There was **one** enemy in the game. There are six, and which one you meet depends on
